@@ -1,0 +1,27 @@
+{
+  "cards": [
+    { "name": "杀", "suit": "spade",   "number": 7,  "count": 7 },
+    { "name": "杀", "suit": "spade",   "number": 8,  "count": 3 },
+    { "name": "杀", "suit": "spade",   "number": 9,  "count": 3 },
+    { "name": "杀", "suit": "spade",   "number": 10, "count": 2 },
+    { "name": "杀", "suit": "club",    "number": 2,  "count": 4 },
+    { "name": "杀", "suit": "club",    "number": 3,  "count": 3 },
+    { "name": "杀", "suit": "club",    "number": 4,  "count": 3 },
+    { "name": "杀", "suit": "heart",   "number": 10, "count": 2 },
+    { "name": "杀", "suit": "diamond", "number": 10, "count": 2 },
+    { "name": "杀", "suit": "diamond", "number": 9,  "count": 1 },
+
+    { "name": "闪", "suit": "diamond", "number": 2,  "count": 3 },
+    { "name": "闪", "suit": "diamond", "number": 3,  "count": 3 },
+    { "name": "闪", "suit": "diamond", "number": 4,  "count": 2 },
+    { "name": "闪", "suit": "diamond", "number": 5,  "count": 2 },
+    { "name": "闪", "suit": "diamond", "number": 6,  "count": 2 },
+    { "name": "闪", "suit": "diamond", "number": 7,  "count": 2 },
+
+    { "name": "桃", "suit": "heart",   "number": 2,  "count": 3 },
+    { "name": "桃", "suit": "heart",   "number": 3,  "count": 2 },
+    { "name": "桃", "suit": "heart",   "number": 4,  "count": 2 },
+    { "name": "桃", "suit": "heart",   "number": 5,  "count": 2 },
+    { "name": "桃", "suit": "heart",   "number": 6,  "count": 1 }
+  ]
+}

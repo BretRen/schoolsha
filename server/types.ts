@@ -19,7 +19,7 @@ export interface Player {
   alive: boolean;
 }
 
-export type PendingType = "dodge" | "near_death";
+export type PendingType = "dodge" | "near_death" | "duel";
 
 export interface PendingResponse {
   type: PendingType;

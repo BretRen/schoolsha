@@ -20,7 +20,7 @@ export interface Player {
   characterId: string | null;
 }
 
-export type PendingType = "dodge" | "near_death" | "duel";
+export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife";
 
 export interface PendingResponse {
   type: PendingType;
@@ -46,6 +46,8 @@ export interface GameState {
   disconnectCount: [number, number];
   /** 每名玩家的断线起始时间（null = 在线） */
   disconnectedAt: [number | null, number | null];
+  /** 酒/辣条效果：本回合下一张杀伤害+1 */
+  wineUsed: boolean;
 }
 
 // ---------- JSON 配置类型 ----------

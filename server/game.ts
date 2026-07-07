@@ -68,6 +68,7 @@ export function createGame(): GameState {
     turnStartTime: Date.now(),
     disconnectCount: [0, 0],
     disconnectedAt: [null, null],
+    wineUsed: false,
   };
 
   if (picks[0]) mountPassiveSkills(state, 0, picks[0]);
@@ -159,6 +160,7 @@ function enterPhase(state: GameState, phase: Phase) {
       emit({ type: "turn_end", player: state.turnPlayer }, state);
       state.turnPlayer = 1 - state.turnPlayer;
       state.attackUsed = false;
+      state.wineUsed = false;
       state.phase = "judge";
       resetSkillCounts();
       state.turnStartTime = Date.now();

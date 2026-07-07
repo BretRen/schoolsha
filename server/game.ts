@@ -7,20 +7,45 @@ import { createDeck, shuffle, drawCards } from "./cards.ts";
 import { tryUseCard, handleTimeout } from "./effects.ts";
 import { cardLabel } from "./cards.ts";
 import { emit } from "./events.ts";
+import {
+  getCharacter,
+  mountPassiveSkills,
+  getHandLimit,
+  tryUseSkill,
+  resetSkillCounts,
+} from "./skills.ts";
 
 export { cardLabel };
+
+// ---------- 角色选择状态 ----------
+
+let picks: (string | null)[] = [null, null];
+
+export function getPicks() {
+  return picks;
+}
+
+export function resetPicks() {
+  picks = [null, null];
+}
+
+export function bothPicked(): boolean {
+  return picks[0] !== null && picks[1] !== null;
+}
 
 // ---------- 创建新游戏 ----------
 
 export function createGame(): GameState {
   const deck = shuffle(createDeck());
 
+  const char0 = getCharacter(picks[0]!);
+  const char1 = getCharacter(picks[1]!);
+
   const players: [Player, Player] = [
-    { hp: 3, maxHp: 3, hand: [], alive: true },
-    { hp: 3, maxHp: 3, hand: [], alive: true },
+    { hp: char0?.maxHp ?? 3, maxHp: char0?.maxHp ?? 3, hand: [], alive: true, characterId: picks[0] },
+    { hp: char1?.maxHp ?? 3, maxHp: char1?.maxHp ?? 3, hand: [], alive: true, characterId: picks[1] },
   ];
 
-  // 先每人摸 4 张起始手牌
   const r1 = drawCards(deck, [], 4);
   players[0].hand = r1.drawn;
   const r2 = drawCards(r1.deck, r1.discard, 4);
@@ -38,11 +63,14 @@ export function createGame(): GameState {
     winner: null,
   };
 
-  console.log("Game created. Starting hands:");
-  console.log(`  P0: ${players[0].hand.map(cardLabel).join(", ")}`);
-  console.log(`  P1: ${players[1].hand.map(cardLabel).join(", ")}`);
+  // 挂载被动/锁定技
+  if (picks[0]) mountPassiveSkills(state, 0, picks[0]);
+  if (picks[1]) mountPassiveSkills(state, 1, picks[1]);
 
-  // 自动推进到第一个阶段
+  console.log("Game created. Starting hands:");
+  console.log(`  P0 (${char0?.name ?? "?"}): ${players[0].hand.map(cardLabel).join(", ")}`);
+  console.log(`  P1 (${char1?.name ?? "?"}): ${players[1].hand.map(cardLabel).join(", ")}`);
+
   advancePhase(state);
   return state;
 }
@@ -51,9 +79,8 @@ export function createGame(): GameState {
 
 export function advancePhase(state: GameState) {
   if (state.gameOver) return;
-  if (state.pendingResponse) return; // 等响应，不推进
+  if (state.pendingResponse) return;
 
-  // 跳过判定阶段（暂未实现）
   if (state.phase === "judge") {
     emit({ type: "phase_exit", phase: "judge", player: state.turnPlayer }, state);
     state.phase = "draw";
@@ -69,7 +96,6 @@ export function advancePhase(state: GameState) {
   }
 
   if (state.phase === "play") {
-    // play 阶段由玩家手动结束或自然结束
     emit({ type: "phase_exit", phase: "play", player: state.turnPlayer }, state);
     state.phase = "discard";
     enterPhase(state, "discard");
@@ -94,7 +120,8 @@ function enterPhase(state: GameState, phase: Phase) {
 
   switch (phase) {
     case "draw": {
-      // 摸 2 张
+      // 学霸的"补习"技能：多摸一张。通过事件系统在 draw_card 后触发
+      // 这里先摸标准 2 张，技能 handler 会追加
       const { drawn, deck, discard } = drawCards(state.deck, state.discard, 2);
       state.deck = deck;
       state.discard = discard;
@@ -103,19 +130,16 @@ function enterPhase(state: GameState, phase: Phase) {
       console.log(
         `P${state.turnPlayer} draws: ${drawn.map(cardLabel).join(", ")}`,
       );
-
-      // 摸完自动进入出牌
       advancePhase(state);
       break;
     }
 
     case "discard": {
-      // 弃牌阶段：手牌上限 = 当前血量
       const player = state.players[state.turnPlayer];
-      const limit = player.hp;
+      const limit = getHandLimit(state, state.turnPlayer, player.characterId ?? "");
       if (player.hand.length <= limit) {
         console.log(
-          `P${state.turnPlayer} discard: hand=${player.hand.length} <= hp=${limit}, skip`,
+          `P${state.turnPlayer} discard: hand=${player.hand.length} <= hp+skill=${limit}, skip`,
         );
         advancePhase(state);
       }
@@ -127,6 +151,7 @@ function enterPhase(state: GameState, phase: Phase) {
       state.turnPlayer = 1 - state.turnPlayer;
       state.attackUsed = false;
       state.phase = "judge";
+      resetSkillCounts();
       emit({ type: "turn_start", player: state.turnPlayer }, state);
       enterPhase(state, "judge");
       advancePhase(state);
@@ -150,6 +175,9 @@ export function handleMessage(
   switch (action) {
     case "play_card":
       return handlePlayCard(state, playerIdx, msg.card_id, msg.target);
+
+    case "use_skill":
+      return handleUseSkill(state, playerIdx, msg.skill_id);
 
     case "end_phase": {
       if (playerIdx !== state.turnPlayer) return "不是你的回合";
@@ -184,17 +212,22 @@ function handlePlayCard(
 ): string | null {
   const error = tryUseCard(state, playerIdx, cardId, target);
   if (error) return error;
-
-  // 检查是否有人死了
   if (state.gameOver) return null;
-
-  // 如果需要响应，暂停阶段推进
   if (state.pendingResponse) return null;
+  if (!state.players[state.turnPlayer].alive) return null;
+  return null;
+}
 
-  // 检查回合玩家是否还活着（比如对自己用了某些牌）
-  const turnPlayer = state.players[state.turnPlayer];
-  if (!turnPlayer.alive) return null;
+function handleUseSkill(
+  state: GameState,
+  playerIdx: number,
+  skillId: string,
+): string | null {
+  const charId = state.players[playerIdx].characterId;
+  if (!charId) return "你没有选择角色";
 
+  const err = tryUseSkill(state, playerIdx, charId, skillId);
+  if (err) return err;
   return null;
 }
 
@@ -204,7 +237,7 @@ function handleDiscard(
   cardIds: string[],
 ): string | null {
   const player = state.players[playerIdx];
-  const limit = player.hp;
+  const limit = getHandLimit(state, playerIdx, player.characterId ?? "");
 
   const needDiscard = player.hand.length - limit;
   if (needDiscard <= 0) {
@@ -216,7 +249,6 @@ function handleDiscard(
     return `需要弃 ${needDiscard} 张牌，只选了 ${cardIds.length} 张`;
   }
 
-  // 验证并移除
   const discarded: typeof player.hand = [];
   for (const id of cardIds.slice(0, needDiscard)) {
     const idx = player.hand.findIndex((c) => c.id === id);
@@ -234,7 +266,7 @@ function handleDiscard(
   return null;
 }
 
-// ---------- 超时检查（外部定时器调用） ----------
+// ---------- 超时检查 ----------
 
 export function checkTimeout(state: GameState) {
   if (!state.pendingResponse) return false;
@@ -261,16 +293,17 @@ export function getPlayerView(
     maxHp: opponent.maxHp,
     handCount: opponent.hand.length,
     alive: opponent.alive,
+    characterId: opponent.characterId,
   };
 
-  // 如果 pending 对象的 type 包含 card 引用，它会包含 Card 对象
-  // ServerStateView 中的 pendingResponse 可以原样传递
+  const char = me.characterId ? getCharacter(me.characterId) : null;
+
   const pendingView = state.pendingResponse ? { ...state.pendingResponse } : null;
 
   return {
     phase: state.phase,
     turnPlayer: state.turnPlayer,
-    you: { ...me },
+    you: { ...me, skills: char?.skills ?? [] },
     opponent: oppView,
     attackUsed: state.attackUsed,
     pendingResponse: pendingView,

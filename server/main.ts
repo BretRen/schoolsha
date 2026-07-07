@@ -2,14 +2,15 @@
 // main.ts — WebSocket 服务器入口
 // ============================================================
 
-import { createGame, handleMessage, getPlayerView, checkTimeout, cardLabel } from "./game.ts";
-import type { GameState, ServerMsg, ClientMsg } from "./types.ts";
+import { createGame, handleMessage, getPlayerView, checkTimeout, cardLabel, resetPicks, bothPicked, getPicks } from "./game.ts";
+import { getAllCharacters } from "./skills.ts";
+import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts";
 
 // ---------- 简易匹配 ----------
 
 interface Client {
   socket: WebSocket;
-  index: number; // 0 or 1
+  index: number;
 }
 
 let game: GameState | null = null;
@@ -54,6 +55,15 @@ const PORT = parseInt(Deno.env.get("PORT") || "8099");
 
 Deno.serve({ port: PORT }, (req) => {
   if (req.headers.get("upgrade") !== "websocket") {
+    // HTTP 端点
+    const url = new URL(req.url);
+    if (url.pathname === "/info") {
+      return new Response(JSON.stringify({
+        version: "0.2.0",
+        auth: { mode: "none" },
+        ws: `ws://localhost:${PORT}`,
+      }), { headers: { "content-type": "application/json" } });
+    }
     return new Response("Sanguosha server — WebSocket only", { status: 426 });
   }
 
@@ -62,7 +72,6 @@ Deno.serve({ port: PORT }, (req) => {
   socket.addEventListener("open", () => {
     console.log("Client connected");
 
-    // 分配座位
     let seat: number;
     if (!clients[0]) {
       seat = 0;
@@ -77,26 +86,25 @@ Deno.serve({ port: PORT }, (req) => {
     const client: Client = { socket, index: seat };
     clients[seat] = client;
 
-    // 人齐了 → 开局
+    // 人齐 → 发送角色选择
     if (clients[0] && clients[1]) {
-      game = createGame();
-      startTimeoutCheck();
-      broadcast();
-      console.log("Game started!");
+      resetPicks();
+      const chars: CharacterInfo[] = getAllCharacters().map((c) => ({
+        id: c.id,
+        name: c.name,
+        maxHp: c.maxHp,
+        skills: c.skills,
+      }));
+      for (const c of clients) {
+        if (c) send(c.socket, { type: "character_select", characters: chars });
+      }
+      console.log("Lobby full, character select sent");
     } else {
-      send(socket, {
-        type: "error",
-        message: "等待另一位玩家...",
-      } as ServerMsg);
+      send(socket, { type: "waiting", message: "等待另一位玩家..." });
     }
   });
 
   socket.addEventListener("message", (event) => {
-    if (!game) {
-      error(socket, "游戏尚未开始");
-      return;
-    }
-
     let msg: ClientMsg;
     try {
       msg = JSON.parse(event.data) as ClientMsg;
@@ -105,11 +113,31 @@ Deno.serve({ port: PORT }, (req) => {
       return;
     }
 
-    // 找到发送方
     const clientEntry = clients.find((c) => c?.socket === socket);
     if (!clientEntry) return;
     const playerIdx = clientEntry.index;
 
+    // ---- 角色选择阶段 ----
+    if (!game && msg.action === "pick_character") {
+      const picks = getPicks();
+      picks[playerIdx] = msg.id;
+      console.log(`P${playerIdx} picked: ${msg.id}`);
+
+      if (bothPicked()) {
+        console.log("Both players picked, starting game...");
+        game = createGame();
+        startTimeoutCheck();
+        broadcast();
+      }
+      return;
+    }
+
+    if (!game) {
+      error(socket, "游戏尚未开始（请先选择角色）");
+      return;
+    }
+
+    // ---- 游戏中 ----
     const err = handleMessage(game, playerIdx, msg);
     if (err) {
       console.log(`P${playerIdx} error: ${err}`);

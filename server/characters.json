@@ -1,0 +1,28 @@
+{
+  "characters": [
+    {
+      "id": "normal",
+      "name": "普通学生",
+      "maxHp": 3,
+      "skills": []
+    },
+    {
+      "id": "monitor",
+      "name": "班长",
+      "maxHp": 3,
+      "skills": ["authority"]
+    },
+    {
+      "id": "athlete",
+      "name": "体育生",
+      "maxHp": 4,
+      "skills": ["tough"]
+    },
+    {
+      "id": "nerd",
+      "name": "学霸",
+      "maxHp": 3,
+      "skills": ["cram"]
+    }
+  ]
+}

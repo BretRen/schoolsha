@@ -4,12 +4,14 @@
 
 export type Suit = "spade" | "heart" | "club" | "diamond";
 export type Phase = "judge" | "draw" | "play" | "discard" | "end";
+export type CardType = "basic" | "trick" | "weapon" | "armor";
 
 export interface Card {
   id: string;
   name: string;
   suit: Suit;
   number: number;
+  type: CardType;
 }
 
 export interface Player {
@@ -18,6 +20,8 @@ export interface Player {
   hand: Card[];
   alive: boolean;
   characterId: string | null;
+  weapon: Card | null;
+  armor: Card | null;
 }
 
 export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife";
@@ -46,7 +50,7 @@ export interface GameState {
   disconnectCount: [number, number];
   /** 每名玩家的断线起始时间（null = 在线） */
   disconnectedAt: [number | null, number | null];
-  /** 酒/辣条效果：本回合下一张杀伤害+1 */
+  /** 酒/辣条效果：本回合下一张作业伤害+1 */
   wineUsed: boolean;
 }
 
@@ -57,6 +61,7 @@ export interface CardSpec {
   suit: Suit;
   number: number;
   count: number;
+  type: CardType;
 }
 
 export interface CardsConfig {
@@ -88,21 +93,25 @@ export interface PlayerView {
   handCount: number;
   alive: boolean;
   characterId: string | null;
+  weapon: Card | null;
+  armor: Card | null;
 }
 
 export interface ServerStateView {
   phase: Phase;
   turnPlayer: number;
-  you: { hp: number; maxHp: number; hand: Card[]; alive: boolean; characterId: string | null; skills: string[] };
+  you: {
+    hp: number; maxHp: number; hand: Card[]; alive: boolean;
+    characterId: string | null; skills: string[];
+    weapon: Card | null; armor: Card | null;
+  };
   opponent: PlayerView;
   attackUsed: boolean;
   pendingResponse: PendingResponse | null;
   gameOver: boolean;
   winner: number | null;
   deckCount: number;
-  /** 回合剩余秒数（用于前端倒计时显示） */
   turnTimeLeft: number;
-  /** 对手是否断线中 */
   opponentDisconnected: boolean;
 }
 

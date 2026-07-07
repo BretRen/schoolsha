@@ -2,7 +2,7 @@
 // cards.ts — 卡牌定义与操作
 // ============================================================
 
-import type { Card, Suit, CardsConfig } from "./types.ts";
+import type { Card, Suit, CardType, CardsConfig } from "./types.ts";
 import cardsConfig from "./cards.json" with { type: "json" };
 
 // 中文显示
@@ -33,6 +33,7 @@ export function createDeck(): Card[] {
         name: spec.name,
         suit: spec.suit as Suit,
         number: spec.number,
+        type: spec.type as CardType,
       });
     }
   }

@@ -46,8 +46,8 @@ export function createGame(): GameState {
   const char1 = getCharacter(picks[1]!);
 
   const players: [Player, Player] = [
-    { hp: char0?.maxHp ?? 3, maxHp: char0?.maxHp ?? 3, hand: [], alive: true, characterId: picks[0] },
-    { hp: char1?.maxHp ?? 3, maxHp: char1?.maxHp ?? 3, hand: [], alive: true, characterId: picks[1] },
+    { hp: char0?.maxHp ?? 3, maxHp: char0?.maxHp ?? 3, hand: [], alive: true, characterId: picks[0], weapon: null, armor: null },
+    { hp: char1?.maxHp ?? 3, maxHp: char1?.maxHp ?? 3, hand: [], alive: true, characterId: picks[1], weapon: null, armor: null },
   ];
 
   const r1 = drawCards(deck, [], 4);
@@ -365,6 +365,8 @@ export function getPlayerView(
     handCount: opponent.hand.length,
     alive: opponent.alive,
     characterId: opponent.characterId,
+    weapon: opponent.weapon,
+    armor: opponent.armor,
   };
 
   const char = me.characterId ? getCharacter(me.characterId) : null;

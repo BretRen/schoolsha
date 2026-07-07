@@ -1,8 +1,8 @@
 // ============================================================
-// effects.ts — 卡牌效果（可复用原语 + 全卡牌注册表）
+// effects.ts — 卡牌效果 + 装备系统
 // ============================================================
 
-import type { GameState, Card, PendingType } from "./types.ts";
+import type { GameState, Card, CardType, PendingType } from "./types.ts";
 import { hasCard, removeCard, drawCards } from "./cards.ts";
 import { emit } from "./events.ts";
 
@@ -39,6 +39,9 @@ const playPhase: Condition = (s) => s.phase === "play";
 const noPending: Condition = (s) => !s.pendingResponse;
 const noAttack: Condition = (s) => !s.attackUsed;
 const hpBelowMax: Condition = (s, p) => s.players[p].hp < s.players[p].maxHp;
+/** AI武器：无视attackUsed限制 */
+const canAttack: Condition = (s, p) =>
+  !s.attackUsed || s.players[p].weapon?.name === "AI";
 
 function all(...conds: Condition[]): Condition {
   return (s, p) => conds.every((c) => c(s, p));
@@ -59,6 +62,14 @@ function pendingIs(pendingType: PendingType): Condition {
 // ============================================================
 
 function dealDamage(s: GameState, source: number, target: number, amount: number) {
+  // 大衣：陷害/点名 伤害+1
+  if (s.players[target].armor?.name === "大衣") {
+    const pending = s.pendingResponse;
+    // 仅在陷害/点名等"火属性"伤害时 +1（简化：非作业来源的伤害）
+    if (!pending || (pending.type !== "dodge" && pending.type !== "barbarian")) {
+      amount++;
+    }
+  }
   s.players[target].hp -= amount;
   emit({ type: "damage", source, target, amount }, s);
 }
@@ -90,36 +101,115 @@ function setNearDeathPending(s: GameState, source: number) {
 }
 
 function stealRandomCard(s: GameState, from: number, to: number): boolean {
-  const hand = s.players[from].hand;
-  if (hand.length === 0) return false;
-  const idx = Math.floor(Math.random() * hand.length);
-  const card = hand.splice(idx, 1)[0];
+  const target = s.players[from];
+  // 手牌 + 装备 全都可以偷
+  const pool: { card: Card; source: "hand" | "weapon" | "armor" }[] = [];
+  for (const c of target.hand) pool.push({ card: c, source: "hand" });
+  if (target.weapon) pool.push({ card: target.weapon, source: "weapon" });
+  if (target.armor) pool.push({ card: target.armor, source: "armor" });
+  if (pool.length === 0) return false;
+
+  const idx = Math.floor(Math.random() * pool.length);
+  const { card, source } = pool[idx];
+
+  if (source === "hand") {
+    removeCard(target.hand, card.id);
+  } else if (source === "weapon") {
+    target.weapon = null;
+  } else {
+    target.armor = null;
+  }
+
   s.players[to].hand.push(card);
   emit({ type: "card_played", player: to, card }, s);
   return true;
 }
 
-function discardRandomCard(s: GameState, player: number): boolean {
-  const hand = s.players[player].hand;
-  if (hand.length === 0) return false;
-  const idx = Math.floor(Math.random() * hand.length);
-  const card = hand.splice(idx, 1)[0];
+function discardFromPool(s: GameState, player: number): boolean {
+  const target = s.players[player];
+  const pool: { card: Card; source: "hand" | "weapon" | "armor" }[] = [];
+  for (const c of target.hand) pool.push({ card: c, source: "hand" });
+  if (target.weapon) pool.push({ card: target.weapon, source: "weapon" });
+  if (target.armor) pool.push({ card: target.armor, source: "armor" });
+  if (pool.length === 0) return false;
+
+  const idx = Math.floor(Math.random() * pool.length);
+  const { card, source } = pool[idx];
+
+  if (source === "hand") {
+    removeCard(target.hand, card.id);
+  } else if (source === "weapon") {
+    target.weapon = null;
+  } else {
+    target.armor = null;
+  }
+
   s.discard.push(card);
   emit({ type: "card_discarded", player, cards: [card] }, s);
   return true;
 }
 
+/** 装备一张牌 */
+function equipCard(s: GameState, playerIdx: number, card: Card): string | null {
+  const player = s.players[playerIdx];
+  if (card.type === "weapon") {
+    if (player.weapon) s.discard.push(player.weapon);
+    player.weapon = card;
+  } else if (card.type === "armor") {
+    if (player.armor) s.discard.push(player.armor);
+    player.armor = card;
+  } else {
+    return "不是装备牌";
+  }
+  emit({ type: "card_played", player: playerIdx, card }, s);
+  return null;
+}
+
 // ============================================================
-// 卡牌效果注册 — 全部使用学校主题名称
+// 卡牌效果注册
 // ============================================================
 
-// 基本牌
+// --- 基本牌 ---
 
 registerCardEffect("作业", {
-  canUse: all(playPhase, isTurn, noPending, noAttack),
+  canUse: all(playPhase, isTurn, noPending, canAttack),
   needsTarget: true,
   targetFilter: (_s, source, target) => source !== target,
   onUse: (s, playerIdx, card) => {
+    const opponent = s.players[1 - playerIdx];
+
+    // 电脑：黑作业(spade/club)无效
+    if (opponent.armor?.name === "电脑" && (card.suit === "spade" || card.suit === "club")) {
+      emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+      return;
+    }
+
+    // 大衣：作业无效
+    if (opponent.armor?.name === "大衣") {
+      emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+      return;
+    }
+
+    // 抽奖：判定 — 抽一张牌，红色=自动闪避
+    if (opponent.armor?.name === "抽奖") {
+      if (s.deck.length === 0 && s.discard.length === 0) {
+        // 无牌可判定，作业正常生效
+      } else {
+        const { drawn, deck, discard } = drawCards(s.deck, s.discard, 1);
+        s.deck = deck;
+        s.discard = discard;
+        if (drawn.length > 0) {
+          const judge = drawn[0];
+          s.discard.push(judge);
+          if (judge.suit === "heart" || judge.suit === "diamond") {
+            // 红色=自动闪避，作业无效
+            emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+            return;
+          }
+        }
+      }
+    }
+
     s.attackUsed = true;
     setDodgePending(s, playerIdx, card);
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
@@ -149,37 +239,89 @@ registerCardEffect("辣条", {
   ),
   needsTarget: false,
   onUse: (s, playerIdx, card) => {
-    // 濒死用：回血（同放假）
     if (s.pendingResponse?.type === "near_death") {
       s.players[playerIdx].hp = 1;
       emit({ type: "heal", player: playerIdx, amount: 1 }, s);
       s.pendingResponse = null;
     } else {
-      // 出牌阶段用：下一张作业伤害+1
       s.wineUsed = true;
     }
     emit({ type: "card_played", player: playerIdx, card }, s);
   },
 });
 
-// 锦囊牌 — 即时
+// --- 锦囊牌 — 需要响应 ---
 
 registerCardEffect("拼作业", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
+    // 大衣：免疫
+    if (s.players[opponent].armor?.name === "大衣") {
+      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+      return;
+    }
     s.pendingResponse = {
-      type: "duel",
-      source: playerIdx,
-      target: opponent,
-      card,
+      type: "duel", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
     };
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("duel"),
 });
+
+registerCardEffect("作业检查", {
+  canUse: all(playPhase, isTurn, noPending),
+  needsTarget: true,
+  onUse: (s, playerIdx, card) => {
+    const opponent = 1 - playerIdx;
+    if (s.players[opponent].armor?.name === "大衣") {
+      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+      return;
+    }
+    s.pendingResponse = {
+      type: "barbarian", source: playerIdx, target: opponent, card,
+      timeout: Date.now() + 15_000,
+    };
+    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+  },
+  canRespond: pendingIs("barbarian"),
+});
+
+registerCardEffect("最终测试", {
+  canUse: all(playPhase, isTurn, noPending),
+  needsTarget: true,
+  onUse: (s, playerIdx, card) => {
+    const opponent = 1 - playerIdx;
+    if (s.players[opponent].armor?.name === "大衣") {
+      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+      return;
+    }
+    s.pendingResponse = {
+      type: "volley", source: playerIdx, target: opponent, card,
+      timeout: Date.now() + 15_000,
+    };
+    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+  },
+  canRespond: pendingIs("volley"),
+});
+
+registerCardEffect("嫁祸", {
+  canUse: all(playPhase, isTurn, noPending),
+  needsTarget: true,
+  onUse: (s, playerIdx, card) => {
+    const opponent = 1 - playerIdx;
+    s.pendingResponse = {
+      type: "borrow_knife", source: playerIdx, target: opponent, card,
+      timeout: Date.now() + 15_000,
+    };
+    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+  },
+  canRespond: pendingIs("borrow_knife"),
+});
+
+// --- 锦囊牌 — 即刻 ---
 
 registerCardEffect("神偷", {
   canUse: all(playPhase, isTurn, noPending),
@@ -194,84 +336,8 @@ registerCardEffect("打小报告", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    discardRandomCard(s, 1 - playerIdx);
+    discardFromPool(s, 1 - playerIdx);
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-  },
-});
-
-// 锦囊牌 — 需要对手响应
-
-registerCardEffect("作业检查", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    s.pendingResponse = {
-      type: "barbarian",
-      source: playerIdx,
-      target: opponent,
-      card,
-      timeout: Date.now() + 15_000,
-    };
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-  },
-  canRespond: pendingIs("barbarian"),
-});
-
-registerCardEffect("最终测试", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    s.pendingResponse = {
-      type: "volley",
-      source: playerIdx,
-      target: opponent,
-      card,
-      timeout: Date.now() + 15_000,
-    };
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-  },
-  canRespond: pendingIs("volley"),
-});
-
-registerCardEffect("嫁祸", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    s.pendingResponse = {
-      type: "borrow_knife",
-      source: playerIdx,
-      target: opponent,
-      card,
-      timeout: Date.now() + 15_000,
-    };
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-  },
-  // 对手可以弃牌或扣血——弃牌通过 discard 响应（简化：任何牌都行，视为"给武器"）
-  canRespond: pendingIs("borrow_knife"),
-});
-
-// 锦囊牌 — 即刻生效
-
-registerCardEffect("团队项目", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    dealDamage(s, playerIdx, opponent, 2);
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-  },
-});
-
-registerCardEffect("点名", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    dealDamage(s, playerIdx, opponent, 1);
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
 });
 
@@ -279,9 +345,26 @@ registerCardEffect("陷害", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    dealDamage(s, playerIdx, opponent, 3);
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+    dealDamage(s, playerIdx, 1 - playerIdx, 3);
+    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+  },
+});
+
+registerCardEffect("团队项目", {
+  canUse: all(playPhase, isTurn, noPending),
+  needsTarget: true,
+  onUse: (s, playerIdx, card) => {
+    dealDamage(s, playerIdx, 1 - playerIdx, 2);
+    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+  },
+});
+
+registerCardEffect("点名", {
+  canUse: all(playPhase, isTurn, noPending),
+  needsTarget: true,
+  onUse: (s, playerIdx, card) => {
+    dealDamage(s, playerIdx, 1 - playerIdx, 1);
+    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });
 
@@ -289,7 +372,7 @@ registerCardEffect("午饭留堂", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    discardRandomCard(s, 1 - playerIdx);
+    discardFromPool(s, 1 - playerIdx);
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });
@@ -298,7 +381,6 @@ registerCardEffect("午饭", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: false,
   onUse: (s, playerIdx, card) => {
-    // 揭示4张牌，回合玩家摸2张
     const { drawn, deck, discard } = drawCards(s.deck, s.discard, 2);
     s.deck = deck;
     s.discard = discard;
@@ -312,9 +394,8 @@ registerCardEffect("感冒", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    dealDamage(s, playerIdx, opponent, 1);
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+    dealDamage(s, playerIdx, 1 - playerIdx, 1);
+    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });
 
@@ -322,82 +403,55 @@ registerCardEffect("免罚券", {
   canUse: () => false,
   needsTarget: false,
   onUse: () => {},
-  // 可以响应任何锦囊 pending（非 dodge/near_death/duel 的 pending）
   canRespond: (s, p) => {
     const pn = s.pendingResponse;
     if (!pn || pn.target !== p) return false;
-    // 锦囊 pending 类型列表
-    return ["barbarian", "volley", "borrow_knife"].includes(pn.type);
+    return ["barbarian", "volley", "borrow_knife", "duel"].includes(pn.type);
   },
 });
 
-// 装备牌 — 暂作为普通伤害牌，装备系统后续实现
+// --- 装备牌 ---
+
 registerCardEffect("钢笔", {
   canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    dealDamage(s, playerIdx, 1 - playerIdx, 1);
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-  },
+  needsTarget: false,
+  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
 });
 
 registerCardEffect("AI", {
   canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    // AI（诸葛连弩）简化：打出后本回合可以多出一张作业
-    s.attackUsed = false;
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-  },
+  needsTarget: false,
+  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
 });
 
 registerCardEffect("尺子", {
   canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    dealDamage(s, playerIdx, 1 - playerIdx, 1);
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-  },
+  needsTarget: false,
+  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
 });
 
 registerCardEffect("三角尺", {
   canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    dealDamage(s, playerIdx, 1 - playerIdx, 1);
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-  },
+  needsTarget: false,
+  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
 });
 
 registerCardEffect("电脑", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: false,
-  onUse: (s, playerIdx, card) => {
-    healTo(s, playerIdx, 1);
-    emit({ type: "card_played", player: playerIdx, card }, s);
-  },
+  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
 });
 
 registerCardEffect("大衣", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: false,
-  onUse: (s, playerIdx, card) => {
-    healTo(s, playerIdx, 1);
-    emit({ type: "card_played", player: playerIdx, card }, s);
-  },
+  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
 });
 
 registerCardEffect("抽奖", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: false,
-  onUse: (s, playerIdx, card) => {
-    const { drawn, deck, discard } = drawCards(s.deck, s.discard, 1);
-    s.deck = deck;
-    s.discard = discard;
-    s.players[playerIdx].hand.push(...drawn);
-    emit({ type: "draw_card", player: playerIdx, cards: drawn }, s);
-    emit({ type: "card_played", player: playerIdx, card }, s);
-  },
+  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
 });
 
 // ============================================================
@@ -436,9 +490,16 @@ export function tryUseCard(
     finalTarget = 1 - playerIdx;
   }
 
-  removeCard(player.hand, cardId);
-  state.discard.push(card);
-  effect.onUse(state, playerIdx, card, finalTarget);
+  // 装备牌不走弃牌堆
+  if (card.type === "weapon" || card.type === "armor") {
+    removeCard(player.hand, cardId);
+    const err = equipCard(state, playerIdx, card);
+    if (err) return err;
+  } else {
+    removeCard(player.hand, cardId);
+    state.discard.push(card);
+    effect.onUse(state, playerIdx, card, finalTarget);
+  }
 
   return null;
 }
@@ -456,12 +517,21 @@ export function tryRespond(
   if (!hasCard(player.hand, cardId)) return "你没有这张牌";
   const card = player.hand.find((c) => c.id === cardId)!;
 
-  // 赦免 → dodge
-  if (pending.type === "dodge" && card.name === "赦免") {
+  // 赦免 → dodge / volley
+  if (card.name === "赦免" && (pending.type === "dodge" || pending.type === "volley")) {
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
     emit({ type: "card_played", player: playerIdx, card }, state);
+
+    // 尺子：出赦免后攻击者可以再出一张作业
+    if (pending.type === "dodge" && state.players[pending.source].weapon?.name === "尺子") {
+      state.attackUsed = false;
+    }
+    // 三角尺：出赦免后仍受到1点伤害
+    if (pending.type === "dodge" && state.players[pending.source].weapon?.name === "三角尺") {
+      dealDamage(state, pending.source, playerIdx, 1);
+    }
     return null;
   }
 
@@ -485,11 +555,8 @@ export function tryRespond(
     if (pending.type === "duel") {
       const [source, target] = [pending.source, pending.target];
       state.pendingResponse = {
-        type: "duel",
-        source: target,
-        target: source,
-        card: pending.card,
-        timeout: Date.now() + 15_000,
+        type: "duel", source: target, target: source,
+        card: pending.card, timeout: Date.now() + 15_000,
       };
     } else {
       state.pendingResponse = null;
@@ -497,16 +564,7 @@ export function tryRespond(
     return null;
   }
 
-  // 赦免 → volley
-  if (pending.type === "volley" && card.name === "赦免") {
-    removeCard(player.hand, cardId);
-    state.discard.push(card);
-    state.pendingResponse = null;
-    emit({ type: "card_played", player: playerIdx, card }, state);
-    return null;
-  }
-
-  // 任意牌 → borrow_knife（弃牌视为"给武器"）
+  // 任意牌 → borrow_knife
   if (pending.type === "borrow_knife") {
     removeCard(player.hand, cardId);
     state.discard.push(card);
@@ -515,8 +573,8 @@ export function tryRespond(
     return null;
   }
 
-  // 免罚券 → 抵消锦囊 pending
-  if (card.name === "免罚券" && ["barbarian", "volley", "borrow_knife"].includes(pending.type)) {
+  // 免罚券 → 取消任何锦囊 pending
+  if (card.name === "免罚券" && ["barbarian", "volley", "borrow_knife", "duel"].includes(pending.type)) {
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
@@ -524,7 +582,6 @@ export function tryRespond(
     return null;
   }
 
-  // 错误提示
   if (pending.type === "dodge") return "需要出【赦免】";
   if (pending.type === "near_death") return "需要出【放假】或【辣条】";
   if (pending.type === "duel" || pending.type === "barbarian") return "需要出【作业】";
@@ -540,8 +597,10 @@ export function handleTimeout(state: GameState) {
 
   if (pending.type === "dodge") {
     const target = pending.target;
-    const dmg = state.wineUsed ? 2 : 1;
-    state.wineUsed = false;
+    let dmg = 1;
+    if (state.wineUsed) { dmg++; state.wineUsed = false; }
+    // 钢笔：伤害+1
+    if (state.players[pending.source].weapon?.name === "钢笔") dmg++;
     dealDamage(state, pending.source, target, dmg);
     state.pendingResponse = null;
 
@@ -562,40 +621,9 @@ export function handleTimeout(state: GameState) {
     return;
   }
 
-  if (pending.type === "duel") {
-    const target = pending.target;
-    dealDamage(state, pending.source, target, 1);
-    state.pendingResponse = null;
-
-    if (state.players[target].hp <= 0) {
-      setNearDeathPending(state, pending.source);
-    }
-    return;
-  }
-
-  if (pending.type === "barbarian") {
-    const target = pending.target;
-    dealDamage(state, pending.source, target, 1);
-    state.pendingResponse = null;
-
-    if (state.players[target].hp <= 0) {
-      setNearDeathPending(state, pending.source);
-    }
-    return;
-  }
-
-  if (pending.type === "volley") {
-    const target = pending.target;
-    dealDamage(state, pending.source, target, 1);
-    state.pendingResponse = null;
-
-    if (state.players[target].hp <= 0) {
-      setNearDeathPending(state, pending.source);
-    }
-    return;
-  }
-
-  if (pending.type === "borrow_knife") {
+  // duel / barbarian / volley / borrow_knife 超时
+  const plainTypes = ["duel", "barbarian", "volley", "borrow_knife"] as string[];
+  if (plainTypes.includes(pending.type)) {
     const target = pending.target;
     dealDamage(state, pending.source, target, 1);
     state.pendingResponse = null;

@@ -17,6 +17,10 @@ import {
 
 export { cardLabel };
 
+// ---------- 常量 ----------
+
+const TURN_TIMEOUT_SEC = 60;
+
 // ---------- 角色选择状态 ----------
 
 let picks: (string | null)[] = [null, null];
@@ -61,9 +65,11 @@ export function createGame(): GameState {
     pendingResponse: null,
     gameOver: false,
     winner: null,
+    turnStartTime: Date.now(),
+    disconnectCount: [0, 0],
+    disconnectedAt: [null, null],
   };
 
-  // 挂载被动/锁定技
   if (picks[0]) mountPassiveSkills(state, 0, picks[0]);
   if (picks[1]) mountPassiveSkills(state, 1, picks[1]);
 
@@ -120,8 +126,6 @@ function enterPhase(state: GameState, phase: Phase) {
 
   switch (phase) {
     case "draw": {
-      // 学霸的"补习"技能：多摸一张。通过事件系统在 draw_card 后触发
-      // 这里先摸标准 2 张，技能 handler 会追加
       const { drawn, deck, discard } = drawCards(state.deck, state.discard, 2);
       state.deck = deck;
       state.discard = discard;
@@ -131,6 +135,11 @@ function enterPhase(state: GameState, phase: Phase) {
         `P${state.turnPlayer} draws: ${drawn.map(cardLabel).join(", ")}`,
       );
       advancePhase(state);
+      break;
+    }
+
+    case "play": {
+      state.turnStartTime = Date.now();
       break;
     }
 
@@ -152,6 +161,7 @@ function enterPhase(state: GameState, phase: Phase) {
       state.attackUsed = false;
       state.phase = "judge";
       resetSkillCounts();
+      state.turnStartTime = Date.now();
       emit({ type: "turn_start", player: state.turnPlayer }, state);
       enterPhase(state, "judge");
       advancePhase(state);
@@ -268,15 +278,74 @@ function handleDiscard(
 
 // ---------- 超时检查 ----------
 
-export function checkTimeout(state: GameState) {
-  if (!state.pendingResponse) return false;
+const TURN_TIMEOUT_MS = TURN_TIMEOUT_SEC * 1000;
 
-  if (Date.now() >= state.pendingResponse.timeout) {
+export function checkTimeout(state: GameState): boolean {
+  let changed = false;
+
+  // Pending 超时
+  if (state.pendingResponse && Date.now() >= state.pendingResponse.timeout) {
     console.log(`P${state.pendingResponse.target} timeout on ${state.pendingResponse.type}`);
     handleTimeout(state);
+    changed = true;
+  }
+
+  // 回合超时（仅在 play 阶段）
+  if (
+    !state.gameOver &&
+    state.phase === "play" &&
+    !state.pendingResponse &&
+    Date.now() - state.turnStartTime > TURN_TIMEOUT_MS
+  ) {
+    console.log(`P${state.turnPlayer} turn timeout (${TURN_TIMEOUT_SEC}s)`);
+    advancePhase(state);
+    changed = true;
+  }
+
+  return changed;
+}
+
+// ---------- 断线管理 ----------
+
+const MAX_DISCONNECTS = 3;
+
+/** 标记玩家断线。返回是否应立即判负（超过次数限制） */
+export function markDisconnected(state: GameState, playerIdx: number): boolean {
+  state.disconnectedAt[playerIdx] = Date.now();
+  state.disconnectCount[playerIdx]++;
+  console.log(`P${playerIdx} disconnected (${state.disconnectCount[playerIdx]}/${MAX_DISCONNECTS})`);
+
+  if (state.disconnectCount[playerIdx] > MAX_DISCONNECTS) {
+    console.log(`P${playerIdx} exceeded disconnect limit, opponent wins`);
+    state.gameOver = true;
+    state.winner = 1 - playerIdx;
     return true;
   }
   return false;
+}
+
+/** 玩家重连 */
+export function markReconnected(state: GameState, playerIdx: number) {
+  state.disconnectedAt[playerIdx] = null;
+  console.log(`P${playerIdx} reconnected`);
+}
+
+/** 检查断线是否超时（30秒）。返回是否已判负 */
+export function checkDisconnectTimeout(state: GameState, playerIdx: number): boolean {
+  const at = state.disconnectedAt[playerIdx];
+  if (at === null) return false;
+  if (Date.now() - at > 30_000) {
+    console.log(`P${playerIdx} disconnect timeout (30s), opponent wins`);
+    state.gameOver = true;
+    state.winner = 1 - playerIdx;
+    return true;
+  }
+  return false;
+}
+
+/** 是否有人断线中 */
+export function anyoneDisconnected(state: GameState): boolean {
+  return state.disconnectedAt[0] !== null || state.disconnectedAt[1] !== null;
 }
 
 // ---------- 生成客户端视图 ----------
@@ -300,6 +369,11 @@ export function getPlayerView(
 
   const pendingView = state.pendingResponse ? { ...state.pendingResponse } : null;
 
+  // 回合剩余时间
+  const turnTimeLeft = state.phase === "play" && !state.pendingResponse
+    ? Math.max(0, TURN_TIMEOUT_SEC - Math.floor((Date.now() - state.turnStartTime) / 1000))
+    : TURN_TIMEOUT_SEC;
+
   return {
     phase: state.phase,
     turnPlayer: state.turnPlayer,
@@ -310,5 +384,7 @@ export function getPlayerView(
     gameOver: state.gameOver,
     winner: state.winner,
     deckCount: state.deck.length,
+    turnTimeLeft,
+    opponentDisconnected: state.disconnectedAt[1 - playerIdx] !== null,
   };
 }

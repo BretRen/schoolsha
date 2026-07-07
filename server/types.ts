@@ -40,6 +40,12 @@ export interface GameState {
   pendingResponse: PendingResponse | null;
   gameOver: boolean;
   winner: number | null;
+  /** 当前回合开始时间（用于回合超时检测） */
+  turnStartTime: number;
+  /** 每名玩家的断线次数（最多3次） */
+  disconnectCount: [number, number];
+  /** 每名玩家的断线起始时间（null = 在线） */
+  disconnectedAt: [number | null, number | null];
 }
 
 // ---------- JSON 配置类型 ----------
@@ -64,7 +70,8 @@ export type ClientMsg =
   | { action: "use_skill"; skill_id: string; target?: number }
   | { action: "end_phase" }
   | { action: "discard"; card_ids: string[] }
-  | { action: "pass" };
+  | { action: "pass" }
+  | { action: "reconnect"; seat: number };
 
 export interface CharacterInfo {
   id: string;
@@ -91,10 +98,16 @@ export interface ServerStateView {
   gameOver: boolean;
   winner: number | null;
   deckCount: number;
+  /** 回合剩余秒数（用于前端倒计时显示） */
+  turnTimeLeft: number;
+  /** 对手是否断线中 */
+  opponentDisconnected: boolean;
 }
 
 export type ServerMsg =
-  | { type: "character_select"; characters: CharacterInfo[] }
+  | { type: "character_select"; characters: CharacterInfo[]; timeoutSec: number }
   | { type: "game_state"; state: ServerStateView; yourIndex: number }
   | { type: "waiting"; message: string }
+  | { type: "disconnected"; message: string; attemptsLeft: number }
+  | { type: "reconnected"; message: string }
   | { type: "error"; message: string };

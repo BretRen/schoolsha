@@ -94,7 +94,7 @@ function render() {
   console.clear();
   if (!state) {
     console.log(
-      C.t("\n  ⏳ 三国杀 CLI\n") + C.dim(`  ${WS_URL} — 等待对手...\n`),
+      C.t("\n  学校杀 CLI\n") + C.dim(`  ${WS_URL} — 等待对手...\n`),
     );
     return;
   }
@@ -141,10 +141,20 @@ function render() {
   );
 
   if (state.pendingResponse) {
-    if (state.pendingResponse.target === myIndex) {
-      console.log(C.danger("\n  ⚠ 对方出了杀！请出【闪】"));
-    } else if (state.pendingResponse.source === myIndex) {
-      console.log(C.dim("\n  ⌛ 等待对手出闪..."));
+    if (state.pendingResponse?.type === "dodge") {
+      if (state.pendingResponse.target === myIndex) {
+        console.log(C.danger("\n  ⚠ 对方出了杀！请出【闪】"));
+      } else if (state.pendingResponse.source === myIndex) {
+        console.log(C.dim("\n  ⌛ 等待对手出闪..."));
+      }
+    }
+
+    if (state.pendingResponse?.type === "duel") {
+      if (state.pendingResponse.target === myIndex) {
+        console.log(C.danger("\n  ⚔ 决斗！出【杀】或放弃"));
+      } else {
+        console.log(C.dim("\n  ⚔ 决斗中，等待对手出杀..."));
+      }
     }
   }
 

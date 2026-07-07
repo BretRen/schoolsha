@@ -2,6 +2,7 @@
 // main.ts — WebSocket 服务器入口
 // ============================================================
 
+import { handleDeath } from "./effects.ts";
 import {
   checkTimeout,
   createGame,
@@ -59,6 +60,26 @@ function startTimeoutCheck() {
 const PORT = parseInt(Deno.env.get("PORT") || "8099");
 
 Deno.serve({ port: PORT }, (req) => {
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  if (path == "/info") {
+    return Response.json({
+      version: "0.1.0",
+      server: "schoolsha",
+      auth: {
+        required: true,
+        mode: "oauth_pkce",
+        issuer: "https://auth.pdnode.com",
+      },
+      ws: `ws://${req.headers.get("host")}/ws`, // 让客户端知道去哪连 WebSocket
+      game: {
+        mode: "1v1",
+        max_players: 2,
+      },
+    });
+  }
+
   if (req.headers.get("upgrade") !== "websocket") {
     return new Response("SchoolSha server — WebSocket only", { status: 426 });
   }
@@ -130,6 +151,11 @@ Deno.serve({ port: PORT }, (req) => {
     const idx = clients.findIndex((c) => c?.socket === socket);
     if (idx !== -1) {
       console.log(`Player ${idx} left the game`);
+      if (game && !game.gameOver) {
+        handleDeath(game, idx);
+        broadcast();
+      }
+
       clients[idx] = null;
     }
   });
@@ -137,4 +163,4 @@ Deno.serve({ port: PORT }, (req) => {
   return response;
 });
 
-console.log(`🔪 Sanguosha server running on ws://0.0.0.0:${PORT}`);
+console.log(`Stoller SchoolSha server running on ws://0.0.0.0:${PORT}`);

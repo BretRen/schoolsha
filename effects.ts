@@ -90,7 +90,6 @@ export const cardEffects: Record<CardName, CardEffect> = {
     canUse: (state, playerIdx) =>
       state.phase === "play" &&
       playerIdx === state.turnPlayer &&
-      !state.attackUsed &&
       state.pendingResponse === null,
     needsTarget: true,
     targetFilter: (_state, source, target) => source !== target,
@@ -257,26 +256,22 @@ export function handleTimeout(state: GameState) {
         timeout: Date.now() + 15_000,
       };
     }
+    return;
   }
 
   if (pending.type === "near_death") {
-    const target = pending.target;
-    state.players[target].alive = false;
-    state.players[target].hp = 0;
-    emit({ type: "player_death", player: target }, state);
-    state.pendingResponse = null;
-    state.gameOver = true;
-    state.winner = 1 - target;
+    handleDeath(state, pending.target);
     return;
   }
 
   state.pendingResponse = null;
 }
 
-// function handleDeath(state: GameState, playerIdx: number) {
-//   state.players[playerIdx].alive = false;
-//   emit({ type: "player_death", player: playerIdx }, state);
-
-//   state.gameOver = true;
-//   state.winner = 1 - playerIdx;
-// }
+export function handleDeath(state: GameState, playerIdx: number) {
+  state.players[playerIdx].alive = false;
+  state.players[playerIdx].hp = 0;
+  emit({ type: "player_death", player: playerIdx }, state);
+  state.pendingResponse = null;
+  state.gameOver = true;
+  state.winner = 1 - playerIdx;
+}

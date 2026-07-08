@@ -22,38 +22,61 @@ export interface AuthUser {
 }
 
 /**
- * 验证 JWT access_token（或 id_token）
- * 返回用户信息，失败返回 null
+ * 验证 token。先尝试 JWT 本地验证，失败则用 Zitadel introspection 端点。
+ * Zitadel 的 User Agent 应用默认发 opaque token，不能本地验证。
  */
 export async function validateToken(token: string): Promise<AuthUser | null> {
-  const doVerify = async (aud?: string) => {
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer,
-      ...(aud ? { audience: aud } : {}),
-    });
-    return {
-      sub: payload.sub as string,
-      displayName: (payload.nickname || payload.name || payload.preferred_username || payload.sub) as string,
-      name: payload.name as string | undefined,
-      email: payload.email as string | undefined,
-      preferredUsername: payload.preferred_username as string | undefined,
-    };
-  };
-
-  if (!clientId) {
-    console.warn("[auth] ZITADEL_CLIENT_ID not set — skipping audience check");
+  // ---- 策略 1: JWT 本地验证（token 包含两段 "." 即为 JWT）----
+  if (token.split(".").length === 3) {
     try {
-      return await doVerify();
+      const { payload } = await jwtVerify(token, jwks, { issuer });
+      // 校验 azp
+      if (clientId && payload.azp !== clientId) {
+        console.error(`[auth] JWT azp mismatch: expected ${clientId}, got ${payload.azp}`);
+        return null;
+      }
+      console.log(`[auth] JWT validated (sub=${payload.sub})`);
+      return {
+        sub: payload.sub as string,
+        displayName: (payload.nickname || payload.name || payload.preferred_username || payload.sub) as string,
+      };
     } catch (e) {
-      console.error("[auth] token validation failed:", (e as Error).message);
-      return null;
+      console.warn(`[auth] JWT verify failed (will try introspection): ${(e as Error).message}`);
+      // 继续走 introspection
     }
   }
 
+  // ---- 策略 2: Opaque token → introspection 端点 ----
   try {
-    return await doVerify(clientId);
+    const body = new URLSearchParams({ token });
+    if (clientId) body.set("client_id", clientId);
+
+    const res = await fetch(`${issuer}/oauth/v2/introspect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+
+    if (!res.ok) {
+      console.error(`[auth] introspection failed: HTTP ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    if (!data.active) {
+      console.error(`[auth] introspection: token inactive`);
+      return null;
+    }
+
+    console.log(`[auth] opaque token validated (sub=${data.sub})`);
+    return {
+      sub: data.sub as string,
+      displayName: (data.username || data.sub) as string,
+      name: data.name as string | undefined,
+      email: data.email as string | undefined,
+    };
   } catch (e) {
-    console.error("[auth] token validation failed:", (e as Error).message);
+    console.error(`[auth] introspection error: ${(e as Error).message}`);
     return null;
   }
 }
@@ -93,17 +116,26 @@ export function extractToken(req: Request): string | null {
   // 1. Authorization header（首选）
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {
-    return auth.slice(7);
+    const t = auth.slice(7);
+    console.log(`[auth] token from Authorization header: ${t.slice(0, 20)}... (len=${t.length})`);
+    return t;
   }
 
   // 2. Sec-WebSocket-Protocol（浏览器 WS 构造函数的第二个参数）
   const proto = req.headers.get("sec-websocket-protocol");
-  if (proto) return proto;
+  if (proto) {
+    console.log(`[auth] token from Sec-WebSocket-Protocol: ${proto.slice(0, 20)}... (len=${proto.length})`);
+    return proto;
+  }
 
   // 3. URL query param（后备，用于不支持自定义 WS 头的客户端如 Godot）
   const url = new URL(req.url);
   const queryToken = url.searchParams.get("token");
-  if (queryToken) return queryToken;
+  if (queryToken) {
+    console.log(`[auth] token from URL query: ${queryToken.slice(0, 20)}... (len=${queryToken.length})`);
+    return queryToken;
+  }
 
+  console.log(`[auth] no token found in request. URL: ${req.url}`);
   return null;
 }

@@ -21,16 +21,19 @@ async function startLogin() {
   const verifierBytes = new Uint8Array(32);
   crypto.getRandomValues(verifierBytes);
   const verifier = base64url(verifierBytes);
-  const challenge = base64url(new Uint8Array(await sha256(verifier)));
 
   sessionStorage.setItem("pkce_verifier", verifier);
+
+  // PKCE S256
+  const challenge = base64url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
+  const method = "S256";
 
   const params = new URLSearchParams({
     client_id: AUTH.clientId,
     redirect_uri: location.origin + "/",
     response_type: "code",
     code_challenge: challenge,
-    code_challenge_method: "S256",
+    code_challenge_method: method,
     scope: "openid profile email",
   });
   location.href = `${AUTH.provider}/oauth/v2/authorize?${params}`;
@@ -177,7 +180,17 @@ function connect(wsUrl) {
   };
 
   ST.ws.onerror = () => {
-    text("menu-status", "连接失败");
+    if (AUTH.enabled && AUTH.token) {
+      text("menu-status", "令牌失效，请重新登录");
+      AUTH.token = null;
+      sessionStorage.removeItem("auth_token");
+      startLogin();
+    } else if (AUTH.enabled && !AUTH.token) {
+      text("menu-status", "请先登录");
+      startLogin();
+    } else {
+      text("menu-status", "连接失败，请检查网络");
+    }
   };
 }
 

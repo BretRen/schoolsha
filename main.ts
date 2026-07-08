@@ -177,40 +177,27 @@ Deno.serve({ port: PORT }, async (req) => {
     return new Response("Sanguosha server — WebSocket only", { status: 426 });
   }
 
-  // ---- 认证：在升级前验证 token ----
+  // ---- 认证：提取 token（在升级后验证，让 JS 能收到错误消息）----
   let userId = "";
   let displayName = "";
+  let authError: string | null = null;
 
   if (AUTH_ENABLED) {
     const token = extractToken(req);
     if (!token) {
-      return new Response(JSON.stringify({
-        error: "unauthorized",
-        message: "缺少认证 token",
-        hint: "请在 WebSocket 连接时传 Authorization: Bearer <token>",
-        alternatives: [
-          "Sec-WebSocket-Protocol: <token>（浏览器：new WebSocket(url, [token])）",
-          "?token=<token> URL 参数",
-        ],
-      }), { status: 401, headers: { "content-type": "application/json" } });
+      authError = "缺少认证 token，请先登录";
+    } else {
+      const user = await validateToken(token);
+      if (!user) {
+        authError = "token 无效或已过期，请重新登录";
+      } else {
+        userId = user.sub;
+        displayName = user.displayName;
+        const info = await fetchUserInfo(token);
+        if (info) displayName = info.name;
+        console.log(`[auth] user=${displayName} (${userId})`);
+      }
     }
-
-    const user = await validateToken(token);
-    if (!user) {
-      return new Response(JSON.stringify({
-        error: "invalid_token",
-        message: "token 无效或已过期",
-      }), { status: 401, headers: { "content-type": "application/json" } });
-    }
-
-    userId = user.sub;
-    displayName = user.displayName;
-
-    // 尝试从 userinfo 拉取更准确的显示名
-    const info = await fetchUserInfo(token);
-    if (info) displayName = info.name;
-
-    console.log(`[auth] user=${displayName} (${userId})`);
   } else {
     userId = `anon_${Date.now()}`;
     displayName = "";
@@ -225,6 +212,7 @@ Deno.serve({ port: PORT }, async (req) => {
     const { socket, response } = Deno.upgradeWebSocket(req);
 
     socket.addEventListener("open", () => {
+      if (authError) { send(socket, { type: "error", message: authError }); socket.close(); return; }
       matchmaking.join(userId, displayName, socket);
       console.log(`[matchmaking] ${displayName || userId} connected (elo=${getElo(userId)})`);
     });
@@ -243,6 +231,7 @@ Deno.serve({ port: PORT }, async (req) => {
   let seat = -1;
 
   socket.addEventListener("open", () => {
+    if (authError) { send(socket, { type: "error", message: authError }); socket.close(); return; }
     room.touch();
     const nameTag = displayName || "?";
 

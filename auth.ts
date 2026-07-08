@@ -46,32 +46,22 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
     }
   }
 
-  // ---- 策略 2: Opaque token → introspection 端点 ----
+  // ---- 策略 2: Opaque token → userinfo 端点验证 ----
   try {
-    const body = new URLSearchParams({ token });
-    if (clientId) body.set("client_id", clientId);
-
-    const res = await fetch(`${issuer}/oauth/v2/introspect`, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
+    const res = await fetch(`${issuer}/oidc/v1/userinfo`, {
+      headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!res.ok) {
-      console.error(`[auth] introspection failed: HTTP ${res.status}`);
+      console.error(`[auth] userinfo returned ${res.status}: token invalid`);
       return null;
     }
 
     const data = await res.json();
-    if (!data.active) {
-      console.error(`[auth] introspection: token inactive`);
-      return null;
-    }
-
-    console.log(`[auth] opaque token validated (sub=${data.sub})`);
+    console.log(`[auth] opaque token validated via userinfo (sub=${data.sub})`);
     return {
       sub: data.sub as string,
-      displayName: (data.username || data.sub) as string,
+      displayName: (data.nickname || data.name || data.preferred_username || data.sub) as string,
       name: data.name as string | undefined,
       email: data.email as string | undefined,
     };

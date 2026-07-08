@@ -1,5 +1,5 @@
 // ============================================================
-// main.ts — WebSocket 服务器入口
+// main.ts — WebSocket 服务器入口 (Zitadel OIDC 认证)
 // ============================================================
 
 import {
@@ -9,6 +9,7 @@ import {
   anyoneDisconnected,
 } from "./game.ts";
 import { getAllCharacters } from "./skills.ts";
+import { validateToken, extractToken, type AuthUser } from "./auth.ts";
 import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts";
 
 // ---------- 常量 ----------
@@ -22,6 +23,7 @@ const MAX_DISCONNECTS = 3;
 interface Client {
   socket: WebSocket;
   index: number;
+  user: AuthUser;
 }
 
 let game: GameState | null = null;
@@ -106,33 +108,70 @@ function startSelectTimer() {
 // ---------- 启动 ----------
 
 const PORT = parseInt(Deno.env.get("PORT") || "8099");
+const AUTH_ENABLED = !!Deno.env.get("ZITADEL_CLIENT_ID");
 
-Deno.serve({ port: PORT }, (req) => {
+Deno.serve({ port: PORT }, async (req) => {
+  // ---- HTTP 端点 ----
   if (req.headers.get("upgrade") !== "websocket") {
     const url = new URL(req.url);
     if (url.pathname === "/info") {
       return new Response(JSON.stringify({
-        version: "0.3.0",
-        auth: { mode: "none" },
-        ws: `ws://localhost:${PORT}`,
+        version: "0.4.0",
+        auth: {
+          mode: AUTH_ENABLED ? "zitadel_oidc" : "none",
+          provider: AUTH_ENABLED ? Deno.env.get("ZITADEL_ISSUER") : null,
+          pkce: AUTH_ENABLED ? true : false,
+        },
+        ws: `ws://localhost:${PORT}/ws`,
       }), { headers: { "content-type": "application/json" } });
     }
     return new Response("Sanguosha server — WebSocket only", { status: 426 });
   }
 
+  // ---- 认证：在升级前验证 token ----
+  let user: AuthUser | null = null;
+
+  if (AUTH_ENABLED) {
+    const token = extractToken(req);
+    if (!token) {
+      return new Response(JSON.stringify({
+        error: "unauthorized",
+        message: "缺少认证 token。请通过 ?token=<jwt> 或 Authorization header 提供。",
+        hint: "客户端需要先完成 PKCE 流程获取 access_token",
+      }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    user = await validateToken(token);
+    if (!user) {
+      return new Response(JSON.stringify({
+        error: "invalid_token",
+        message: "token 无效或已过期",
+      }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    console.log(`[auth] user=${user.preferredUsername || user.name || user.sub} connected`);
+  }
+
+  // ---- WebSocket 升级 ----
   const { socket, response } = Deno.upgradeWebSocket(req);
 
   socket.addEventListener("open", () => {
-    console.log("Client connected");
+    console.log(`Client connected${user ? ` (${user.preferredUsername || user.sub})` : ""}`);
 
     let seat: number;
 
-    // ---- 断线重连：检查是否有空座位在等待重连 ----
+    // ---- 断线重连 ----
     if (game && !game.gameOver && anyoneDisconnected(game)) {
       for (let i = 0; i < 2; i++) {
         if (game.disconnectedAt[i] !== null && !clients[i]) {
           seat = i;
-          clients[seat] = { socket, index: seat };
+          clients[seat] = { socket, index: seat, user: user! };
           markReconnected(game, seat);
           send(socket, { type: "reconnected", message: "已重新连接" });
           broadcast();
@@ -153,11 +192,10 @@ Deno.serve({ port: PORT }, (req) => {
       return;
     }
 
-    const client: Client = { socket, index: seat };
+    const client: Client = { socket, index: seat, user: user! };
     clients[seat] = client;
 
     if (clients[0] && clients[1]) {
-      // 如果还有旧游戏状态（上一局结束了），清掉
       if (game?.gameOver) {
         game = null;
         if (timeoutInterval) { clearInterval(timeoutInterval); timeoutInterval = null; }
@@ -177,7 +215,8 @@ Deno.serve({ port: PORT }, (req) => {
         });
       }
       startSelectTimer();
-      console.log("Lobby full, character select sent");
+      const names = clients.map(c => c?.user?.preferredUsername || c?.user?.name || "?").join(" vs ");
+      console.log(`Lobby full (${names}), character select sent`);
     } else {
       send(socket, { type: "waiting", message: "等待另一位玩家..." });
     }
@@ -200,7 +239,7 @@ Deno.serve({ port: PORT }, (req) => {
     if (!game && msg.action === "pick_character") {
       const picks = getPicks();
       picks[playerIdx] = msg.id;
-      console.log(`P${playerIdx} picked: ${msg.id}`);
+      console.log(`P${playerIdx} (${clientEntry.user?.preferredUsername || "?"}) picked: ${msg.id}`);
 
       if (bothPicked()) {
         if (selectTimer) clearTimeout(selectTimer);
@@ -228,16 +267,15 @@ Deno.serve({ port: PORT }, (req) => {
   });
 
   socket.addEventListener("close", () => {
-    console.log("Client disconnected");
     const idx = clients.findIndex((c) => c?.socket === socket);
     if (idx === -1) return;
 
-    console.log(`Player ${idx} left`);
+    const name = clients[idx]?.user?.preferredUsername || clients[idx]?.user?.name || "?";
+    console.log(`Player ${idx} (${name}) left`);
 
     // 游戏进行中 → 断线处理
     if (game && !game.gameOver) {
       const overLimit = markDisconnected(game, idx);
-      // 通知对方
       const opponent = clients[1 - idx];
       if (opponent) {
         const left = MAX_DISCONNECTS - game.disconnectCount[idx];
@@ -258,4 +296,7 @@ Deno.serve({ port: PORT }, (req) => {
   return response;
 });
 
-console.log(`🔪 Sanguosha server running on ws://0.0.0.0:${PORT}`);
+const authStatus = AUTH_ENABLED
+  ? `auth=zitadel (${Deno.env.get("ZITADEL_ISSUER")})`
+  : "auth=none";
+console.log(`🔪 Sanguosha v0.4.0 running on ws://0.0.0.0:${PORT} (${authStatus})`);

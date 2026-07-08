@@ -1,13 +1,2 @@
-# Deno
-deno.lock
-
-# IDE
-.vscode/
-.idea/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Env
 .env
+*.log

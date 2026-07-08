@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>学校杀</title>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+
+<!-- ====== 菜单 ====== -->
+<div id="screen-menu" class="screen">
+  <div class="menu-card">
+    <h1>🏫 学校杀</h1>
+    <p class="subtitle">1v1 卡牌对战</p>
+    <div class="menu-buttons">
+      <button class="btn-primary" onclick="createRoom()">创建房间</button>
+      <div class="join-row">
+        <input id="join-code" type="text" maxlength="6" placeholder="房间码" class="code-input" autocomplete="off">
+        <button class="btn-secondary" onclick="joinRoom()">加入</button>
+      </div>
+      <button class="btn-secondary" onclick="quickMatch()">⚡ 快速匹配</button>
+      <button class="btn-secondary" onclick="showLeaderboard()">🏆 排行榜</button>
+    </div>
+    <p id="menu-status" class="status-text"></p>
+  </div>
+</div>
+
+<!-- ====== 等待 / 房间 ====== -->
+<div id="screen-lobby" class="screen hidden">
+  <div class="lobby-card">
+    <h2>等待对手</h2>
+    <div id="lobby-code" class="big-code"></div>
+    <p id="lobby-invite" class="invite-hint"></p>
+    <div class="spinner"></div>
+    <p id="lobby-status" class="status-text">等待另一位玩家...</p>
+    <button class="btn-secondary" onclick="leaveLobby()">取消</button>
+  </div>
+  <div id="lobby-opponent" class="hidden">
+    <div class="spinner"></div>
+    <p>对手已加入，正在准备...</p>
+  </div>
+</div>
+
+<!-- ====== 选角 ====== -->
+<div id="screen-char" class="screen hidden">
+  <h2>选择你的角色</h2>
+  <div id="char-timer" class="timer"></div>
+  <div id="char-list" class="char-grid"></div>
+  <p id="char-status" class="status-text"></p>
+</div>
+
+<!-- ====== 游戏 ====== -->
+<div id="screen-game" class="screen hidden">
+  <!-- 对手 -->
+  <div class="opponent-area">
+    <div class="player-info">
+      <span class="player-name" id="opp-name">对手</span>
+      <span class="player-hp" id="opp-hp">♥♥♥</span>
+      <span class="player-hand-count" id="opp-cards">手牌: 4</span>
+    </div>
+    <div class="equip-row" id="opp-equip"></div>
+    <div id="opp-disconnected" class="disconnected-badge hidden">已断线</div>
+  </div>
+
+  <!-- 游戏区 -->
+  <div class="game-area">
+    <div class="game-header">
+      <span id="phase-label" class="phase-badge">出牌阶段</span>
+      <span id="turn-timer" class="timer">60s</span>
+      <span id="deck-count" class="deck-info">牌堆: 72</span>
+    </div>
+    <div id="pending-msg" class="pending-banner hidden"></div>
+    <div id="game-log" class="game-log"></div>
+  </div>
+
+  <!-- 自己 -->
+  <div class="player-area">
+    <div class="player-info">
+      <span class="player-name" id="my-name">你</span>
+      <span class="player-hp" id="my-hp">♥♥♥</span>
+    </div>
+    <div class="equip-row" id="my-equip"></div>
+    <div id="my-hand" class="hand-area"></div>
+    <div class="action-bar" id="action-bar"></div>
+  </div>
+</div>
+
+<!-- ====== 排行榜 ====== -->
+<div id="screen-leaderboard" class="screen hidden">
+  <div class="lb-card">
+    <h2>🏆 排行榜</h2>
+    <div id="lb-table" class="lb-table"></div>
+    <div id="lb-you" class="lb-you hidden"></div>
+    <button class="btn-secondary" onclick="backToMenu()">返回</button>
+  </div>
+</div>
+
+<!-- ====== 游戏结束弹窗 ====== -->
+<div id="game-over-overlay" class="overlay hidden">
+  <div class="overlay-card">
+    <h2 id="go-title"></h2>
+    <p id="go-subtitle"></p>
+    <button class="btn-primary" onclick="backToMenu()">返回菜单</button>
+  </div>
+</div>
+
+<script src="/web/app.js"></script>
+</body>
+</html>

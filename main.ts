@@ -37,6 +37,17 @@ function deepLink(code: string): string {
   return `pdnode://schoolsha/invite/${code}`;
 }
 
+function serveStatic(filePath: string, mime: string): Response {
+  try {
+    const content = Deno.readFileSync(filePath);
+    return new Response(content, {
+      headers: { "content-type": `${mime}; charset=utf-8` },
+    });
+  } catch {
+    return new Response("Not Found", { status: 404 });
+  }
+}
+
 // ---------- 邀请落地页 ----------
 
 function inviteHTML(code: string): string {
@@ -146,6 +157,20 @@ Deno.serve({ port: PORT }, async (req) => {
       return new Response(JSON.stringify(data), {
         headers: { "content-type": "application/json" },
       });
+    }
+
+    // 静态文件
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      return serveStatic("web/index.html", "text/html");
+    }
+    if (url.pathname.startsWith("/web/")) {
+      const filePath = url.pathname.slice(1);
+      const ext = filePath.split(".").pop() || "";
+      const mime: Record<string, string> = {
+        html: "text/html", css: "text/css", js: "application/javascript",
+        png: "image/png", svg: "image/svg+xml", ico: "image/x-icon",
+      };
+      return serveStatic(filePath, mime[ext] || "application/octet-stream");
     }
 
     return new Response("Sanguosha server — WebSocket only", { status: 426 });

@@ -26,6 +26,11 @@
 ├── types.ts                   类型定义 + WS 协议
 ├── auth.ts                    Zitadel JWT 验证
 ├── cli.ts                     ANSI 命令行测试客户端
+├── web/                       网页版客户端
+│   ├── index.html             主页面
+│   ├── style.css              暗色主题样式
+│   └── app.js                 游戏逻辑（纯 JS，无框架）
+├── test_integration.ts        全流程集成测试
 ├── test_equip.ts              装备系统单元测试
 ├── cards.json                 88 张牌配置
 ├── characters.json             4 个角色
@@ -49,6 +54,9 @@ deno check main.ts
 
 # 装备系统测试
 deno run --allow-env test_equip.ts
+
+# 集成测试（需要服务器先跑）
+deno run --allow-net --allow-read --allow-write test_integration.ts
 
 # 手动 CLI 测试（需要两个终端）
 deno run --allow-net cli.ts

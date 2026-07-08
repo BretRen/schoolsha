@@ -390,5 +390,10 @@ export function getPlayerView(
     deckCount: state.deck.length,
     turnTimeLeft,
     opponentDisconnected: state.disconnectedAt[1 - playerIdx] !== null,
+    // 名字字段由 main.ts 的 broadcast() 填充
+    playerName: "",
+    playerId: "",
+    opponentName: "",
+    opponentId: "",
   };
 }

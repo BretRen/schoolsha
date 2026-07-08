@@ -12,7 +12,10 @@ const jwks = createRemoteJWKSet(new URL(`${issuer}/oauth/v2/keys`));
 
 /** 从 JWT 中提取的用户信息 */
 export interface AuthUser {
+  /** Zitadel 唯一用户 ID (sub claim) */
   sub: string;
+  /** 显示名称（优先 nickname → name → preferred_username → sub） */
+  displayName: string;
   name?: string;
   email?: string;
   preferredUsername?: string;
@@ -23,16 +26,24 @@ export interface AuthUser {
  * 返回用户信息，失败返回 null
  */
 export async function validateToken(token: string): Promise<AuthUser | null> {
+  const doVerify = async (aud?: string) => {
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer,
+      ...(aud ? { audience: aud } : {}),
+    });
+    return {
+      sub: payload.sub as string,
+      displayName: (payload.nickname || payload.name || payload.preferred_username || payload.sub) as string,
+      name: payload.name as string | undefined,
+      email: payload.email as string | undefined,
+      preferredUsername: payload.preferred_username as string | undefined,
+    };
+  };
+
   if (!clientId) {
-    console.warn("[auth] ZITADEL_CLIENT_ID not set — skipping token validation");
+    console.warn("[auth] ZITADEL_CLIENT_ID not set — skipping audience check");
     try {
-      const { payload } = await jwtVerify(token, jwks, { issuer });
-      return {
-        sub: payload.sub as string,
-        name: payload.name as string | undefined,
-        email: payload.email as string | undefined,
-        preferredUsername: payload.preferred_username as string | undefined,
-      };
+      return await doVerify();
     } catch (e) {
       console.error("[auth] token validation failed:", (e as Error).message);
       return null;
@@ -40,18 +51,32 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
   }
 
   try {
-    const { payload } = await jwtVerify(token, jwks, {
-      issuer,
-      audience: clientId,
-    });
-    return {
-      sub: payload.sub as string,
-      name: payload.name as string | undefined,
-      email: payload.email as string | undefined,
-      preferredUsername: payload.preferred_username as string | undefined,
-    };
+    return await doVerify(clientId);
   } catch (e) {
     console.error("[auth] token validation failed:", (e as Error).message);
+    return null;
+  }
+}
+
+/**
+ * 从 Zitadel userinfo 端点拉取用户显示名称
+ * JWT 里可能没有昵称字段，所以通过 API 补全
+ */
+export async function fetchUserInfo(token: string): Promise<{ name: string } | null> {
+  try {
+    const res = await fetch(`${issuer}/oidc/v1/userinfo`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      console.warn(`[auth] userinfo fetch failed: ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    // 优先级：nickname > name > preferred_username > sub
+    const name = data.nickname || data.name || data.preferred_username || data.sub;
+    return { name };
+  } catch (e) {
+    console.warn("[auth] userinfo fetch error:", (e as Error).message);
     return null;
   }
 }

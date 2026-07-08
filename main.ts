@@ -9,7 +9,7 @@ import {
   anyoneDisconnected,
 } from "./game.ts";
 import { getAllCharacters } from "./skills.ts";
-import { validateToken, extractToken, type AuthUser } from "./auth.ts";
+import { validateToken, extractToken, fetchUserInfo } from "./auth.ts";
 import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts";
 
 // ---------- 常量 ----------
@@ -23,11 +23,14 @@ const MAX_DISCONNECTS = 3;
 interface Client {
   socket: WebSocket;
   index: number;
-  user: AuthUser;
+  userId: string;
+  displayName: string;
 }
 
 let game: GameState | null = null;
 const clients: (Client | null)[] = [null, null];
+/** 断线玩家的 userId（用于重连验证） */
+const disconnectedUserId: (string | null)[] = [null, null];
 let selectStartedAt = 0;
 let selectTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -39,6 +42,14 @@ function broadcast() {
     if (!client || client.socket.readyState !== WebSocket.OPEN) continue;
 
     const view = getPlayerView(game, i);
+    const opp = clients[1 - i];
+
+    // 填充玩家名字
+    view.playerName = client.displayName;
+    view.playerId = client.userId;
+    view.opponentName = opp?.displayName || "?";
+    view.opponentId = opp?.userId || "";
+
     send(client.socket, { type: "game_state", state: view, yourIndex: i });
   }
 }
@@ -90,7 +101,7 @@ function startSelectTimer() {
 
     for (let i = 0; i < 2; i++) {
       if (picks[i] === null) {
-        picks[i] = chars[0].id; // 默认选第一个角色
+        picks[i] = chars[0].id;
         console.log(`P${i} select timeout, auto-picked ${chars[0].name}`);
         changed = true;
       }
@@ -129,7 +140,8 @@ Deno.serve({ port: PORT }, async (req) => {
   }
 
   // ---- 认证：在升级前验证 token ----
-  let user: AuthUser | null = null;
+  let userId = "";
+  let displayName = "";
 
   if (AUTH_ENABLED) {
     const token = extractToken(req);
@@ -148,7 +160,7 @@ Deno.serve({ port: PORT }, async (req) => {
       });
     }
 
-    user = await validateToken(token);
+    const user = await validateToken(token);
     if (!user) {
       return new Response(JSON.stringify({
         error: "invalid_token",
@@ -159,27 +171,53 @@ Deno.serve({ port: PORT }, async (req) => {
       });
     }
 
-    console.log(`[auth] user=${user.preferredUsername || user.name || user.sub} connected`);
+    userId = user.sub;
+    displayName = user.displayName;
+
+    // 尝试从 userinfo 端点拉取更准确的显示名（有些 Zitadel 配置不在 JWT 里放 nickname）
+    const info = await fetchUserInfo(token);
+    if (info) {
+      displayName = info.name;
+    }
+
+    console.log(`[auth] user=${displayName} (${userId}) connected`);
+  } else {
+    // 无认证模式：用随机 ID 和 "Player N" 作为名字
+    userId = `anon_${Date.now()}`;
+    displayName = "";
   }
 
   // ---- WebSocket 升级 ----
   const { socket, response } = Deno.upgradeWebSocket(req);
 
   socket.addEventListener("open", () => {
-    console.log(`Client connected${user ? ` (${user.preferredUsername || user.sub})` : ""}`);
+    const nameTag = displayName || `Player ?`;
+    console.log(`Client connected: ${nameTag}`);
 
     let seat: number;
 
-    // ---- 断线重连 ----
+    // ---- 断线重连：验证身份 ----
     if (game && !game.gameOver && anyoneDisconnected(game)) {
       for (let i = 0; i < 2; i++) {
         if (game.disconnectedAt[i] !== null && !clients[i]) {
+          // 验证重连者身份
+          if (AUTH_ENABLED && disconnectedUserId[i] && disconnectedUserId[i] !== userId) {
+            console.log(`[auth] reconnect denied: userId mismatch for P${i}`);
+            send(socket, {
+              type: "error",
+              message: `重连失败：身份不匹配（原玩家 ID 不同）`,
+            });
+            socket.close();
+            return;
+          }
+
           seat = i;
-          clients[seat] = { socket, index: seat, user: user! };
+          clients[seat] = { socket, index: seat, userId, displayName };
+          disconnectedUserId[seat] = null;
           markReconnected(game, seat);
           send(socket, { type: "reconnected", message: "已重新连接" });
           broadcast();
-          console.log(`P${seat} reconnected`);
+          console.log(`P${seat} reconnected (${nameTag})`);
           return;
         }
       }
@@ -196,7 +234,7 @@ Deno.serve({ port: PORT }, async (req) => {
       return;
     }
 
-    const client: Client = { socket, index: seat, user: user! };
+    const client: Client = { socket, index: seat, userId, displayName };
     clients[seat] = client;
 
     if (clients[0] && clients[1]) {
@@ -219,7 +257,7 @@ Deno.serve({ port: PORT }, async (req) => {
         });
       }
       startSelectTimer();
-      const names = clients.map(c => c?.user?.preferredUsername || c?.user?.name || "?").join(" vs ");
+      const names = clients.map(c => c?.displayName || "?").join(" vs ");
       console.log(`Lobby full (${names}), character select sent`);
     } else {
       send(socket, { type: "waiting", message: "等待另一位玩家..." });
@@ -243,7 +281,7 @@ Deno.serve({ port: PORT }, async (req) => {
     if (!game && msg.action === "pick_character") {
       const picks = getPicks();
       picks[playerIdx] = msg.id;
-      console.log(`P${playerIdx} (${clientEntry.user?.preferredUsername || "?"}) picked: ${msg.id}`);
+      console.log(`P${playerIdx} (${clientEntry.displayName || "?"}) picked: ${msg.id}`);
 
       if (bothPicked()) {
         if (selectTimer) clearTimeout(selectTimer);
@@ -274,11 +312,15 @@ Deno.serve({ port: PORT }, async (req) => {
     const idx = clients.findIndex((c) => c?.socket === socket);
     if (idx === -1) return;
 
-    const name = clients[idx]?.user?.preferredUsername || clients[idx]?.user?.name || "?";
+    const name = clients[idx]?.displayName || "?";
     console.log(`Player ${idx} (${name}) left`);
 
     // 游戏进行中 → 断线处理
     if (game && !game.gameOver) {
+      // 保存断线者 userId 用于重连验证
+      if (AUTH_ENABLED && clients[idx]) {
+        disconnectedUserId[idx] = clients[idx]!.userId;
+      }
       const overLimit = markDisconnected(game, idx);
       const opponent = clients[1 - idx];
       if (opponent) {

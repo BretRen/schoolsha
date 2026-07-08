@@ -113,6 +113,14 @@ export interface ServerStateView {
   deckCount: number;
   turnTimeLeft: number;
   opponentDisconnected: boolean;
+  /** 自己的显示名称 */
+  playerName: string;
+  /** 自己的唯一 ID */
+  playerId: string;
+  /** 对手的显示名称 */
+  opponentName: string;
+  /** 对手的唯一 ID */
+  opponentId: string;
 }
 
 export type ServerMsg =

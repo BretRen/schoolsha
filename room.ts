@@ -5,7 +5,7 @@
 import {
   createGame, handleMessage, getPlayerView, checkTimeout,
   cardLabel, markDisconnected, markReconnected, checkDisconnectTimeout,
-  anyoneDisconnected,
+  anyoneDisconnected, advancePhase, getHandLimit,
 } from "./game.ts";
 import { getAllCharacters } from "./skills.ts";
 import { updateElo } from "./elo.ts";
@@ -170,6 +170,26 @@ export class Room {
 
     const overLimit = markDisconnected(this.game, idx);
     const opponent = this.clients[1 - idx];
+
+    // 如果断线的是当前回合玩家，自动跳过他的回合
+    if (this.game.turnPlayer === idx && !this.game.pendingResponse) {
+      if (this.game.phase === "play") {
+        advancePhase(this.game);
+      } else if (this.game.phase === "discard") {
+        // 自动弃牌（弃超过手牌上限的部分）
+        const player = this.game.players[idx];
+        const limit = getHandLimit(this.game, idx, player.characterId ?? "");
+        const need = player.hand.length - limit;
+        if (need > 0) {
+          const discarded = player.hand.splice(0, need);
+          this.game.discard.push(...discarded);
+        }
+        advancePhase(this.game);
+      } else {
+        advancePhase(this.game);
+      }
+    }
+
     if (opponent) {
       const left = MAX_DISCONNECTS - this.game.disconnectCount[idx];
       this.send(opponent.socket, {

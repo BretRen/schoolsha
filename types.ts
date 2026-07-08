@@ -130,7 +130,10 @@ export type ServerMsg =
   | { type: "disconnected"; message: string; attemptsLeft: number }
   | { type: "room_created"; code: string; inviteUrl: string; wsUrl: string }
   | { type: "reconnected"; message: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "queue_status"; status: string; position: number; estimatedWait: string }
+  | { type: "match_found"; room: string; opponent: { displayName: string; elo: number } }
+  | { type: "queue_timeout"; message: string };
 
 /** /room/create 响应 */
 export interface RoomInfo {

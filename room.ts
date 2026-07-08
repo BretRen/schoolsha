@@ -8,6 +8,7 @@ import {
   anyoneDisconnected,
 } from "./game.ts";
 import { getAllCharacters } from "./skills.ts";
+import { updateElo } from "./elo.ts";
 import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts";
 
 // ---------- 常量 ----------
@@ -45,6 +46,8 @@ export class Room {
   lastActiveAt: number;
   /** 游戏是否已经开始（选角完成） */
   gameStarted = false;
+  /** 防止同一局游戏重复记录 ELO */
+  private _eloRecorded = false;
 
   private selectTimer: ReturnType<typeof setTimeout> | null = null;
   private timeoutInterval: ReturnType<typeof setInterval> | null = null;
@@ -84,6 +87,18 @@ export class Room {
 
       this.send(client.socket, { type: "game_state", state: view, yourIndex: i });
     }
+
+    // 游戏结束 → 记录 ELO
+    if (this.game.gameOver && !this._eloRecorded) {
+      this._eloRecorded = true;
+      const wIdx = this.game.winner!;
+      const lIdx = 1 - wIdx;
+      const w = this.clients[wIdx];
+      const l = this.clients[lIdx];
+      if (w && l) {
+        updateElo(w.userId, l.userId, w.displayName, l.displayName);
+      }
+    }
   }
 
   // ---- 选角超时 ----
@@ -116,6 +131,7 @@ export class Room {
     if (this.picks[0] === null || this.picks[1] === null) return;
 
     console.log(`[${this.code}] Starting game: ${chars.find(c => c.id === this.picks[0])?.name} vs ${chars.find(c => c.id === this.picks[1])?.name}`);
+    this._eloRecorded = false;
     this.game = createGame([this.picks[0], this.picks[1]]);
     this.gameStarted = true;
     this.startTimeoutCheck();

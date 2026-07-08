@@ -5,6 +5,8 @@
 import { handleMessage, anyoneDisconnected, markReconnected } from "./game.ts";
 import { validateToken, extractToken, fetchUserInfo } from "./auth.ts";
 import { roomManager, type Client } from "./room.ts";
+import { matchmaking } from "./matchmaking.ts";
+import { getLeaderboard, getElo } from "./elo.ts";
 import type { ClientMsg, RoomInfo } from "./types.ts";
 
 // ---------- 常量 ----------
@@ -124,16 +126,26 @@ Deno.serve({ port: PORT }, async (req) => {
     // 服务器信息
     if (url.pathname === "/info") {
       return new Response(JSON.stringify({
-        version: "0.5.0",
+        version: "0.6.0",
         auth: {
           mode: AUTH_ENABLED ? "zitadel_oidc" : "none",
           provider: AUTH_ENABLED ? Deno.env.get("ZITADEL_ISSUER") : null,
           pkce: AUTH_ENABLED ? true : false,
         },
         rooms: roomManager.count,
+        queue: matchmaking.length,
         ws: `ws://localhost:${PORT}/ws`,
         publicUrl: PUBLIC_URL,
       }), { headers: { "content-type": "application/json" } });
+    }
+
+    // 排行榜
+    if (url.pathname === "/leaderboard") {
+      const pid = url.searchParams.get("userId") || undefined;
+      const data = getLeaderboard(10, pid);
+      return new Response(JSON.stringify(data), {
+        headers: { "content-type": "application/json" },
+      });
     }
 
     return new Response("Sanguosha server — WebSocket only", { status: 426 });
@@ -178,10 +190,27 @@ Deno.serve({ port: PORT }, async (req) => {
     displayName = "";
   }
 
-  // ---- 解析房间码 ----
+  // ---- 解析模式 ----
+  const mode = url.searchParams.get("mode") || "";
   const roomCode = (url.searchParams.get("room") || "").toUpperCase();
 
-  // ---- WebSocket 升级 ----
+  // ---- 匹配模式 WebSocket ----
+  if (mode === "matching") {
+    const { socket, response } = Deno.upgradeWebSocket(req);
+
+    socket.addEventListener("open", () => {
+      matchmaking.join(userId, displayName, socket);
+      console.log(`[matchmaking] ${displayName || userId} connected (elo=${getElo(userId)})`);
+    });
+
+    socket.addEventListener("close", () => {
+      matchmaking.leave(userId);
+    });
+
+    return response;
+  }
+
+  // ---- 房间模式 WebSocket ----
   const { socket, response } = Deno.upgradeWebSocket(req);
 
   let room = roomCode ? roomManager.getOrCreateRoom(roomCode) : roomManager.createRoom();
@@ -333,6 +362,8 @@ Deno.serve({ port: PORT }, async (req) => {
 const authStatus = AUTH_ENABLED
   ? `auth=zitadel (${Deno.env.get("ZITADEL_ISSUER")})`
   : "auth=none";
-console.log(`🔪 Sanguosha v0.5.0 (multi-room) running on ws://0.0.0.0:${PORT} (${authStatus})`);
-console.log(`   Room API: ${PUBLIC_URL}/room/create`);
-console.log(`   Info API: ${PUBLIC_URL}/info`);
+console.log(`🔪 Sanguosha v0.6.0 (multi-room + elo) running on ws://0.0.0.0:${PORT} (${authStatus})`);
+console.log(`   Room API:    ${PUBLIC_URL}/room/create`);
+console.log(`   Matchmaking: ws://localhost:${PORT}/ws?mode=matching`);
+console.log(`   Leaderboard: ${PUBLIC_URL}/leaderboard`);
+console.log(`   Info:        ${PUBLIC_URL}/info`);

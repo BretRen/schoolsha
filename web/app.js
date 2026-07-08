@@ -107,6 +107,7 @@ const ST = {
   gs: null,         // ServerStateView
   selectedCards: new Set(),
   selectTarget: null,
+  timerInterval: null,  // 倒计时 interval
 };
 
 // ====== 工具 ======
@@ -319,6 +320,7 @@ function leaveLobby() {
 }
 
 function backToMenu() {
+  if (ST.timerInterval) { clearInterval(ST.timerInterval); ST.timerInterval = null; }
   if (ST.ws) ST.ws.close();
   ST.ws = null;
   ST.gs = null;
@@ -430,10 +432,27 @@ function renderGame() {
 
   // 操作栏
   renderActions(gs);
+
+  // 启动本地倒计时
+  startTimer(gs.turnTimeLeft);
 }
 
-function renderHand(hand) {
-  ST.selectedCards.clear();
+function startTimer(seconds) {
+  if (ST.timerInterval) clearInterval(ST.timerInterval);
+  let remaining = seconds;
+  const el = $("turn-timer");
+  if (!el) return;
+  el.textContent = `${remaining}s`;
+  ST.timerInterval = setInterval(() => {
+    remaining--;
+    if (remaining < 0) remaining = 0;
+    el.textContent = `${remaining}s`;
+    if (remaining <= 0) clearInterval(ST.timerInterval);
+  }, 1000);
+}
+
+function renderHand(hand, keepSelection = false) {
+  if (!keepSelection) ST.selectedCards.clear();
   let h = "";
   for (const c of hand) {
     const cls = `card suit-${c.suit} ${ST.selectedCards.has(c.id) ? "selected" : ""}`;
@@ -523,7 +542,7 @@ function toggleCard(id) {
       ST.selectedCards.add(id);
     }
   }
-  renderHand(gs.you.hand);
+  renderHand(gs.you.hand, true);
   renderActions(gs);
 }
 

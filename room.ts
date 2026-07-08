@@ -16,7 +16,7 @@ import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts"
 const CHAR_SELECT_TIMEOUT_SEC = 30;
 const RECONNECT_WINDOW_SEC = 30;
 const MAX_DISCONNECTS = 3;
-const TURN_TIMEOUT_CHECK_MS = 2_000;
+const TURN_TIMEOUT_CHECK_MS = 5_000;
 /** 空闲房间清理时间（1 小时） */
 const ROOM_TTL_MS = 60 * 60_000;
 /** 已结束游戏清理时间（10 分钟） */
@@ -143,19 +143,17 @@ export class Room {
   private startTimeoutCheck(): void {
     if (this.timeoutInterval) clearInterval(this.timeoutInterval);
     this.timeoutInterval = setInterval(() => {
-      if (!this.game) return;
+      if (!this.game || this.game.gameOver) return;
 
-      if (checkTimeout(this.game)) {
-        this.broadcast();
-      }
-
+      checkTimeout(this.game);
       for (let i = 0; i < 2; i++) {
         if (this.game.disconnectedAt[i] !== null) {
-          if (checkDisconnectTimeout(this.game, i)) {
-            this.broadcast();
-          }
+          checkDisconnectTimeout(this.game, i);
         }
       }
+
+      // 无条件广播，客户端用服务端倒计时为准
+      this.broadcast();
     }, TURN_TIMEOUT_CHECK_MS);
   }
 

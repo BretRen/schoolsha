@@ -93,7 +93,74 @@ async function initAuth() {
   // 处理 OAuth 回调
   if (AUTH.enabled && location.search.includes("code=")) {
     const ok = await handleAuthCallback();
-    if (ok) return;
+    if (ok) {
+      // 登录成功后检查是否有活跃房间可重连
+      checkReconnect();
+      return;
+    }
+  }
+
+  // 非回调情况也检查重连
+  if (AUTH.token) checkReconnect();
+}
+
+// ====== 重连 ======
+function checkReconnect() {
+  const savedRoom = sessionStorage.getItem("active_room");
+  if (!savedRoom) return;
+
+  showReconnectPrompt(savedRoom, 30);
+}
+
+function showReconnectPrompt(code, seconds) {
+  // 创建重连提示 overlay
+  const overlay = document.createElement("div");
+  overlay.id = "reconnect-overlay";
+  overlay.innerHTML = `
+    <div class="overlay-card">
+      <h2>🔌 断线重连</h2>
+      <p>你有一个活跃的房间 <strong style="color:#c4b5fd;font-family:monospace;font-size:20px">${code}</strong></p>
+      <p id="reconnect-countdown" style="color:#888">${seconds} 秒内可重连</p>
+      <div style="margin-top:20px;display:flex;gap:12px;justify-content:center">
+        <button class="btn-primary" id="btn-reconnect">重新连接</button>
+        <button class="btn-secondary" id="btn-ignore">忽略</button>
+      </div>
+    </div>
+  `;
+  overlay.style.cssText = `
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,0.8);display:flex;align-items:center;
+    justify-content:center;z-index:9999;
+  `;
+  document.body.appendChild(overlay);
+
+  const countdownEl = overlay.querySelector("#reconnect-countdown");
+  let remaining = seconds;
+  const timer = setInterval(() => {
+    remaining--;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      closeReconnectPrompt();
+    }
+    if (countdownEl) countdownEl.textContent = `${remaining} 秒内可重连`;
+  }, 1000);
+
+  overlay.querySelector("#btn-reconnect").onclick = () => {
+    clearInterval(timer);
+    closeReconnectPrompt();
+    ST.roomCode = code;
+    connect(buildWsUrl(`?room=${code}`));
+    text("menu-status", "");
+  };
+
+  overlay.querySelector("#btn-ignore").onclick = () => {
+    clearInterval(timer);
+    closeReconnectPrompt();
+  };
+
+  function closeReconnectPrompt() {
+    sessionStorage.removeItem("active_room");
+    if (overlay.parentNode) overlay.remove();
   }
 }
 
@@ -107,7 +174,6 @@ const ST = {
   gs: null,         // ServerStateView
   selectedCards: new Set(),
   selectTarget: null,
-  timerInterval: null,  // 倒计时 interval
 };
 
 // ====== 工具 ======
@@ -175,8 +241,16 @@ function connect(wsUrl) {
   ST.ws.onclose = () => {
     console.log("[ws] closed");
     if (ST.screen === "game" || ST.screen === "char") {
+      // 游戏中断线：保存房间码供重连
+      if (ST.roomCode && ST.gs && !ST.gs.gameOver) {
+        sessionStorage.setItem("active_room", ST.roomCode);
+      }
       showScreen("menu");
       text("menu-status", "连接断开");
+      // 提示重连
+      if (ST.roomCode && ST.gs && !ST.gs.gameOver) {
+        showReconnectPrompt(ST.roomCode, 30);
+      }
     }
   };
 
@@ -207,6 +281,7 @@ function handle(msg) {
     case "room_created":
       ST.roomCode = msg.code;
       ST.mode = "room";
+      sessionStorage.setItem("active_room", msg.code);
       showScreen("lobby");
       text("lobby-code", msg.code);
       text("lobby-invite", msg.inviteUrl);
@@ -228,7 +303,10 @@ function handle(msg) {
       ST.myIndex = msg.yourIndex;
       if (ST.screen !== "game") showScreen("game");
       renderGame();
-      if (ST.gs.gameOver) showGameOver();
+      if (ST.gs.gameOver) {
+        sessionStorage.removeItem("active_room");
+        showGameOver();
+      }
       break;
 
     case "disconnected":
@@ -252,6 +330,7 @@ function handle(msg) {
     case "match_found":
       ST.mode = "matching";
       ST.roomCode = msg.room;
+      sessionStorage.setItem("active_room", msg.room);
       text("lobby-status", `匹配成功！对手: ${msg.opponent.displayName} (ELO ${msg.opponent.elo})`);
       // 切换到游戏房间
       connect(buildWsUrl(`?room=${msg.room}`));
@@ -320,7 +399,6 @@ function leaveLobby() {
 }
 
 function backToMenu() {
-  if (ST.timerInterval) { clearInterval(ST.timerInterval); ST.timerInterval = null; }
   if (ST.ws) ST.ws.close();
   ST.ws = null;
   ST.gs = null;
@@ -418,7 +496,7 @@ function renderGame() {
   if (me.armor) eq += `防具: ${cardName(me.armor)}`;
   text("my-equip", eq);
 
-  // 阶段
+  // 阶段（服务端倒计时为准，每 5 秒推送）
   const phaseNames = { judge: "判定阶段", draw: "摸牌阶段", play: "出牌阶段", discard: "弃牌阶段", end: "结束阶段" };
   text("phase-label", phaseNames[gs.phase] || gs.phase);
   text("turn-timer", `${gs.turnTimeLeft}s`);
@@ -432,23 +510,6 @@ function renderGame() {
 
   // 操作栏
   renderActions(gs);
-
-  // 启动本地倒计时
-  startTimer(gs.turnTimeLeft);
-}
-
-function startTimer(seconds) {
-  if (ST.timerInterval) clearInterval(ST.timerInterval);
-  let remaining = seconds;
-  const el = $("turn-timer");
-  if (!el) return;
-  el.textContent = `${remaining}s`;
-  ST.timerInterval = setInterval(() => {
-    remaining--;
-    if (remaining < 0) remaining = 0;
-    el.textContent = `${remaining}s`;
-    if (remaining <= 0) clearInterval(ST.timerInterval);
-  }, 1000);
 }
 
 function renderHand(hand, keepSelection = false) {
@@ -527,8 +588,6 @@ function toggleCard(id) {
   const gs = ST.gs;
   if (!gs) return;
 
-  // 如果是弃牌阶段以外的出牌阶段且 pending 为空
-  // 或者有 pendingResponse 且 target 是自己
   const p = gs.pendingResponse;
 
   if (ST.selectedCards.has(id)) {
@@ -593,6 +652,7 @@ function showGameOver() {
       $("auth-btn").onclick = () => {
         AUTH.token = null;
         sessionStorage.removeItem("auth_token");
+        sessionStorage.removeItem("active_room");
         text("auth-user", "未登录");
         $("auth-btn").textContent = "登录";
         $("auth-btn").onclick = startLogin;

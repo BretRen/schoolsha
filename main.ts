@@ -157,6 +157,11 @@ Deno.serve({ port: PORT }, (req) => {
     clients[seat] = client;
 
     if (clients[0] && clients[1]) {
+      // 如果还有旧游戏状态（上一局结束了），清掉
+      if (game?.gameOver) {
+        game = null;
+        if (timeoutInterval) { clearInterval(timeoutInterval); timeoutInterval = null; }
+      }
       resetPicks();
       const chars: CharacterInfo[] = getAllCharacters().map((c) => ({
         id: c.id,

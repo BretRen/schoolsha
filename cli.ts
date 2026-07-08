@@ -142,7 +142,7 @@ function render() {
   const phaseInfo = `${YEL}${B}${phaseName(state.phase)}阶段${R}`;
   const deckInfo = `${D}牌堆: ${state.deckCount}${R}`;
   const atkInfo = state.phase === "play" && state.turnPlayer === myIndex
-    ? (state.attackUsed ? `${D}出杀: 已用${R}` : `${GRN}出杀: 可用${R}`)
+    ? (state.attackUsed ? `${D}出作业: 已用${R}` : `${GRN}出作业: 可用${R}`)
     : "";
 
   console.log(`  ${phaseInfo}    ${deckInfo}    ${atkInfo}`);
@@ -155,15 +155,30 @@ function render() {
 
   // ── 等待响应提示 ──
   if (state.pendingResponse) {
-    const cardInfo = state.pendingResponse.card
-      ? ` (${cardStr(state.pendingResponse.card)})`
-      : "";
-    if (state.pendingResponse.target === myIndex) {
-      if (state.pendingResponse.type === "dodge") {
-        console.log(`\n  ${RED}⚠ 对方对你出了杀！请选择一张 【闪】 响应${R}${cardInfo}`);
-      }
-    } else if (state.pendingResponse.source === myIndex) {
-      console.log(`\n  ${D}⌛ 等待对手出闪...${R}`);
+    const pr = state.pendingResponse;
+    const cardInfo = pr.card ? ` (${cardStr(pr.card)})` : "";
+    if (pr.target === myIndex) {
+      const hints: Record<string, string> = {
+        dodge: "⚠ 对手对你出了作业！请出【赦免】响应",
+        near_death: "⚠ 你濒死！请出【放假】或【辣条】",
+        duel: "⚠ 拼作业！请出【作业】响应",
+        barbarian: "⚠ 作业检查！请出【作业】响应",
+        volley: "⚠ 最终测试！请出【赦免】响应",
+        borrow_knife: "⚠ 嫁祸！请弃一张牌响应",
+      };
+      const hint = hints[pr.type] || `⚠ 需要响应: ${pr.type}`;
+      console.log(`\n  ${RED}${hint}${R}${cardInfo}`);
+    } else if (pr.source === myIndex) {
+      const waitHints: Record<string, string> = {
+        dodge: "⌛ 等待对手出赦免...",
+        near_death: "⌛ 等待对手自救...",
+        duel: "⌛ 等待对手出作业...",
+        barbarian: "⌛ 等待对手出作业...",
+        volley: "⌛ 等待对手出赦免...",
+        borrow_knife: "⌛ 等待对手弃牌...",
+      };
+      const hint = waitHints[pr.type] || `⌛ 等待对手响应...`;
+      console.log(`\n  ${D}${hint}${R}`);
     }
   }
 
@@ -191,7 +206,18 @@ function render() {
   // ── 指令帮助 ──
   console.log("");
   if (needResponse()) {
-    console.log(`  ${YEL}闪 <编号>${R}  — 出闪响应`);
+    const pending = state.pendingResponse!;
+    const helpHints: Record<string, string> = {
+      dodge: `  ${YEL}出 <编号>${R}  — 出【赦免】响应`,
+      near_death: `  ${YEL}出 <编号>${R}  — 出【放假】或【辣条】`,
+      duel: `  ${YEL}出 <编号>${R}  — 出【作业】响应`,
+      barbarian: `  ${YEL}出 <编号>${R}  — 出【作业】响应`,
+      volley: `  ${YEL}出 <编号>${R}  — 出【赦免】响应`,
+      borrow_knife: `  ${YEL}出 <编号>${R}  — 弃牌响应`,
+    };
+    const hint = helpHints[pending.type] || `  ${YEL}出 <编号>${R}  — 响应`;
+    console.log(hint);
+    console.log(`  ${YEL}pass${R}  — 放弃响应（承受伤害）`);
   } else if (needDiscard()) {
     const n = state.you.hand.length - state.you.hp;
     console.log(`  ${YEL}弃 <编号> [编号]...${R}  — 需要弃 ${n} 张牌`);
@@ -261,20 +287,8 @@ function handleCmd(cmd: string) {
     const target = state.pendingResponse ? undefined : 1 - myIndex;
     send({ action: "play_card", card_id: card.id, target });
 
-  } else if (action === "闪" || action === "dodge") {
-    const n = parseInt(parts[1]);
-    if (isNaN(n) || !state || n < 1 || n > state.you.hand.length) {
-      errorMsg = `无效编号: ${parts[1]}`;
-      render();
-      return;
-    }
-    const card = state.you.hand[n - 1];
-    if (card.name !== "闪") {
-      errorMsg = `【${card.name}】不是闪`;
-      render();
-      return;
-    }
-    send({ action: "play_card", card_id: card.id });
+  } else if (action === "pass" || action === "跳过") {
+    send({ action: "pass" });
 
   } else if (action === "结束" || action === "end") {
     send({ action: "end_phase" });

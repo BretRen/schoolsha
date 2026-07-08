@@ -4,6 +4,7 @@
 
 import type { GameState } from "./types.ts";
 import { onEvent } from "./events.ts";
+import { drawCards } from "./cards.ts";
 import charactersConfig from "./characters.json" with { type: "json" };
 import skillsConfig from "./skills.json" with { type: "json" };
 
@@ -171,9 +172,14 @@ function executeSkillEffect(state: GameState, playerIdx: number, skill: SkillDef
       break;
     }
     case "draw_cards": {
-      // draw_cards needs access to deck — we import it lazily
-      // For now, the "cram" skill handler in mountPassiveSkills uses onEvent
-      // but the actual draw needs access to deck. We'll handle this differently.
+      // 被动技：额外摸牌（不触发递归事件）
+      const { drawn, deck, discard } = drawCards(state.deck, state.discard, effect.count);
+      state.deck = deck;
+      state.discard = discard;
+      state.players[playerIdx].hand.push(...drawn);
+      console.log(
+        `[Skill] ${skill.name}: P${playerIdx} draws extra ${drawn.length} card(s)`,
+      );
       break;
     }
     case "heal": {

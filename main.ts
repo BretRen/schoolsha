@@ -1,141 +1,141 @@
 // ============================================================
-// main.ts — WebSocket 服务器入口 (Zitadel OIDC 认证)
+// main.ts — WebSocket 服务器入口 (多房间 + Zitadel OIDC)
 // ============================================================
 
-import {
-  createGame, handleMessage, getPlayerView, checkTimeout,
-  cardLabel, resetPicks, bothPicked, getPicks,
-  markDisconnected, markReconnected, checkDisconnectTimeout,
-  anyoneDisconnected,
-} from "./game.ts";
-import { getAllCharacters } from "./skills.ts";
+import { handleMessage, anyoneDisconnected, markReconnected } from "./game.ts";
 import { validateToken, extractToken, fetchUserInfo } from "./auth.ts";
-import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts";
+import { roomManager, type Client } from "./room.ts";
+import type { ClientMsg, RoomInfo } from "./types.ts";
 
 // ---------- 常量 ----------
 
-const CHAR_SELECT_TIMEOUT_SEC = 30;
-const RECONNECT_WINDOW_SEC = 30;
-const MAX_DISCONNECTS = 3;
+const PORT = parseInt(Deno.env.get("PORT") || "8099");
+const AUTH_ENABLED = !!Deno.env.get("ZITADEL_CLIENT_ID");
+const PUBLIC_URL = Deno.env.get("PUBLIC_URL") || `http://localhost:${PORT}`;
 
-// ---------- 简易匹配 ----------
+// ---------- 辅助 ----------
 
-interface Client {
-  socket: WebSocket;
-  index: number;
-  userId: string;
-  displayName: string;
-}
-
-let game: GameState | null = null;
-const clients: (Client | null)[] = [null, null];
-/** 断线玩家的 userId（用于重连验证） */
-const disconnectedUserId: (string | null)[] = [null, null];
-let selectStartedAt = 0;
-let selectTimer: ReturnType<typeof setTimeout> | null = null;
-
-function broadcast() {
-  if (!game) return;
-
-  for (let i = 0; i < 2; i++) {
-    const client = clients[i];
-    if (!client || client.socket.readyState !== WebSocket.OPEN) continue;
-
-    const view = getPlayerView(game, i);
-    const opp = clients[1 - i];
-
-    // 填充玩家名字
-    view.playerName = client.displayName;
-    view.playerId = client.userId;
-    view.opponentName = opp?.displayName || "?";
-    view.opponentId = opp?.userId || "";
-
-    send(client.socket, { type: "game_state", state: view, yourIndex: i });
-  }
-}
-
-function send(ws: WebSocket, msg: ServerMsg) {
+function send(ws: WebSocket, msg: unknown) {
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify(msg));
 }
 
-function error(ws: WebSocket, message: string) {
-  send(ws, { type: "error", message });
+function inviteUrl(code: string): string {
+  return `${PUBLIC_URL}/invite/${code}`;
 }
 
-// ---------- 超时轮询（2秒间隔） ----------
-
-const TIMEOUT_CHECK_MS = 2_000;
-let timeoutInterval: ReturnType<typeof setInterval> | null = null;
-
-function startTimeoutCheck() {
-  if (timeoutInterval) clearInterval(timeoutInterval);
-  timeoutInterval = setInterval(() => {
-    if (!game) return;
-
-    // 检查 pending + 回合超时
-    if (checkTimeout(game)) {
-      broadcast();
-    }
-
-    // 检查断线超时
-    for (let i = 0; i < 2; i++) {
-      if (game.disconnectedAt[i] !== null) {
-        if (checkDisconnectTimeout(game, i)) {
-          broadcast();
-        }
-      }
-    }
-  }, TIMEOUT_CHECK_MS);
+function wsUrl(code: string): string {
+  // WebSocket URL: 从 HTTP public URL 推导
+  const u = new URL(PUBLIC_URL);
+  const proto = u.protocol === "https:" ? "wss" : "ws";
+  return `${proto}://${u.host}/ws?room=${code}`;
 }
 
-// ---------- 选角超时 ----------
+function deepLink(code: string): string {
+  return `pdnode://schoolsha/invite/${code}`;
+}
 
-function startSelectTimer() {
-  if (selectTimer) clearTimeout(selectTimer);
-  selectStartedAt = Date.now();
-  selectTimer = setTimeout(() => {
-    const picks = getPicks();
-    const chars = getAllCharacters();
-    let changed = false;
+// ---------- 邀请落地页 ----------
 
-    for (let i = 0; i < 2; i++) {
-      if (picks[i] === null) {
-        picks[i] = chars[0].id;
-        console.log(`P${i} select timeout, auto-picked ${chars[0].name}`);
-        changed = true;
-      }
-    }
-
-    if (bothPicked()) {
-      console.log("Character select timeout, starting game with auto-picks");
-      game = createGame();
-      startTimeoutCheck();
-      broadcast();
-    }
-  }, CHAR_SELECT_TIMEOUT_SEC * 1000);
+function inviteHTML(code: string): string {
+  const link = deepLink(code);
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>学校杀 - 加入房间 ${code}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box }
+  body {
+    background:#0f0f0f; color:#e0e0e0;
+    font-family:system-ui,-apple-system,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    min-height:100vh; text-align:center;
+    flex-direction:column; gap:20px;
+  }
+  .card {
+    background:#1a1a1a; border-radius:12px;
+    padding:40px; max-width:400px; width:90%;
+    border:1px solid #2a2a2a;
+  }
+  .code {
+    font-size:48px; font-weight:bold;
+    letter-spacing:8px; color:#c4b5fd;
+    font-family:monospace;
+    margin:16px 0;
+  }
+  .hint { color:#888; font-size:14px; margin-top:16px }
+  .btn {
+    display:inline-block; background:#7c3aed;
+    color:#fff; padding:12px 32px; border-radius:8px;
+    text-decoration:none; font-size:16px; margin-top:12px;
+  }
+  a { color:#a78bfa }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🏫 学校杀</h1>
+  <p>好友邀请你加入对战</p>
+  <div class="code">${code}</div>
+  <a class="btn" href="${link}">打开游戏</a>
+  <p class="hint">
+    如未自动跳转，请确保已安装游戏客户端<br>
+    或复制上方房间码手动加入
+  </p>
+</div>
+<script>
+  window.location.href = "${link}";
+</script>
+</body>
+</html>`;
 }
 
 // ---------- 启动 ----------
 
-const PORT = parseInt(Deno.env.get("PORT") || "8099");
-const AUTH_ENABLED = !!Deno.env.get("ZITADEL_CLIENT_ID");
-
 Deno.serve({ port: PORT }, async (req) => {
+  const url = new URL(req.url);
+
   // ---- HTTP 端点 ----
   if (req.headers.get("upgrade") !== "websocket") {
-    const url = new URL(req.url);
+    // 邀请落地页
+    const inviteMatch = url.pathname.match(/^\/invite\/([A-Za-z0-9]+)$/);
+    if (inviteMatch) {
+      return new Response(inviteHTML(inviteMatch[1].toUpperCase()), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // 创建房间
+    if (url.pathname === "/room/create") {
+      const room = roomManager.createRoom();
+      const info: RoomInfo = {
+        code: room.code,
+        wsUrl: wsUrl(room.code),
+        inviteUrl: inviteUrl(room.code),
+        deepLink: deepLink(room.code),
+      };
+      return new Response(JSON.stringify(info), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+
+    // 服务器信息
     if (url.pathname === "/info") {
       return new Response(JSON.stringify({
-        version: "0.4.0",
+        version: "0.5.0",
         auth: {
           mode: AUTH_ENABLED ? "zitadel_oidc" : "none",
           provider: AUTH_ENABLED ? Deno.env.get("ZITADEL_ISSUER") : null,
           pkce: AUTH_ENABLED ? true : false,
         },
+        rooms: roomManager.count,
         ws: `ws://localhost:${PORT}/ws`,
+        publicUrl: PUBLIC_URL,
       }), { headers: { "content-type": "application/json" } });
     }
+
     return new Response("Sanguosha server — WebSocket only", { status: 426 });
   }
 
@@ -149,15 +149,12 @@ Deno.serve({ port: PORT }, async (req) => {
       return new Response(JSON.stringify({
         error: "unauthorized",
         message: "缺少认证 token",
-        hint: "请在 WebSocket 连接时设置 Authorization: Bearer <token> 请求头",
+        hint: "请在 WebSocket 连接时传 Authorization: Bearer <token>",
         alternatives: [
           "Sec-WebSocket-Protocol: <token>（浏览器：new WebSocket(url, [token])）",
-          "?token=<token> URL 参数（后备方案）",
+          "?token=<token> URL 参数",
         ],
-      }), {
-        status: 401,
-        headers: { "content-type": "application/json" },
-      });
+      }), { status: 401, headers: { "content-type": "application/json" } });
     }
 
     const user = await validateToken(token);
@@ -165,103 +162,104 @@ Deno.serve({ port: PORT }, async (req) => {
       return new Response(JSON.stringify({
         error: "invalid_token",
         message: "token 无效或已过期",
-      }), {
-        status: 401,
-        headers: { "content-type": "application/json" },
-      });
+      }), { status: 401, headers: { "content-type": "application/json" } });
     }
 
     userId = user.sub;
     displayName = user.displayName;
 
-    // 尝试从 userinfo 端点拉取更准确的显示名（有些 Zitadel 配置不在 JWT 里放 nickname）
+    // 尝试从 userinfo 拉取更准确的显示名
     const info = await fetchUserInfo(token);
-    if (info) {
-      displayName = info.name;
-    }
+    if (info) displayName = info.name;
 
-    console.log(`[auth] user=${displayName} (${userId}) connected`);
+    console.log(`[auth] user=${displayName} (${userId})`);
   } else {
-    // 无认证模式：用随机 ID 和 "Player N" 作为名字
     userId = `anon_${Date.now()}`;
     displayName = "";
   }
 
+  // ---- 解析房间码 ----
+  const roomCode = (url.searchParams.get("room") || "").toUpperCase();
+
   // ---- WebSocket 升级 ----
   const { socket, response } = Deno.upgradeWebSocket(req);
 
+  let room = roomCode ? roomManager.getOrCreateRoom(roomCode) : roomManager.createRoom();
+  let seat = -1;
+
   socket.addEventListener("open", () => {
-    const nameTag = displayName || `Player ?`;
-    console.log(`Client connected: ${nameTag}`);
+    room.touch();
+    const nameTag = displayName || "?";
 
-    let seat: number;
+    // 如果房间是自动创建的（没提供 room 参数），告诉客户端
+    if (!roomCode) {
+      send(socket, {
+        type: "room_created",
+        code: room.code,
+        inviteUrl: inviteUrl(room.code),
+        wsUrl: wsUrl(room.code),
+      });
+    }
 
-    // ---- 断线重连：验证身份 ----
-    if (game && !game.gameOver && anyoneDisconnected(game)) {
+    // ---- 断线重连 ----
+    if (room.game && !room.game.gameOver && anyoneDisconnected(room.game)) {
       for (let i = 0; i < 2; i++) {
-        if (game.disconnectedAt[i] !== null && !clients[i]) {
-          // 验证重连者身份
-          if (AUTH_ENABLED && disconnectedUserId[i] && disconnectedUserId[i] !== userId) {
-            console.log(`[auth] reconnect denied: userId mismatch for P${i}`);
+        if (room.game.disconnectedAt[i] !== null && !room.clients[i]) {
+          // 验证身份
+          const savedId = room.disconnectedUserId[i];
+          if (AUTH_ENABLED && savedId && savedId !== userId) {
+            console.log(`[${room.code}] reconnect denied: userId mismatch for P${i}`);
             send(socket, {
               type: "error",
-              message: `重连失败：身份不匹配（原玩家 ID 不同）`,
+              message: "重连失败：身份不匹配（不是同一位玩家）",
             });
             socket.close();
             return;
           }
 
           seat = i;
-          clients[seat] = { socket, index: seat, userId, displayName };
-          disconnectedUserId[seat] = null;
-          markReconnected(game, seat);
+          room.clients[seat] = {
+            socket,
+            index: seat,
+            userId,
+            displayName,
+          };
+          room.disconnectedUserId[seat] = null;
+          markReconnected(room.game, seat);
           send(socket, { type: "reconnected", message: "已重新连接" });
-          broadcast();
-          console.log(`P${seat} reconnected (${nameTag})`);
+          room.broadcast();
+          console.log(`[${room.code}] P${seat} reconnected (${nameTag})`);
           return;
         }
       }
     }
 
     // ---- 普通连接 ----
-    if (!clients[0]) {
-      seat = 0;
-    } else if (!clients[1]) {
-      seat = 1;
-    } else {
-      error(socket, "房间已满");
+    seat = room.findSeat() ?? -1;
+    if (seat === -1) {
+      send(socket, {
+        type: "error",
+        message: "房间已满（最多 2 人）",
+      });
       socket.close();
       return;
     }
 
     const client: Client = { socket, index: seat, userId, displayName };
-    clients[seat] = client;
+    room.clients[seat] = client;
 
-    if (clients[0] && clients[1]) {
-      if (game?.gameOver) {
-        game = null;
-        if (timeoutInterval) { clearInterval(timeoutInterval); timeoutInterval = null; }
+    if (room.clients[0] && room.clients[1]) {
+      // 如果之前有过已结束的游戏，重置
+      if (room.game?.gameOver) {
+        room.game = null;
+        room.gameStarted = false;
       }
-      resetPicks();
-      const chars: CharacterInfo[] = getAllCharacters().map((c) => ({
-        id: c.id,
-        name: c.name,
-        maxHp: c.maxHp,
-        skills: c.skills,
-      }));
-      for (const c of clients) {
-        if (c) send(c.socket, {
-          type: "character_select",
-          characters: chars,
-          timeoutSec: CHAR_SELECT_TIMEOUT_SEC,
-        });
-      }
-      startSelectTimer();
-      const names = clients.map(c => c?.displayName || "?").join(" vs ");
-      console.log(`Lobby full (${names}), character select sent`);
+      room.picks = [null, null];
+      room.sendCharacterSelect();
     } else {
       send(socket, { type: "waiting", message: "等待另一位玩家..." });
     }
+    console.log(`[${room.code}] P${seat} connected (${nameTag})`);
   });
 
   socket.addEventListener("message", (event) => {
@@ -269,74 +267,64 @@ Deno.serve({ port: PORT }, async (req) => {
     try {
       msg = JSON.parse(event.data) as ClientMsg;
     } catch {
-      error(socket, "无效 JSON");
+      send(socket, { type: "error", message: "无效 JSON" });
       return;
     }
 
-    const clientEntry = clients.find((c) => c?.socket === socket);
-    if (!clientEntry) return;
-    const playerIdx = clientEntry.index;
+    // 找到当前 socket 在房间中的座位
+    const idx = room.clients.findIndex((c) => c?.socket === socket);
+    if (idx === -1) return;
+    seat = idx;
 
     // ---- 角色选择阶段 ----
-    if (!game && msg.action === "pick_character") {
-      const picks = getPicks();
-      picks[playerIdx] = msg.id;
-      console.log(`P${playerIdx} (${clientEntry.displayName || "?"}) picked: ${msg.id}`);
+    if (!room.game && msg.action === "pick_character") {
+      room.picks[idx] = msg.id;
+      const nameTag = room.clients[idx]?.displayName || "?";
+      console.log(`[${room.code}] P${idx} (${nameTag}) picked: ${msg.id}`);
 
-      if (bothPicked()) {
-        if (selectTimer) clearTimeout(selectTimer);
-        console.log("Both players picked, starting game...");
-        game = createGame();
-        startTimeoutCheck();
-        broadcast();
+      // 双方都选好了
+      if (room.picks[0] && room.picks[1]) {
+        room.startGame();
       }
       return;
     }
 
-    if (!game) {
-      error(socket, "游戏尚未开始（请先选择角色）");
+    if (!room.game) {
+      send(socket, { type: "error", message: "游戏尚未开始（请先选择角色）" });
       return;
     }
 
     // ---- 游戏中 ----
-    const err = handleMessage(game, playerIdx, msg);
+    const err = handleMessage(room.game, idx, msg);
     if (err) {
-      console.log(`P${playerIdx} error: ${err}`);
-      error(socket, err);
+      console.log(`[${room.code}] P${idx} error: ${err}`);
+      send(socket, { type: "error", message: err });
     }
 
-    broadcast();
+    room.broadcast();
   });
 
   socket.addEventListener("close", () => {
-    const idx = clients.findIndex((c) => c?.socket === socket);
+    const idx = room.clients.findIndex((c) => c?.socket === socket);
     if (idx === -1) return;
 
-    const name = clients[idx]?.displayName || "?";
-    console.log(`Player ${idx} (${name}) left`);
+    const nameTag = room.clients[idx]?.displayName || "?";
+    console.log(`[${room.code}] P${idx} (${nameTag}) left`);
 
     // 游戏进行中 → 断线处理
-    if (game && !game.gameOver) {
-      // 保存断线者 userId 用于重连验证
-      if (AUTH_ENABLED && clients[idx]) {
-        disconnectedUserId[idx] = clients[idx]!.userId;
-      }
-      const overLimit = markDisconnected(game, idx);
-      const opponent = clients[1 - idx];
-      if (opponent) {
-        const left = MAX_DISCONNECTS - game.disconnectCount[idx];
-        send(opponent.socket, {
-          type: "disconnected",
-          message: `对手已断线，${RECONNECT_WINDOW_SEC}秒内可重连（剩余次数: ${left}）`,
-          attemptsLeft: left,
-        });
-      }
-      if (overLimit) {
-        broadcast();
+    if (room.game && !room.game.gameOver) {
+      room.handleDisconnect(idx);
+    } else if (!room.game) {
+      // 选角阶段有人离开 → 通知另一位重新等待
+      room.picks = [null, null];
+      const other = room.clients[1 - idx];
+      if (other) {
+        send(other.socket, { type: "error", message: "对手已离开，等待新玩家..." });
+        send(other.socket, { type: "waiting", message: "等待另一位玩家..." });
       }
     }
 
-    clients[idx] = null;
+    room.clients[idx] = null;
   });
 
   return response;
@@ -345,4 +333,6 @@ Deno.serve({ port: PORT }, async (req) => {
 const authStatus = AUTH_ENABLED
   ? `auth=zitadel (${Deno.env.get("ZITADEL_ISSUER")})`
   : "auth=none";
-console.log(`🔪 Sanguosha v0.4.0 running on ws://0.0.0.0:${PORT} (${authStatus})`);
+console.log(`🔪 Sanguosha v0.5.0 (multi-room) running on ws://0.0.0.0:${PORT} (${authStatus})`);
+console.log(`   Room API: ${PUBLIC_URL}/room/create`);
+console.log(`   Info API: ${PUBLIC_URL}/info`);

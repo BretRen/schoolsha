@@ -16,8 +16,9 @@
 
 ```
 /opt/games/sanguosha/          ← 工作目录
-├── main.ts                    入口：WebSocket 服务器 + 匹配 + 认证
-├── game.ts                    阶段机 + 超时 + 断线重连
+├── main.ts                    入口：WebSocket 服务器 + HTTP API + 多房间路由
+├── room.ts                    房间管理器（Room 类 + RoomManager 单例）
+├── game.ts                    阶段机 + 超时 + 断线重连（纯函数，无全局状态）
 ├── effects.ts                 全部卡牌效果 + 装备系统 + 响应系统
 ├── events.ts                  事件总线（技能系统入口）
 ├── skills.ts                  技能运行时（JSON → 事件绑定）
@@ -61,6 +62,14 @@ deno run --allow-net cli.ts
 2. **JSON 驱动** — 卡牌/角色/技能通过 JSON 配置，新增一张牌只需改 JSON + 注册效果
 3. **事件总线** — 所有技能通过 `events.ts` 的 `onEvent` / `emit` 绑定，不修改核心逻辑
 
+### 多房间架构
+
+- `room.ts` 的 `RoomManager` 管理所有房间（单例），每 5 分钟清理过期房间
+- 房间码 6 位大写字母数字（排除 0/O/1/I/L），`GET /room/create` 创建新房间
+- `?room=CODE` 参数加入指定房间；不带参数则自动创建
+- WebSocket 断线重连：先验证 userId（如有），再恢复连接
+- 邀请链接：`pdnode://schoolsha/invite/CODE`（自定义 scheme）+ HTML 落地页 `GET /invite/CODE`
+
 ### 如何新增一张牌
 
 1. 在 `cards.json` 添加条目（name, type, suit, number, count）
@@ -92,6 +101,7 @@ deno run --allow-net cli.ts
 
 - `.env` 在 `.gitignore` 中，不提交
 - 认证开关：`ZITADEL_CLIENT_ID` 为空 = 无认证，有值 = 强制 Zitadel 验证
+- `PUBLIC_URL`：公网地址，用于生成邀请链接（默认 `http://localhost:8099`）
 - 服务器启动必须带 `--env-file=.env`
 
 ## Git 仓库
@@ -105,4 +115,4 @@ deno run --allow-net cli.ts
 - 不要在生产服务器上随意重启服务（游戏进行中会掉线）
 - 修改 JSON 配置后无需重启，下次创建新游戏时生效
 - 修改 TypeScript 代码后需要重启服务器
-- 当前只有 1v1 模式（`clients` 数组硬编码为 2）
+- 每个房间独立运行 1v1，互不影响

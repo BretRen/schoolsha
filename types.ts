@@ -128,5 +128,14 @@ export type ServerMsg =
   | { type: "game_state"; state: ServerStateView; yourIndex: number }
   | { type: "waiting"; message: string }
   | { type: "disconnected"; message: string; attemptsLeft: number }
+  | { type: "room_created"; code: string; inviteUrl: string; wsUrl: string }
   | { type: "reconnected"; message: string }
   | { type: "error"; message: string };
+
+/** /room/create 响应 */
+export interface RoomInfo {
+  code: string;
+  wsUrl: string;
+  inviteUrl: string;
+  deepLink: string;
+}

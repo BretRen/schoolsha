@@ -21,29 +21,14 @@ export { cardLabel };
 
 const TURN_TIMEOUT_SEC = 60;
 
-// ---------- 角色选择状态 ----------
-
-let picks: (string | null)[] = [null, null];
-
-export function getPicks() {
-  return picks;
-}
-
-export function resetPicks() {
-  picks = [null, null];
-}
-
-export function bothPicked(): boolean {
-  return picks[0] !== null && picks[1] !== null;
-}
-
 // ---------- 创建新游戏 ----------
 
-export function createGame(): GameState {
+/** picks: [player0_characterId, player1_characterId] */
+export function createGame(picks: [string, string]): GameState {
   const deck = shuffle(createDeck());
 
-  const char0 = getCharacter(picks[0]!);
-  const char1 = getCharacter(picks[1]!);
+  const char0 = getCharacter(picks[0]);
+  const char1 = getCharacter(picks[1]);
 
   const players: [Player, Player] = [
     { hp: char0?.maxHp ?? 3, maxHp: char0?.maxHp ?? 3, hand: [], alive: true, characterId: picks[0], weapon: null, armor: null },

@@ -4,6 +4,18 @@
 
 服务端通过 Zitadel OIDC 验证用户身份。客户端需要在建立 WebSocket 连接前完成 PKCE 流程获取 `access_token`。
 
+## 连接时传递 token（优先级）
+
+1. **Authorization header**（首选，不暴露在 URL）
+   ```
+   Authorization: Bearer <access_token>
+   ```
+2. **Sec-WebSocket-Protocol**（浏览器专用）
+   ```js
+   new WebSocket("wss://host/ws", [access_token])
+   ```
+3. **URL query param**（后备，Godot 等受限客户端）
+
 ## Zitadel 端点
 
 | 端点 | URL |
@@ -22,27 +34,6 @@ code_verifier = 随机 43-128 字符的字符串 (A-Z, a-z, 0-9, -._~)
 code_challenge = base64url(sha256(code_verifier))
 ```
 
-### Godot 4 示例
-
-```gdscript
-func _generate_pkce() -> Dictionary:
-    # 生成 64 字节随机数，base64url 编码
-    var bytes = PackedByteArray()
-    bytes.resize(64)
-    for i in range(64):
-        bytes[i] = randi() % 256
-    var verifier = Marshalls.raw_to_base64(bytes).replace("+", "-").replace("/", "_").replace("=", "")
-    
-    # SHA256 + base64url
-    var ctx = HashingContext.new()
-    ctx.start(HashingContext.HASH_SHA256)
-    ctx.update(verifier.to_utf8_buffer())
-    var hash = ctx.finish()
-    var challenge = Marshalls.raw_to_base64(hash).replace("+", "-").replace("/", "_").replace("=", "")
-    
-    return { "verifier": verifier, "challenge": challenge }
-```
-
 ### 2. 浏览器打开授权页面
 
 ```
@@ -54,8 +45,6 @@ https://auth.pdnode.com/oauth/v2/authorize?
   code_challenge=<CHALLENGE>&
   code_challenge_method=S256
 ```
-
-用户登录后会重定向到 `redirect_uri?code=<AUTHORIZATION_CODE>`
 
 ### 3. 用 code 换 token
 
@@ -80,20 +69,57 @@ code_verifier=<VERIFIER>
 }
 ```
 
-### 4. 连接 WebSocket
+## 各客户端连接方式
 
-```
-ws://host:8099/ws?token=<access_token>
+### ✅ 浏览器 / Node.js（首选：Authorization header）
+
+```js
+// PKCE 获取 token 后...
+const ws = new WebSocket("wss://host:8099/ws");
+
+// 浏览器 WS 构造函数不支持自定义请求头，
+// 用 Sec-WebSocket-Protocol 传 token：
+const ws = new WebSocket("wss://host:8099/ws", [accessToken]);
 ```
 
-或带 Authorization header（如果客户端支持）:
+### ✅ Deno（首选：Authorization header）
+
+```typescript
+// Deno 的 WebSocket 支持自定义 headers
+const ws = new WebSocket("ws://localhost:8099/ws");
+ws.addEventListener("open", () => { /* ready */ });
+
+// 但创建时无法设 header，需要在 HTTP upgrade 阶段处理。
+// 推荐：先走 HTTP → 拿 token → 用 ?token= 参数连接
+const ws = new WebSocket(`ws://localhost:8099/ws?token=${accessToken}`);
 ```
-Authorization: Bearer <access_token>
+
+### ⚠️ Godot 4（URL 后备方案）
+
+Godot 的 `WebSocketPeer.connect_to_url()` 不支持自定义请求头，只能用 URL 参数：
+
+```gdscript
+# 1. PKCE 获取 token（同标准流程）
+
+# 2. 连接时把 token 放 URL
+var ws = WebSocketPeer.new()
+var url = "ws://localhost:8099/ws?token=" + access_token
+ws.connect_to_url(url)
+```
+
+### ✅ 其他 HTTP 客户端（Authorization header）
+
+```bash
+# curl + websocat 测试
+websocat -H="Authorization: Bearer $TOKEN" ws://localhost:8099/ws
+
+# 或用 URL 参数快速测试
+websocat "ws://localhost:8099/ws?token=$TOKEN"
 ```
 
 ## 刷新 token
 
-access_token 过期后，用 refresh_token 刷新：
+access_token 过期后：
 
 ```
 POST https://auth.pdnode.com/oauth/v2/token
@@ -103,54 +129,3 @@ refresh_token=<REFRESH_TOKEN>
 ```
 
 (scope 需要包含 `offline_access`)
-
-## Deno 示例 (测试用)
-
-```typescript
-// 手动获取 token 用于测试
-const CLIENT_ID = "<your_client_id>";
-const REDIRECT_URI = "http://localhost:9999/callback";
-
-// 1. 生成 PKCE
-const verifier = crypto.randomUUID() + crypto.randomUUID();
-const encoder = new TextEncoder();
-const hash = await crypto.subtle.digest("SHA-256", encoder.encode(verifier));
-const challenge = btoa(String.fromCharCode(...new Uint8Array(hash)))
-  .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-
-// 2. 打开浏览器授权
-const authUrl = `https://auth.pdnode.com/oauth/v2/authorize?` +
-  `client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&` +
-  `response_type=code&scope=openid+profile+email&` +
-  `code_challenge=${challenge}&code_challenge_method=S256`;
-console.log("Open:", authUrl);
-
-// 3. 启动本地 HTTP 服务器接收回调
-Deno.serve({ port: 9999 }, async (req) => {
-  const url = new URL(req.url);
-  const code = url.searchParams.get("code");
-  if (!code) return new Response("no code");
-
-  // 4. 换 token
-  const tokenRes = await fetch("https://auth.pdnode.com/oauth/v2/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: CLIENT_ID,
-      code,
-      redirect_uri: REDIRECT_URI,
-      code_verifier: verifier,
-    }),
-  });
-  const tokens = await tokenRes.json();
-  console.log("Access Token:", tokens.access_token);
-
-  // 5. 连接到游戏服务器
-  const ws = new WebSocket(`ws://localhost:8099/ws?token=${tokens.access_token}`);
-  ws.onopen = () => console.log("Connected!");
-  ws.onmessage = (e) => console.log(JSON.parse(e.data));
-
-  return new Response("OK — check console");
-});
-```

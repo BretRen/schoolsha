@@ -25,7 +25,6 @@ export interface AuthUser {
 export async function validateToken(token: string): Promise<AuthUser | null> {
   if (!clientId) {
     console.warn("[auth] ZITADEL_CLIENT_ID not set — skipping token validation");
-    // 无 clientId 时降级：只验证签名和 issuer，不检查 audience
     try {
       const { payload } = await jwtVerify(token, jwks, { issuer });
       return {
@@ -59,27 +58,27 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
 
 /**
  * 从 HTTP 请求中提取 Bearer token
- * 支持三种方式（优先级从高到低）：
- *   1. Authorization header: Bearer <token>
- *   2. URL query param: ?token=<token>
- *   3. WebSocket protocol: <token>
+ *
+ * 优先级（从高到低）：
+ *   1. Authorization header:  Bearer <token>        ← 首选，不暴露在 URL
+ *   2. Sec-WebSocket-Protocol: <token>               ← 浏览器 new WebSocket(url, [token])
+ *   3. URL query param:        ?token=<token>        ← 备用（Godot 等不支持 WS 头的客户端）
  */
 export function extractToken(req: Request): string | null {
-  const url = new URL(req.url);
-
-  // 1. Authorization header
+  // 1. Authorization header（首选）
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {
     return auth.slice(7);
   }
 
-  // 2. URL query param
-  const queryToken = url.searchParams.get("token");
-  if (queryToken) return queryToken;
-
-  // 3. Sec-WebSocket-Protocol (某些客户端用这个传 token)
+  // 2. Sec-WebSocket-Protocol（浏览器 WS 构造函数的第二个参数）
   const proto = req.headers.get("sec-websocket-protocol");
   if (proto) return proto;
+
+  // 3. URL query param（后备，用于不支持自定义 WS 头的客户端如 Godot）
+  const url = new URL(req.url);
+  const queryToken = url.searchParams.get("token");
+  if (queryToken) return queryToken;
 
   return null;
 }

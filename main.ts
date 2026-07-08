@@ -136,8 +136,12 @@ Deno.serve({ port: PORT }, async (req) => {
     if (!token) {
       return new Response(JSON.stringify({
         error: "unauthorized",
-        message: "缺少认证 token。请通过 ?token=<jwt> 或 Authorization header 提供。",
-        hint: "客户端需要先完成 PKCE 流程获取 access_token",
+        message: "缺少认证 token",
+        hint: "请在 WebSocket 连接时设置 Authorization: Bearer <token> 请求头",
+        alternatives: [
+          "Sec-WebSocket-Protocol: <token>（浏览器：new WebSocket(url, [token])）",
+          "?token=<token> URL 参数（后备方案）",
+        ],
       }), {
         status: 401,
         headers: { "content-type": "application/json" },

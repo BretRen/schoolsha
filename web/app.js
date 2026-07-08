@@ -5,6 +5,95 @@
 const WS_URL = `ws://${location.host}/ws`;
 const HTTP_URL = `http://${location.host}`;
 
+// ====== 认证 (PKCE) ======
+const AUTH = { enabled: false, provider: "", clientId: "", token: null };
+
+function base64url(buf) {
+  const s = String.fromCharCode(...new Uint8Array(buf));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function sha256(str) {
+  return await crypto.subtle.digest("SHA-256", new TextEncoder().encode(str));
+}
+
+async function startLogin() {
+  const verifierBytes = new Uint8Array(32);
+  crypto.getRandomValues(verifierBytes);
+  const verifier = base64url(verifierBytes);
+  const challenge = base64url(new Uint8Array(await sha256(verifier)));
+
+  sessionStorage.setItem("pkce_verifier", verifier);
+
+  const params = new URLSearchParams({
+    client_id: AUTH.clientId,
+    redirect_uri: location.origin + "/",
+    response_type: "code",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    scope: "openid profile email",
+  });
+  location.href = `${AUTH.provider}/oauth/v2/authorize?${params}`;
+}
+
+async function handleAuthCallback() {
+  const code = new URLSearchParams(location.search).get("code");
+  if (!code) return false;
+
+  const verifier = sessionStorage.getItem("pkce_verifier");
+  if (!verifier) return false;
+
+  // 清理 URL 中的 code
+  history.replaceState(null, "", location.pathname);
+
+  const resp = await fetch(`${AUTH.provider}/oauth/v2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: AUTH.clientId,
+      code,
+      redirect_uri: location.origin + "/",
+      code_verifier: verifier,
+    }),
+  });
+
+  if (!resp.ok) {
+    text("menu-status", "登录失败，请重试");
+    sessionStorage.removeItem("pkce_verifier");
+    return false;
+  }
+
+  const data = await resp.json();
+  AUTH.token = data.access_token;
+  sessionStorage.setItem("auth_token", data.access_token);
+  sessionStorage.removeItem("pkce_verifier");
+  text("menu-status", "已登录");
+  return true;
+}
+
+async function initAuth() {
+  try {
+    const resp = await fetch(`${HTTP_URL}/info`);
+    const info = await resp.json();
+    if (info.auth?.mode === "zitadel_oidc") {
+      AUTH.enabled = true;
+      AUTH.provider = info.auth.provider;
+      AUTH.clientId = info.auth.clientId;
+    }
+  } catch { /* offline */ }
+
+  // 恢复已保存的 token
+  const saved = sessionStorage.getItem("auth_token");
+  if (saved) AUTH.token = saved;
+
+  // 处理 OAuth 回调
+  if (AUTH.enabled && location.search.includes("code=")) {
+    const ok = await handleAuthCallback();
+    if (ok) return;
+  }
+}
+
 // ====== 状态 ======
 const ST = {
   screen: "menu",
@@ -55,6 +144,12 @@ function hpStr(hp, max) {
 }
 
 // ====== WebSocket ======
+function buildWsUrl(path) {
+  let url = `${WS_URL}${path}`;
+  if (AUTH.token) url += (path.includes("?") ? "&" : "?") + `token=${encodeURIComponent(AUTH.token)}`;
+  return url;
+}
+
 function connect(wsUrl) {
   if (ST.ws) ST.ws.close();
   ST.ws = new WebSocket(wsUrl);
@@ -145,7 +240,7 @@ function handle(msg) {
       ST.roomCode = msg.room;
       text("lobby-status", `匹配成功！对手: ${msg.opponent.displayName} (ELO ${msg.opponent.elo})`);
       // 切换到游戏房间
-      connect(`${WS_URL}?room=${msg.room}`);
+      connect(buildWsUrl(`?room=${msg.room}`));
       break;
 
     case "queue_timeout":
@@ -164,12 +259,22 @@ function handle(msg) {
 }
 
 // ====== 菜单操作 ======
+function ensureAuth() {
+  if (AUTH.enabled && !AUTH.token) {
+    text("menu-status", "请先登录");
+    startLogin();
+    return false;
+  }
+  return true;
+}
+
 async function createRoom() {
+  if (!ensureAuth()) return;
   try {
     const resp = await fetch(`${HTTP_URL}/room/create`);
     const info = await resp.json();
     ST.roomCode = info.code;
-    connect(info.wsUrl);
+    connect(buildWsUrl(`?room=${info.code}`));
     text("menu-status", "");
   } catch (e) {
     text("menu-status", "无法连接服务器");
@@ -177,18 +282,20 @@ async function createRoom() {
 }
 
 function joinRoom() {
+  if (!ensureAuth()) return;
   const code = $("join-code").value.trim().toUpperCase();
   if (!code || code.length < 4) {
     text("menu-status", "请输入房间码");
     return;
   }
   ST.roomCode = code;
-  connect(`${WS_URL}?room=${code}`);
+  connect(buildWsUrl(`?room=${code}`));
   text("menu-status", "");
 }
 
 function quickMatch() {
-  connect(`${WS_URL}?mode=matching`);
+  if (!ensureAuth()) return;
+  connect(buildWsUrl("?mode=matching"));
   ST.mode = "matching";
   text("menu-status", "");
 }
@@ -443,7 +550,25 @@ function showGameOver() {
     `你: ♥${gs.you.hp}/${gs.you.maxHp}  对手: ♥${gs.opponent.hp}/${gs.opponent.maxHp}`);
 }
 
-// ====== 快捷键 ======
+// ====== 初始化 ======
+(async () => {
+  await initAuth();
+  if (AUTH.enabled) {
+    show("auth-section");
+    if (AUTH.token) {
+      text("auth-user", "已登录");
+      $("auth-btn").textContent = "退出";
+      $("auth-btn").onclick = () => {
+        AUTH.token = null;
+        sessionStorage.removeItem("auth_token");
+        text("auth-user", "未登录");
+        $("auth-btn").textContent = "登录";
+        $("auth-btn").onclick = startLogin;
+        if (ST.ws) { ST.ws.close(); backToMenu(); }
+      };
+    }
+  }
+})();
 document.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && ST.screen === "menu") {
     joinRoom();

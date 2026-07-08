@@ -71,6 +71,12 @@ button {
 }
 .menu-card h1 { font-size: 36px; }
 .subtitle { color: var(--dim); font-size: 14px; margin-bottom: 8px; }
+.auth-section {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: #1e1040; padding: 8px 16px; border-radius: 8px;
+  border: 1px solid var(--accent); font-size: 14px;
+}
+.auth-section .btn-sm { width: auto; font-size: 13px; padding: 4px 12px; }
 .menu-buttons { display: flex; flex-direction: column; gap: 10px; }
 .join-row { display: flex; gap: 8px; }
 .join-row .code-input { flex: 1; }

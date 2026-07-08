@@ -141,6 +141,7 @@ Deno.serve({ port: PORT }, async (req) => {
         auth: {
           mode: AUTH_ENABLED ? "zitadel_oidc" : "none",
           provider: AUTH_ENABLED ? Deno.env.get("ZITADEL_ISSUER") : null,
+          clientId: AUTH_ENABLED ? Deno.env.get("ZITADEL_CLIENT_ID") : null,
           pkce: AUTH_ENABLED ? true : false,
         },
         rooms: roomManager.count,

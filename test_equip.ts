@@ -15,6 +15,7 @@ function makeState(): GameState {
     deck: [], discard: [], attackUsed: false, pendingResponse: null,
     gameOver: false, winner: null, turnStartTime: Date.now(),
     disconnectCount: [0,0], disconnectedAt: [null,null], wineUsed: false,
+    skillUseCount: {},
   };
 }
 

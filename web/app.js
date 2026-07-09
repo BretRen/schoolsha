@@ -101,7 +101,8 @@ const DEFENSIVE_ONLY = ["豁免"];
 // ====== WebSocket ======
 function buildWsUrl(path){let url=`${WS_URL}${path}`;if(AUTH.token)url+=(path.includes("?")?"&":"?")+`token=${encodeURIComponent(AUTH.token)}`;return url;}
 function connect(wsUrl){
-  if(ST.ws)ST.ws.close();ST.ws=new WebSocket(wsUrl);ST.selectedCards.clear();ST.selectTarget=null;stopTimer();ST.blocked=false;removeOverlay();
+  if(ST.ws)ST.ws.close();
+  ST.ws=new WebSocket(wsUrl, AUTH.token ? [AUTH.token] : undefined);ST.selectedCards.clear();ST.selectTarget=null;stopTimer();ST.blocked=false;removeOverlay();
   ST.ws.onopen=()=>{$("menu-status").textContent="";};
   ST.ws.onmessage=ev=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handle(msg);};
   ST.ws.onclose=()=>{stopTimer();if(ST.screen==="game"||ST.screen==="char"){if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)addActiveRoom(ST.roomCode);showScreen("menu");text("menu-status","连接断开");if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)checkReconnect();}};

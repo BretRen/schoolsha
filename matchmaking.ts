@@ -3,6 +3,9 @@
 // ============================================================
 
 import { getElo } from "./elo.ts";
+import { roomManager } from "./room.ts";
+
+const MATCH_JOIN_TIMEOUT_MS = 30_000; // 30秒内双方必须连接
 
 // ---------- 匹配玩家 ----------
 
@@ -148,8 +151,17 @@ class MatchmakingQueue {
 
     console.log(`[matchmaking] matched: ${player.displayName} (${player.elo}) vs ${opponent.displayName} (${opponent.elo})`);
 
-    // 生成房间码
+    // 生成房间码并预创建房间
     const code = generateRoomCode();
+    const room = roomManager.getOrCreateRoom(code);
+
+    // 30秒后如果房间还是空的 → 清理
+    const joinTimer = setTimeout(() => {
+      if (room.isEmpty()) {
+        console.log(`[matchmaking] Room ${code} join timeout, cleaning up`);
+        roomManager.removeRoom(code);
+      }
+    }, MATCH_JOIN_TIMEOUT_MS);
 
     // 通知双方
     const matchMsg = {

@@ -18,6 +18,21 @@ const PUBLIC_URL = Deno.env.get("PUBLIC_URL") || `http://localhost:${PORT}`;
 
 // ---------- 辅助 ----------
 
+// 简单令牌桶限流
+const rateMap = new Map<string, { tokens: number; last: number }>();
+const RATE_LIMIT = 30; // 每秒最多 30 条 WS 消息
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = rateMap.get(key);
+  if (!entry) { rateMap.set(key, { tokens: RATE_LIMIT - 1, last: now }); return true; }
+  const elapsed = (now - entry.last) / 1000;
+  entry.tokens = Math.min(RATE_LIMIT, entry.tokens + elapsed * RATE_LIMIT);
+  entry.last = now;
+  if (entry.tokens < 1) return false;
+  entry.tokens--;
+  return true;
+}
+
 function send(ws: WebSocket, msg: unknown) {
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify(msg));
@@ -41,9 +56,11 @@ function deepLink(code: string): string {
 function serveStatic(filePath: string, mime: string): Response {
   try {
     const content = Deno.readFileSync(filePath);
-    return new Response(content, {
-      headers: { "content-type": `${mime}; charset=utf-8` },
-    });
+    const headers: Record<string, string> = { "content-type": `${mime}; charset=utf-8` };
+    if (mime === "text/html") {
+      headers["content-security-policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' ws: wss:; img-src 'self' data:;";
+    }
+    return new Response(content, { headers });
   } catch {
     return new Response("Not Found", { status: 404 });
   }
@@ -204,7 +221,7 @@ Deno.serve({ port: PORT }, async (req) => {
       }
     }
   } else {
-    userId = `anon_${Date.now()}`;
+    userId = `anon_${crypto.randomUUID()}`;
     displayName = "";
   }
 
@@ -312,6 +329,9 @@ Deno.serve({ port: PORT }, async (req) => {
   });
 
   socket.addEventListener("message", (event) => {
+    // 限流检查
+    if (!checkRateLimit(`msg:${userId}`)) return;
+
     let msg: ClientMsg;
     try {
       msg = JSON.parse(event.data) as ClientMsg;

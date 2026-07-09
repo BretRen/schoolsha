@@ -1,3 +1,7 @@
 .env
 *.log
 elo.json
+integration_test.py
+integration_test2.py
+quick_test.py
+ws_full_test.py

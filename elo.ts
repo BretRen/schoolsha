@@ -6,6 +6,13 @@ const ELO_FILE = "./elo.json";
 const INITIAL_ELO = 1000;
 const K_FACTOR = 32;
 
+// 简单的文件锁防止并发写 ELO
+let _eloLock: Promise<void> = Promise.resolve();
+function withEloLock(fn: () => void): Promise<void> {
+  _eloLock = _eloLock.then(() => fn());
+  return _eloLock;
+}
+
 // ---------- 数据结构 ----------
 
 export interface EloEntry {
@@ -74,7 +81,8 @@ export function updateElo(
   if (l.elo < 0) l.elo = 0;
 
   w.wins++; l.losses++;
-  saveElo(data);
+  // 用锁保护写入
+  withEloLock(() => saveElo(data));
 
   return { winnerChange: w.elo - oldW, loserChange: l.elo - oldL, winnerNewElo: w.elo, loserNewElo: l.elo };
 }

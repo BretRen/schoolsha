@@ -124,8 +124,8 @@ export interface ServerStateView {
 }
 
 export type ServerMsg =
-  | { type: "character_select"; characters: CharacterInfo[]; timeoutSec: number }
-  | { type: "game_state"; state: ServerStateView; yourIndex: number }
+  | { type: "character_select"; characters: CharacterInfo[]; timeoutSec: number; opponent?: { displayName: string; elo: number; userId: string }; elo?: { my: number; prediction: { win: number; lose: number } | null } }
+  | { type: "game_state"; state: ServerStateView; yourIndex: number; eloResult?: { change: number; newElo: number; opponentChange: number } }
   | { type: "waiting"; message: string }
   | { type: "disconnected"; message: string; attemptsLeft: number }
   | { type: "room_created"; code: string; inviteUrl: string; wsUrl: string }

@@ -7,199 +7,174 @@
 <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.23/dist/full.min.css" rel="stylesheet" type="text/css" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
-tailwind.config = {
-  plugins: [daisyui],
-  daisyui: { themes: ["dark"], darkTheme: "dark" },
-}
+tailwind.config = { plugins: [daisyui], daisyui: { themes: ["dark"] } }
 </script>
 <style>
   .screen { display: none; }
   .screen:not(.hidden) { display: block; }
 
-  /* 卡牌 */
-  .card { display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
-    width:64px;height:90px;border-radius:8px;border:2px solid #333;cursor:pointer;
-    background:linear-gradient(135deg,#1a1a2e,#16213e);transition:all .15s;
-    user-select:none;position:relative;flex-shrink:0; }
-  .card:hover { transform:translateY(-4px);border-color:#666;box-shadow:0 4px 12px rgba(0,0,0,.4); }
-  .card.selected { border-color:#a78bfa;box-shadow:0 0 12px rgba(167,139,250,.5);transform:translateY(-6px); }
-  .card.disabled { opacity:.35;pointer-events:none; }
-  .card .card-suit { font-size:18px;line-height:1; }
-  .card .card-name { font-size:12px;font-weight:600;margin:2px 0;text-align:center; }
-  .card .card-num { font-size:11px;color:#888;position:absolute;top:4px;left:6px; }
+  /* 游戏卡牌（独立命名避免冲突） */
+  .gcard {
+    display:inline-flex;flex-direction:column;align-items:center;justify-content:center;
+    width:64px;height:90px;border-radius:8px;border:2px solid #374151;
+    cursor:pointer;background:linear-gradient(135deg,#111827,#1f2937);
+    transition:all .15s;user-select:none;position:relative;flex-shrink:0;
+  }
+  .gcard:hover { transform:translateY(-4px);border-color:#6b7280;box-shadow:0 4px 12px rgba(0,0,0,.4); }
+  .gcard.selected { border-color:#a78bfa;box-shadow:0 0 12px rgba(167,139,250,.5);transform:translateY(-6px); }
+  .gcard.disabled { opacity:.3;pointer-events:none; }
+  .gcard .gsuit { font-size:18px;line-height:1; }
+  .gcard .gname { font-size:12px;font-weight:600;margin:2px 0;text-align:center; }
+  .gcard .gnum { font-size:11px;color:#9ca3af;position:absolute;top:4px;left:6px; }
+  .gcard.heart .gsuit,.gcard.heart .gnum { color:#ef4444; }
+  .gcard.diamond .gsuit,.gcard.diamond .gnum { color:#f97316; }
+  .gcard.spade .gsuit,.gcard.spade .gnum { color:#9ca3af; }
+  .gcard.club .gsuit,.gcard.club .gnum { color:#22c55e; }
+  .gcard.heart .gname { color:#fca5a5; }
+  .gcard.diamond .gname { color:#fdba74; }
+  .gcard.spade .gname { color:#d1d5db; }
+  .gcard.club .gname { color:#86efac; }
 
-  /* 花色颜色 */
-  .card.suit-heart .card-suit,.card.suit-heart .card-num { color:#ef4444; }
-  .card.suit-diamond .card-suit,.card.suit-diamond .card-num { color:#f97316; }
-  .card.suit-spade .card-suit,.card.suit-spade .card-num { color:#94a3b8; }
-  .card.suit-club .card-suit,.card.suit-club .card-num { color:#22c55e; }
-  .card.suit-heart .card-name { color:#fca5a5; }
-  .card.suit-diamond .card-name { color:#fdba74; }
-  .card.suit-spade .card-name { color:#cbd5e1; }
-  .card.suit-club .card-name { color:#86efac; }
-
-  /* 选角 */
-  .char-card { background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid #4338ca;
+  /* 选角卡 */
+  .chcard { background:linear-gradient(135deg,#1e1b4b,#312e81);border:2px solid #4338ca;
     border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;text-align:center;min-width:140px; }
-  .char-card:hover { border-color:#818cf8;transform:translateY(-2px); }
-  .char-card.selected { border-color:#c4b5fd;box-shadow:0 0 16px rgba(167,139,250,.4); }
-  .char-card h3 { font-size:18px;font-weight:700;margin-bottom:4px; }
-  .char-card .hp { color:#ef4444;font-size:14px; }
-  .char-card .sk { color:#94a3b8;font-size:12px;margin-top:4px; }
+  .chcard:hover { border-color:#818cf8;transform:translateY(-2px); }
+  .chcard.selected { border-color:#c4b5fd;box-shadow:0 0 16px rgba(167,139,250,.4); }
+  .chcard h3 { font-size:18px;font-weight:700;margin-bottom:4px; }
+  .chcard .hp { color:#ef4444;font-size:14px; }
+  .chcard .sk { color:#9ca3af;font-size:12px;margin-top:4px; }
 
-  /* 排行榜 */
-  .lb-header,.lb-row { display:flex;gap:0;padding:8px 16px;border-bottom:1px solid #1e293b; }
-  .lb-header { color:#94a3b8;font-size:12px;font-weight:600;text-transform:uppercase; }
+  /* 排行榜行 */
+  .lb-row { display:flex;padding:8px 16px;border-bottom:1px solid #1f2937; }
+  .lb-head { display:flex;padding:8px 16px;border-bottom:1px solid #374151;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase; }
   .lb-rank { width:40px;text-align:center; }
   .lb-name { flex:1; }
   .lb-elo { width:80px;text-align:right;font-weight:600; }
-  .lb-stats { width:80px;text-align:right;color:#94a3b8; }
+  .lb-stats { width:80px;text-align:right;color:#9ca3af; }
 
-  /* 按钮 */
-  .btn-primary { background:#7c3aed;color:#fff;border:none;padding:8px 20px;border-radius:8px;
-    font-size:14px;font-weight:600;cursor:pointer;transition:all .15s; }
-  .btn-primary:hover { background:#6d28d9; }
-  .btn-secondary { background:#334155;color:#e2e8f0;border:none;padding:8px 20px;border-radius:8px;
-    font-size:14px;font-weight:500;cursor:pointer;transition:all .15s; }
-  .btn-secondary:hover { background:#475569; }
-  .btn-danger { background:#dc2626;color:#fff;border:none;padding:8px 20px;border-radius:8px;
-    font-size:14px;font-weight:600;cursor:pointer;transition:all .15s; }
-  .btn-danger:hover { background:#b91c1c; }
-  .btn-sm { padding:6px 14px;font-size:13px; }
-
-  /* overlay */
-  .overlay { position:fixed;top:0;left:0;width:100%;height:100%;
-    background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:100; }
-  .overlay.hidden { display:none; }
-  .overlay-card { background:#1e1b4b;border:2px solid #7c3aed;border-radius:16px;
-    padding:40px;text-align:center;max-width:360px;display:flex;flex-direction:column;gap:12px; }
-  .overlay-card h2 { font-size:28px; }
+  /* 游戏结束 */
   #go-title.win { color:#22c55e; }
   #go-title.lose { color:#ef4444; }
 
   /* 日志 */
-  #game-log { max-height:120px;overflow-y:auto;font-size:12px;color:#94a3b8; }
-  #game-log div { padding:2px 0;border-bottom:1px solid #1e293b; }
+  #game-log { max-height:120px;overflow-y:auto;font-size:12px; }
+  #game-log > div { padding:2px 0;border-bottom:1px solid #1f2937; }
 
   /* pending */
-  #pending-msg { background:#1e1b4b;border:1px solid #a78bfa;border-radius:8px;padding:10px 16px; }
-  #pending-msg.hidden { display:none; }
+  #pending-msg { border:1px solid #a78bfa;border-radius:8px;padding:10px 16px; }
+  #pending-msg strong { color:#c4b5fd; }
 
-  /* card info */
-  #card-info-wrap { min-height:32px; }
-  #card-info { font-size:13px;color:#94a3b8; }
-
-  /* 固定操作栏 */
-  #action-bar { min-height:40px;display:flex;gap:8px;flex-wrap:wrap;align-items:center; }
+  /* 固定操作栏高度 */
+  #action-bar { min-height:40px; }
 </style>
 </head>
-<body class="bg-base-300 text-base-content min-h-screen">
-<div id="app" class="max-w-lg mx-auto p-4 flex flex-col gap-4">
+<body class="min-h-screen p-4">
+<div id="app" class="max-w-lg mx-auto flex flex-col gap-4">
 
-  <!-- ====== 菜单 ====== -->
+  <!-- ══════ 菜单 ══════ -->
   <div id="screen-menu" class="screen flex flex-col items-center gap-6 pt-12">
     <h1 class="text-4xl font-bold text-primary">🏫 学校杀</h1>
 
     <div id="auth-section" class="hidden flex items-center gap-3">
-      <span id="auth-user" class="text-sm text-base-content/60">未登录</span>
-      <button id="auth-btn" class="btn-secondary btn-sm" onclick="startLogin()">登录</button>
+      <span id="auth-user" class="text-sm opacity-60">未登录</span>
+      <button id="auth-btn" class="btn btn-outline btn-sm" onclick="startLogin()">登录</button>
     </div>
 
     <div class="flex flex-col gap-3 w-full max-w-xs">
-      <button class="btn-primary" onclick="createRoom()">创建房间</button>
+      <button class="btn btn-primary" onclick="createRoom()">创建房间</button>
       <div class="flex gap-2">
         <input id="join-code" type="text" maxlength="6" placeholder="房间码"
-          class="input input-bordered w-full text-center uppercase tracking-widest text-lg font-mono"
-          onkeydown="if(event.key==='Enter')joinRoom()">
-        <button class="btn-secondary btn-sm" onclick="joinRoom()">加入</button>
+          class="input input-bordered w-full text-center uppercase tracking-widest text-lg font-mono">
+        <button class="btn btn-outline btn-sm" onclick="joinRoom()">加入</button>
       </div>
-      <button class="btn-secondary" onclick="quickMatch()">⚡ 快速匹配</button>
-      <button class="btn-secondary btn-sm" onclick="showLeaderboard()">🏆 排行榜</button>
+      <button class="btn btn-outline" onclick="quickMatch()">⚡ 快速匹配</button>
+      <button class="btn btn-ghost btn-sm" onclick="showLeaderboard()">🏆 排行榜</button>
     </div>
 
     <div id="menu-status" class="text-sm text-error"></div>
   </div>
 
-  <!-- ====== 大厅 ====== -->
+  <!-- ══════ 大厅 ══════ -->
   <div id="screen-lobby" class="screen hidden flex flex-col items-center gap-6 pt-12">
     <h2 class="text-2xl font-bold">等待对手</h2>
-    <div class="card bg-base-200 p-6 text-center flex flex-col gap-2">
+    <div class="card bg-base-200 shadow-xl p-6 text-center flex flex-col gap-2 w-full">
       <div id="lobby-code" class="text-4xl font-mono font-bold text-primary tracking-widest"></div>
-      <div id="lobby-invite" class="text-sm text-base-content/60 break-all"></div>
+      <div id="lobby-invite" class="text-sm opacity-60 break-all"></div>
     </div>
-    <div id="lobby-status" class="text-base-content/80"></div>
-    <button class="btn-secondary btn-sm" onclick="leaveLobby()">离开</button>
+    <div id="lobby-status" class="opacity-80"></div>
+    <button class="btn btn-outline btn-sm" onclick="leaveLobby()">离开</button>
   </div>
 
-  <!-- ====== 选角 ====== -->
+  <!-- ══════ 选角 ══════ -->
   <div id="screen-char" class="screen hidden flex flex-col gap-4">
     <h2 class="text-xl font-bold text-center">选择角色</h2>
     <div id="char-timer" class="text-center text-sm text-error"></div>
     <div id="char-list" class="flex flex-wrap justify-center gap-4"></div>
-    <div id="char-status" class="text-center text-sm text-base-content/60"></div>
+    <div id="char-status" class="text-center text-sm opacity-60"></div>
   </div>
 
-  <!-- ====== 游戏 ====== -->
+  <!-- ══════ 游戏 ══════ -->
   <div id="screen-game" class="screen hidden flex flex-col gap-3">
+
     <!-- 对手 -->
-    <div class="card bg-base-200 p-4 flex flex-col gap-1">
+    <div class="card bg-base-200 shadow-lg p-4">
       <div class="flex justify-between items-center">
         <span id="opp-name" class="font-bold text-lg"></span>
         <span id="opp-hp" class="text-red-400 font-mono"></span>
       </div>
-      <div class="flex justify-between text-sm text-base-content/60">
+      <div class="flex justify-between text-sm opacity-60 mt-1">
         <span id="opp-cards"></span>
         <span id="opp-equip"></span>
       </div>
-      <div id="opp-disconnected" class="hidden text-error text-sm">⚠ 对手已断线</div>
+      <div id="opp-disconnected" class="hidden text-error text-sm mt-1">⚠ 对手已断线</div>
     </div>
 
     <!-- 状态栏 -->
-    <div class="flex justify-between items-center text-sm bg-base-200 rounded-lg p-2 px-4">
+    <div class="flex justify-between items-center text-sm bg-base-200 rounded-box p-2 px-4">
       <span id="phase-label" class="font-semibold text-primary"></span>
       <span id="turn-timer" class="font-mono text-warning"></span>
-      <span id="deck-count" class="text-base-content/60"></span>
+      <span id="deck-count" class="opacity-60"></span>
     </div>
 
     <!-- pending -->
-    <div id="pending-msg" class="hidden"></div>
+    <div id="pending-msg" class="hidden bg-base-200"></div>
 
     <!-- 自己 -->
-    <div class="card bg-base-200 p-4 flex flex-col gap-1">
+    <div class="card bg-base-200 shadow-lg p-4">
       <div class="flex justify-between items-center">
         <span id="my-name" class="font-bold text-lg"></span>
         <span id="my-hp" class="text-red-400 font-mono"></span>
       </div>
-      <div id="my-equip" class="text-sm text-base-content/60"></div>
+      <div id="my-equip" class="text-sm opacity-60 mt-1"></div>
     </div>
 
     <!-- 手牌 -->
     <div id="my-hand" class="flex gap-2 flex-wrap justify-center min-h-[96px] items-center"></div>
 
     <!-- 卡牌说明 -->
-    <div id="card-info-wrap" class="text-center"><span id="card-info"></span></div>
+    <div class="text-center min-h-[24px]"><span id="card-info" class="text-sm opacity-60"></span></div>
 
-    <!-- 操作栏 -->
-    <div id="action-bar" class="justify-center"></div>
+    <!-- 操作栏（固定位置） -->
+    <div id="action-bar" class="flex gap-2 flex-wrap justify-center items-center"></div>
 
     <!-- 日志 -->
-    <div id="game-log" class="bg-base-200 rounded-lg p-2"></div>
+    <div id="game-log" class="bg-base-200 rounded-box p-2 opacity-70"></div>
   </div>
 
-  <!-- ====== 排行榜 ====== -->
+  <!-- ══════ 排行榜 ══════ -->
   <div id="screen-leaderboard" class="screen hidden">
     <h2 class="text-xl font-bold text-center mb-4">🏆 排行榜</h2>
     <div id="lb-table" class="card bg-base-200"></div>
     <div id="lb-you" class="mt-2"></div>
-    <button class="btn-secondary btn-sm mt-4 w-full" onclick="showScreen('menu')">返回</button>
+    <button class="btn btn-outline btn-sm mt-4 w-full" onclick="showScreen('menu')">返回</button>
   </div>
 
-  <!-- ====== 游戏结束 ====== -->
-  <div id="game-over-overlay" class="overlay hidden">
-    <div class="overlay-card">
-      <h2 id="go-title"></h2>
-      <p id="go-subtitle" class="text-base-content/60"></p>
-      <button class="btn-primary mt-4" onclick="backToMenu()">返回大厅</button>
+  <!-- ══════ 游戏结束 ══════ -->
+  <div id="game-over-overlay" class="fixed inset-0 bg-black/85 flex items-center justify-center z-[100] hidden">
+    <div class="card bg-base-200 border-2 border-primary rounded-2xl p-10 text-center max-w-sm flex flex-col gap-3">
+      <h2 id="go-title" class="text-3xl"></h2>
+      <p id="go-subtitle" class="opacity-60"></p>
+      <button class="btn btn-primary mt-4" onclick="backToMenu()">返回大厅</button>
     </div>
   </div>
 

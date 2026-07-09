@@ -79,13 +79,13 @@ function checkReconnect() {
 function showReconnectPrompt(code, seconds) {
   const overlay = document.createElement("div");
   overlay.id = "reconnect-overlay";
-  overlay.innerHTML = `<div class="overlay-card">
+  overlay.innerHTML = `<div style="background:#1e1b4b;border:2px solid #7c3aed;border-radius:16px;padding:40px;text-align:center;max-width:360px;display:flex;flex-direction:column;gap:12px">
     <h2>🔌 断线重连</h2>
     <p>活跃房间 <strong style="color:#c4b5fd;font-family:monospace;font-size:20px">${code}</strong></p>
     <p id="reconnect-countdown" style="color:#888">${seconds} 秒内可重连</p>
     <div style="margin-top:20px;display:flex;gap:12px;justify-content:center">
-      <button class="btn-primary" id="btn-reconnect">重新连接</button>
-      <button class="btn-secondary" id="btn-ignore">忽略</button>
+      <button class="btn btn-primary" id="btn-reconnect">重新连接</button>
+      <button class="btn btn-outline" id="btn-ignore">忽略</button>
     </div></div>`;
   overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999";
   document.body.appendChild(overlay);
@@ -322,12 +322,12 @@ function renderLeaderboard(data) {
 // ====== 选角 ======
 function renderCharSelect(chars, timeout) {
   let h = "";
-  for (const c of chars) h += `<div class="char-card" onclick="pickCharacter('${c.id}')"><h3>${c.name}</h3><div class="hp">♥ × ${c.maxHp}</div><div class="sk">${c.skills.length ? c.skills.join(" · ") : "无技能"}</div></div>`;
+  for (const c of chars) h += `<div class="chcard" onclick="pickCharacter('${c.id}')"><h3>${c.name}</h3><div class="hp">♥ × ${c.maxHp}</div><div class="sk">${c.skills.length ? c.skills.join(" · ") : "无技能"}</div></div>`;
   html("char-list", h); text("char-timer", `${timeout}s`);
 }
 function pickCharacter(id) {
-  document.querySelectorAll(".char-card").forEach(el => el.classList.remove("selected"));
-  const card = [...document.querySelectorAll(".char-card")].find(e => e.querySelector("h3")?.textContent && e.innerHTML.includes(id));
+  document.querySelectorAll(".chcard").forEach(el => el.classList.remove("selected"));
+  const card = [...document.querySelectorAll(".chcard")].find(e => e.querySelector("h3")?.textContent && e.innerHTML.includes(id));
   if (card) card.classList.add("selected");
   send({ action: "pick_character", id }); text("char-status", "已选择，等待对手...");
 }
@@ -404,11 +404,11 @@ function renderHand(hand) {
       // 借刀杀人特殊处理：武器牌
       if (pending?.type === "borrow_knife" && (c.name.includes("剑") || c.name.includes("刀") || c.name.includes("矛") || c.name.includes("斧") || c.name.includes("弓") || c.name.includes("弩") || c.name.includes("戟"))) disabled = false;
     }
-    const cls = `card suit-${c.suit} ${selected ? "selected" : ""} ${disabled ? "disabled" : ""}`;
+    const cls = `gcard ${c.suit} ${selected ? "selected" : ""} ${disabled ? "disabled" : ""}`;
     h += `<div class="${cls}" onclick="toggleCard('${c.id}')">
-      <span class="card-suit">${suitSymbol(c.suit)}</span>
-      <span class="card-name">${c.name}</span>
-      <span class="card-num">${c.number}</span>
+      <span class="gsuit">${suitSymbol(c.suit)}</span>
+      <span class="gname">${c.name}</span>
+      <span class="gnum">${c.number}</span>
     </div>`;
   }
   html("my-hand", h);
@@ -448,17 +448,17 @@ function renderActions(gs) {
   const p = gs.pendingResponse;
 
   if (p && p.target === ST.myIndex) {
-    btns += `<button class="btn-secondary btn-sm" onclick="send({action:'pass'})">不响应</button>`;
-    if (ST.selectedCards.size > 0) btns += `<button class="btn-primary btn-sm" onclick="respondCard()">出牌响应</button>`;
+    btns += `<button class="btn btn-outline btn-sm" onclick="send({action:'pass'})">不响应</button>`;
+    if (ST.selectedCards.size > 0) btns += `<button class="btn btn-primary btn-sm" onclick="respondCard()">出牌响应</button>`;
   } else if (isMyTurn && gs.phase === "play" && !p) {
-    if (ST.selectedCards.size > 0) btns += `<button class="btn-primary btn-sm" onclick="playSelected()">出牌</button>`;
+    if (ST.selectedCards.size > 0) btns += `<button class="btn btn-primary btn-sm" onclick="playSelected()">出牌</button>`;
     if (gs.you.skills?.length) {
-      for (const s of gs.you.skills) btns += `<button class="btn-secondary btn-sm" onclick="send({action:'use_skill',skill_id:'${s}'})">技能: ${s}</button>`;
+      for (const s of gs.you.skills) btns += `<button class="btn btn-outline btn-sm" onclick="send({action:'use_skill',skill_id:'${s}'})">技能: ${s}</button>`;
     }
-    btns += `<button class="btn-secondary btn-sm" onclick="send({action:'end_phase'})">结束出牌</button>`;
+    btns += `<button class="btn btn-outline btn-sm" onclick="send({action:'end_phase'})">结束出牌</button>`;
   } else if (isMyTurn && gs.phase === "discard" && !p) {
     const needDiscard = gs.you.hand.length - gs.you.hp;
-    if (needDiscard > 0 && ST.selectedCards.size > 0) btns += `<button class="btn-danger btn-sm" onclick="doDiscard()">弃牌 (${ST.selectedCards.size}/${needDiscard})</button>`;
+    if (needDiscard > 0 && ST.selectedCards.size > 0) btns += `<button class="btn btn-error btn-sm" onclick="doDiscard()">弃牌 (${ST.selectedCards.size}/${needDiscard})</button>`;
     if (needDiscard <= 0) btns += `<span style="color:#888;font-size:13px">无需弃牌</span>`;
   }
   html("action-bar", btns);

@@ -166,6 +166,9 @@ export function handleMessage(
 ): string | null {
   if (state.gameOver) return "游戏已结束";
 
+  // 有人断线时暂停游戏，禁止所有操作
+  if (anyoneDisconnected(state)) return "等待对手重连...";
+
   const action = msg?.action;
   if (!action) return "无效消息";
 

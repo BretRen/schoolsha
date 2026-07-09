@@ -51,6 +51,11 @@ tailwind.config = { plugins: [daisyui], daisyui: { themes: ["dark"] } }
   .gcard.heart { color: #ef4444; }
   .gcard.club { color: #e0e0e0; }
   .gcard.diamond { color: #ef4444; }
+  .gcard.disabled[title]:hover::after {
+    content:attr(title); position:absolute; bottom:110%; left:50%; transform:translateX(-50%);
+    background:#1f2937; color:#fca5a5; padding:4px 10px; border-radius:6px;
+    font-size:11px; white-space:nowrap; z-index:10; border:1px solid #ef4444; pointer-events:none;
+  }
 
   /* ====== 选角卡 ====== */
   .chcard {

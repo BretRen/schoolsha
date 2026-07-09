@@ -71,6 +71,7 @@ function dealDamage(s: GameState, source: number, target: number, amount: number
     }
   }
   s.players[target].hp -= amount;
+  if (s.players[target].hp < 0) s.players[target].hp = 0;
   emit({ type: "damage", source, target, amount }, s);
 }
 

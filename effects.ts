@@ -73,6 +73,10 @@ function dealDamage(s: GameState, source: number, target: number, amount: number
   s.players[target].hp -= amount;
   if (s.players[target].hp < 0) s.players[target].hp = 0;
   emit({ type: "damage", source, target, amount }, s);
+  // 直接伤害可能致死，触发濒死流程
+  if (s.players[target].hp <= 0 && !s.gameOver) {
+    setNearDeathPending(s, source);
+  }
 }
 
 function healTo(s: GameState, player: number, amount: number) {
@@ -325,7 +329,10 @@ registerCardEffect("嫁祸", {
 // --- 锦囊牌 — 即刻 ---
 
 registerCardEffect("神偷", {
-  canUse: all(playPhase, isTurn, noPending),
+  canUse: all(playPhase, isTurn, noPending, (s, p) => {
+    const opp = s.players[1 - p];
+    return opp.hand.length > 0 || opp.weapon !== null || opp.armor !== null;
+  }),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     stealRandomCard(s, 1 - playerIdx, playerIdx);
@@ -334,7 +341,10 @@ registerCardEffect("神偷", {
 });
 
 registerCardEffect("打小报告", {
-  canUse: all(playPhase, isTurn, noPending),
+  canUse: all(playPhase, isTurn, noPending, (s, p) => {
+    const opp = s.players[1 - p];
+    return opp.hand.length > 0 || opp.weapon !== null || opp.armor !== null;
+  }),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     discardFromPool(s, 1 - playerIdx);
@@ -370,7 +380,10 @@ registerCardEffect("点名", {
 });
 
 registerCardEffect("午饭留堂", {
-  canUse: all(playPhase, isTurn, noPending),
+  canUse: all(playPhase, isTurn, noPending, (s, p) => {
+    const opp = s.players[1 - p];
+    return opp.hand.length > 0 || opp.weapon !== null || opp.armor !== null;
+  }),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     discardFromPool(s, 1 - playerIdx);

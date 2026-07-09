@@ -142,6 +142,7 @@ export class Room {
 
   /** 双方都选了角色 → 开始游戏 */
   startGame(): void {
+    if (this.gameStarted) return;
     if (this.selectTimer) clearTimeout(this.selectTimer);
     const chars = getAllCharacters();
 
@@ -181,9 +182,10 @@ export class Room {
   handleDisconnect(idx: number): boolean {
     if (!this.game || this.game.gameOver) return false;
 
-    // 保存断线者 userId
+    // 保存断线者 userId 并立即释放座位
     if (this.clients[idx]) {
       this.disconnectedUserId[idx] = this.clients[idx]!.userId;
+      this.clients[idx] = null; // 立即释放，避免旧 socket close 事件阻塞重连
     }
 
     const overLimit = markDisconnected(this.game, idx);

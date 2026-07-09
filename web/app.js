@@ -67,6 +67,7 @@ const ST = { screen:"menu",ws:null,roomCode:null,mode:null,myIndex:-1,gs:null,se
 
 // ====== 工具 ======
 const $=id=>document.getElementById(id);
+const esc=s=>{const d=document.createElement("div");d.textContent=s;return d.innerHTML;};
 const show=id=>{const e=$(id);if(e)e.classList.remove("hidden");};
 const hide=id=>{const e=$(id);if(e)e.classList.add("hidden");};
 const text=(id,s)=>{const e=$(id);if(e)e.textContent=s;};
@@ -119,7 +120,7 @@ function handle(msg){
     case "waiting":text("lobby-status",msg.message);break;
     case "character_select":
       ST.mode="room";showScreen("char");renderCharSelect(msg.characters,msg.timeoutSec);
-      if(msg.opponent){const op=msg.opponent;const p=msg.elo?.prediction;const line=p?` (ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>)`:'';html("char-status",`对手: ${op.displayName} (ELO ${op.elo})${line}`);}
+      if(msg.opponent){const op=msg.opponent;const p=msg.elo?.prediction;const line=p?` (ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>)`:'';html("char-status",`对手: ${esc(op.displayName)} (ELO ${op.elo})${line}`);}
       break;
     case "game_state":
       ST.gs=msg.state;ST.myIndex=msg.yourIndex;if(ST.screen!=="game")showScreen("game");renderGame();
@@ -136,8 +137,9 @@ function blockGame(msg,att){ST.blocked=true;createOverlay("⚠ 对手已断线",
 
 // ====== 菜单 ======
 function ensureAuth(){if(AUTH.enabled&&!AUTH.token){text("menu-status","请先登录");startLogin();return false;}return true;}
+let _creating=false;
 // deno-lint-ignore no-unused-vars
-function createRoom(){if(!ensureAuth())return;fetch(`${HTTP_URL}/room/create`).then(r=>r.json()).then(info=>{ST.roomCode=info.code;ST.mode="room";addActiveRoom(info.code);showScreen("lobby");text("lobby-code",info.code);text("lobby-invite",info.inviteUrl);connect(buildWsUrl(`?room=${info.code}`));text("menu-status","");}).catch(()=>text("menu-status","无法连接服务器"));}
+function createRoom(){if(!ensureAuth()||_creating)return;_creating=true;fetch(`${HTTP_URL}/room/create`).then(r=>r.json()).then(info=>{ST.roomCode=info.code;ST.mode="room";addActiveRoom(info.code);showScreen("lobby");text("lobby-code",info.code);text("lobby-invite",info.inviteUrl);connect(buildWsUrl(`?room=${info.code}`));text("menu-status","");}).catch(()=>text("menu-status","无法连接服务器")).finally(()=>{_creating=false;});}
 function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim().toUpperCase();if(!code)return;ST.roomCode=code;ST.mode="room";addActiveRoom(code);showScreen("lobby");connect(buildWsUrl(`?room=${code}`));text("menu-status","");}
 // deno-lint-ignore no-unused-vars
 function quickMatch(){if(!ensureAuth())return;connect(buildWsUrl("?mode=matching"));ST.mode="matching";text("menu-status","");}
@@ -148,7 +150,7 @@ function backToMenu(){stopTimer();if(ST.ws)ST.ws.close();ST.ws=null;ST.gs=null;S
 function showLeaderboard(){fetch(`${HTTP_URL}/leaderboard`+(ST.gs?.playerId?`?userId=${ST.gs.playerId}`:"")).then(r=>r.json()).then(renderLeaderboard).then(()=>showScreen("leaderboard")).catch(()=>text("menu-status","无法获取排行榜"));}
 function renderLeaderboard(data){
   let h=`<div class="lb-header"><span class="lb-rank">#</span><span class="lb-name">玩家</span><span class="lb-elo">ELO</span><span class="lb-stats">胜/负</span></div>`;
-  for(const p of data.top10)h+=`<div class="lb-row"><span class="lb-rank">${p.rank}</span><span class="lb-name">${p.displayName||p.userId.slice(0,8)}</span><span class="lb-elo">${p.elo}</span><span class="lb-stats">${p.wins}W ${p.losses}L</span></div>`;
+  for(const p of data.top10)h+=`<div class="lb-row"><span class="lb-rank">${p.rank}</span><span class="lb-name">${esc(p.displayName||p.userId.slice(0,8))}</span><span class="lb-elo">${p.elo}</span><span class="lb-stats">${p.wins}W ${p.losses}L</span></div>`;
   html("lb-table",h||'<p style="color:#888;padding:16px">暂无数据</p>');
   if(data.you){show("lb-you");html("lb-you",`<div class="lb-row"><span class="lb-rank">${data.you.rank}</span><span class="lb-name">← 你</span><span class="lb-elo">${data.you.elo}</span><span class="lb-stats">${data.you.wins}W ${data.you.losses}L</span></div>`);}else hide("lb-you");
 }
@@ -161,7 +163,7 @@ function pickCharacter(id){document.querySelectorAll(".chcard").forEach(e=>e.cla
 // ====== 游戏渲染 ======
 function handSig(h){return h.map(c=>c.id).join(",");}
 function renderGame(){
-  const gs=ST.gs;if(!gs)return;
+  const gs=ST.gs;if(!gs||!gs.you||!gs.opponent)return;
   const opp=gs.opponent;
   text("opp-name",gs.opponentName||"对手");$("opp-hp").textContent=hpStr(opp.hp,opp.maxHp);
   text("opp-cards",`手牌: ${opp.handCount}`);
@@ -267,7 +269,7 @@ function showGameOver(){
   const gs=ST.gs;if(!gs?.gameOver)return;show("game-over-overlay");
   const won=gs.winner===ST.myIndex;
   const el=$("go-title");el.textContent=won?"🎉 胜利！":"💀 失败";el.className=won?"win":"lose";
-  let sub=`${gs.playerName||"你"} vs ${gs.opponentName||"对手"}\n你: ♥${gs.you.hp}/${gs.you.maxHp}  对手: ♥${gs.opponent.hp}/${gs.opponent.maxHp}`;
+  let sub=`${esc(gs.playerName||"你")} vs ${esc(gs.opponentName||"对手")}\n你: ♥${gs.you.hp}/${gs.you.maxHp}  对手: ♥${gs.opponent.hp}/${gs.opponent.maxHp}`;
   if(ST.eloResult){
     const er=ST.eloResult;
     const sign=er.change>0?"+":"";

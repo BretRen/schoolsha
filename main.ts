@@ -7,6 +7,7 @@ import { validateToken, extractToken, fetchUserInfo } from "./auth.ts";
 import { roomManager, type Client } from "./room.ts";
 import { matchmaking } from "./matchmaking.ts";
 import { getLeaderboard, getElo } from "./elo.ts";
+import { getAllCharacters } from "./skills.ts";
 import type { ClientMsg, RoomInfo } from "./types.ts";
 
 // ---------- 常量 ----------
@@ -253,9 +254,9 @@ Deno.serve({ port: PORT }, async (req) => {
     if (room.game && !room.game.gameOver && anyoneDisconnected(room.game)) {
       for (let i = 0; i < 2; i++) {
         if (room.game.disconnectedAt[i] !== null && !room.clients[i]) {
-          // 验证身份
+          // 验证身份（匿名模式下也必须校验，防止座位劫持）
           const savedId = room.disconnectedUserId[i];
-          if (AUTH_ENABLED && savedId && savedId !== userId) {
+          if (savedId && savedId !== userId) {
             console.log(`[${room.code}] reconnect denied: userId mismatch for P${i}`);
             send(socket, {
               type: "error",
@@ -326,6 +327,13 @@ Deno.serve({ port: PORT }, async (req) => {
 
     // ---- 角色选择阶段 ----
     if (!room.game && msg.action === "pick_character") {
+      // 校验角色 ID 有效性
+      const validChars = getAllCharacters();
+      const valid = validChars.find(c => c.id === msg.id);
+      if (!valid) {
+        send(socket, { type: "error", message: "无效的角色选择" });
+        return;
+      }
       room.picks[idx] = msg.id;
       const nameTag = room.clients[idx]?.displayName || "?";
       console.log(`[${room.code}] P${idx} (${nameTag}) picked: ${msg.id}`);

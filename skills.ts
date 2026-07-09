@@ -40,8 +40,7 @@ export type SkillEffect =
 const charMap = new Map<string, CharacterDef>();
 const skillMap = new Map<string, SkillDef>();
 
-// 技能已使用次数（per-turn 限制）
-const skillUseCount = new Map<string, number>();
+// 技能已使用次数（per-turn 限制）— 已迁移到 GameState.skillUseCount
 
 (function load() {
   for (const ch of (charactersConfig as { characters: CharacterDef[] }).characters) {
@@ -132,7 +131,7 @@ export function tryUseSkill(
 
   // per-turn 限制
   if (skill.perTurn) {
-    const used = skillUseCount.get(skillId) ?? 0;
+    const used = state.skillUseCount[skillId] ?? 0;
     if (used >= skill.perTurn) return "本回合已使用过";
   }
 
@@ -149,7 +148,7 @@ export function tryUseSkill(
 
   // 标记使用
   if (skill.perTurn) {
-    skillUseCount.set(skillId, (skillUseCount.get(skillId) ?? 0) + 1);
+    state.skillUseCount[skillId] = (state.skillUseCount[skillId] ?? 0) + 1;
   }
 
   // 执行效果
@@ -206,6 +205,6 @@ function executeSkillEffect(state: GameState, playerIdx: number, skill: SkillDef
 }
 
 /** 新回合开始时重置 per-turn 计数 */
-export function resetSkillCounts() {
-  skillUseCount.clear();
+export function resetSkillCounts(state: GameState) {
+  state.skillUseCount = {};
 }

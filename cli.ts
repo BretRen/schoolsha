@@ -239,7 +239,7 @@ function render() {
 }
 
 // ─── 输入处理 ──────────────────────────────────────────────
-let _inputBuf = "";
+const _inputBuf = "";
 
 async function awaitInput() {
   await Deno.stdout.write(new TextEncoder().encode(`  ${CYA}>${R} `));

@@ -57,11 +57,20 @@ async function initAuth() {
 }
 
 // ====== 重连 ======
+function addActiveRoom(code) {
+  const saved = sessionStorage.getItem("active_room") || "";
+  const rooms = saved.split(",").filter(Boolean);
+  if (!rooms.includes(code)) rooms.push(code);
+  sessionStorage.setItem("active_room", rooms.join(","));
+}
 function checkReconnect() {
-  const savedRoom = sessionStorage.getItem("active_room");
-  if (!savedRoom) return;
-  createOverlay("🔌 断线重连", `活跃房间 <b style="color:#c4b5fd;font-family:monospace">${savedRoom}</b>`, 30, (t) => `${t} 秒内可重连`, () => {
-    ST.roomCode = savedRoom; connect(buildWsUrl(`?room=${savedRoom}`)); text("menu-status", "");
+  const saved = sessionStorage.getItem("active_room");
+  if (!saved) return;
+  const rooms = saved.split(",").filter(Boolean);
+  if (rooms.length === 0) return;
+  const code = rooms[rooms.length - 1]; // 取最后一个（最新）的房间
+  createOverlay("🔌 断线重连", `活跃房间 <b style="color:#c4b5fd">${code}</b>`, 30, (t) => `${t} 秒内可重连`, () => {
+    ST.roomCode = code; connect(buildWsUrl(`?room=${code}`)); text("menu-status", "");
   });
 }
 function createOverlay(title, body, seconds, countdownFn, onAction) {
@@ -86,7 +95,8 @@ function createOverlay(title, body, seconds, countdownFn, onAction) {
 function removeOverlay() {
   const el = document.getElementById("block-overlay");
   if (el) el.remove();
-  sessionStorage.removeItem("active_room");
+  // 不删除 active_room — 让重连提示在刷新后仍然存在
+  // active_room 只在游戏正常结束时清除
 }
 
 // ====== 状态 ======
@@ -94,6 +104,7 @@ const ST = {
   screen: "menu", ws: null, roomCode: null, mode: null, myIndex: -1, gs: null,
   selectedCards: new Set(), selectTarget: null,
   timerInterval: null, serverTimer: 60, lastHandSig: "", blocked: false,
+  eloResult: null,
 };
 
 // ====== 工具 ======
@@ -151,7 +162,7 @@ function connect(wsUrl) {
   ST.ws.onclose = () => {
     stopTimer();
     if (ST.screen === "game" || ST.screen === "char") {
-      if (ST.roomCode && ST.gs && !ST.gs.gameOver) sessionStorage.setItem("active_room", ST.roomCode);
+      if (ST.roomCode && ST.gs && !ST.gs.gameOver) addActiveRoom(ST.roomCode);
       showScreen("menu"); text("menu-status", "连接断开");
       if (ST.roomCode && ST.gs && !ST.gs.gameOver) checkReconnect();
     }
@@ -176,15 +187,29 @@ function stopTimer() { if (ST.timerInterval) { clearInterval(ST.timerInterval); 
 // ====== 消息处理 ======
 function handle(msg) {
   switch (msg.type) {
-    case "room_created": ST.roomCode = msg.code; ST.mode = "room"; sessionStorage.setItem("active_room", msg.code);
+    case "room_created": ST.roomCode = msg.code; ST.mode = "room"; addActiveRoom(msg.code);
       showScreen("lobby"); text("lobby-code", msg.code); text("lobby-invite", msg.inviteUrl); break;
     case "waiting": text("lobby-status", msg.message); break;
-    case "character_select": ST.mode = "room"; showScreen("char"); renderCharSelect(msg.characters, msg.timeoutSec); break;
+    case "character_select":
+      ST.mode = "room"; showScreen("char");
+      renderCharSelect(msg.characters, msg.timeoutSec);
+      // 显示对手信息和 ELO 预测
+      if (msg.opponent) {
+        const op = msg.opponent;
+        const p = msg.elo?.prediction;
+        const eloLine = p ? ` (ELO ${msg.elo.my} → 胜+${p.win} / 负${p.lose})` : '';
+        text("char-status", `对手: ${op.displayName} (ELO ${op.elo})${eloLine}`);
+      }
+      break;
     case "game_state":
       ST.gs = msg.state; ST.myIndex = msg.yourIndex;
       if (ST.screen !== "game") showScreen("game");
       renderGame();
-      if (ST.gs.gameOver) { sessionStorage.removeItem("active_room"); stopTimer(); showGameOver(); }
+      if (ST.gs.gameOver) {
+        // 保存 ELO 结果用于显示
+        if (msg.eloResult) ST.eloResult = msg.eloResult;
+        sessionStorage.removeItem("active_room"); stopTimer(); showGameOver();
+      }
       break;
     case "disconnected":
       show("opp-disconnected");
@@ -197,7 +222,7 @@ function handle(msg) {
       break;
     case "queue_status": ST.mode = "matching"; showScreen("lobby"); text("lobby-code", ""); text("lobby-invite", "");
       text("lobby-status", `匹配中... 排队: ${msg.position} (预计 ${msg.estimatedWait})`); break;
-    case "match_found": ST.mode = "matching"; ST.roomCode = msg.room; sessionStorage.setItem("active_room", msg.room);
+    case "match_found": ST.mode = "matching"; ST.roomCode = msg.room; addActiveRoom(msg.room);
       text("lobby-status", `匹配成功！${msg.opponent.displayName} (ELO ${msg.opponent.elo})`); connect(buildWsUrl(`?room=${msg.room}`)); break;
     case "queue_timeout": showScreen("menu"); text("menu-status", "匹配超时"); break;
     case "error": log(`错误: ${msg.message}`);
@@ -355,7 +380,12 @@ function showGameOver() {
   const gs = ST.gs; if (!gs?.gameOver) return; show("game-over-overlay");
   const won = gs.winner === ST.myIndex; const el = $("go-title");
   el.textContent = won ? "🎉 胜利！" : "💀 失败"; el.className = won ? "win" : "lose";
-  text("go-subtitle", `${gs.playerName||"你"} vs ${gs.opponentName||"对手"}\n你: ♥${gs.you.hp}/${gs.you.maxHp}  对手: ♥${gs.opponent.hp}/${gs.opponent.maxHp}`);
+  let subtitle = `${gs.playerName||"你"} vs ${gs.opponentName||"对手"}\n你: ♥${gs.you.hp}/${gs.you.maxHp}  对手: ♥${gs.opponent.hp}/${gs.opponent.maxHp}`;
+  if (ST.eloResult) {
+    const er = ST.eloResult;
+    subtitle += `\n\nELO ${won ? "+" : ""}${er.change} → ${er.newElo} (对手 ${er.opponentChange > 0 ? "+" : ""}${er.opponentChange})`;
+  }
+  text("go-subtitle", subtitle); ST.eloResult = null;
 }
 
 // ====== 初始化 ======

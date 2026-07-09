@@ -8,7 +8,7 @@ import {
   anyoneDisconnected, advancePhase,
 } from "./game.ts";
 import { getAllCharacters, getHandLimit } from "./skills.ts";
-import { updateElo } from "./elo.ts";
+import { updateElo, predictEloChange, getElo } from "./elo.ts";
 import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts";
 
 // ---------- 常量 ----------
@@ -96,7 +96,25 @@ export class Room {
       const w = this.clients[wIdx];
       const l = this.clients[lIdx];
       if (w && l) {
-        updateElo(w.userId, l.userId, w.displayName, l.displayName);
+        const result = updateElo(w.userId, l.userId, w.displayName, l.displayName);
+        // 广播带有 ELO 结果的 game_state
+        for (let i = 0; i < 2; i++) {
+          const c = this.clients[i];
+          if (!c || c.socket.readyState !== WebSocket.OPEN) continue;
+          const view = getPlayerView(this.game, i);
+          view.playerName = c.displayName;
+          view.playerId = c.userId;
+          const opp2 = this.clients[1 - i];
+          view.opponentName = opp2?.displayName || "?";
+          view.opponentId = opp2?.userId || "";
+          const change = i === wIdx ? result.winnerChange : result.loserChange;
+          const newElo = i === wIdx ? result.winnerNewElo : result.loserNewElo;
+          this.send(c.socket, {
+            type: "game_state", state: view, yourIndex: i,
+            eloResult: { change, newElo, opponentChange: i === wIdx ? result.loserChange : result.winnerChange },
+          });
+        }
+        return;
       }
     }
   }
@@ -228,10 +246,23 @@ export class Room {
       skills: c.skills,
     }));
     for (const c of this.clients) {
-      if (c) this.send(c.socket, {
+      if (!c) continue;
+      const opp = this.clients[1 - c.index];
+      const oppInfo = opp ? {
+        displayName: opp.displayName,
+        elo: getElo(opp.userId),
+        userId: opp.userId,
+      } : null;
+
+      const myElo = getElo(c.userId);
+      const prediction = opp ? predictEloChange(myElo, getElo(opp.userId)) : null;
+
+      this.send(c.socket, {
         type: "character_select",
         characters: chars,
         timeoutSec: CHAR_SELECT_TIMEOUT_SEC,
+        opponent: oppInfo,
+        elo: { my: myElo, prediction },
       });
     }
     this.startSelectTimer();

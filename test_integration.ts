@@ -16,7 +16,9 @@ function ok(name: string, cond: boolean, detail?: string) {
 // 消息队列模式的 recv — 避免 Deno WebSocket 消息丢失
 class WsClient {
   ws: WebSocket;
+// deno-lint-ignore no-explicit-any
   private queue: any[] = [];
+  // deno-lint-ignore no-explicit-any
   private waiters: ((m: any) => void)[] = [];
 
   constructor(url: string) {
@@ -31,6 +33,7 @@ class WsClient {
     };
   }
 
+  // deno-lint-ignore no-explicit-any
   recv(timeout = 5000): Promise<any> {
     return new Promise((resolve, reject) => {
       const t = setTimeout(() => reject(new Error("timeout")), timeout);
@@ -43,6 +46,7 @@ class WsClient {
     });
   }
 
+  // deno-lint-ignore no-explicit-any
   send(msg: any) { this.ws.send(JSON.stringify(msg)); }
   close() { this.ws.close(); }
 }

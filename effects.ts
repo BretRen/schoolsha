@@ -2,7 +2,7 @@
 // effects.ts — 卡牌效果 + 装备系统
 // ============================================================
 
-import type { GameState, Card, CardType, PendingType } from "./types.ts";
+import type { GameState, Card, PendingType } from "./types.ts";
 import { hasCard, removeCard, drawCards } from "./cards.ts";
 import { emit } from "./events.ts";
 
@@ -37,7 +37,7 @@ type Condition = (s: GameState, p: number) => boolean;
 const isTurn: Condition = (s, p) => p === s.turnPlayer;
 const playPhase: Condition = (s) => s.phase === "play";
 const noPending: Condition = (s) => !s.pendingResponse;
-const noAttack: Condition = (s) => !s.attackUsed;
+const _noAttack: Condition = (s) => !s.attackUsed;
 const hpBelowMax: Condition = (s, p) => s.players[p].hp < s.players[p].maxHp;
 /** AI武器：无视attackUsed限制 */
 const canAttack: Condition = (s, p) =>

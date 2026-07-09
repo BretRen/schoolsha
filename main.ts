@@ -227,7 +227,7 @@ Deno.serve({ port: PORT }, async (req) => {
   // ---- 房间模式 WebSocket ----
   const { socket, response } = Deno.upgradeWebSocket(req);
 
-  let room = roomCode ? roomManager.getOrCreateRoom(roomCode) : roomManager.createRoom();
+  const room = roomCode ? roomManager.getOrCreateRoom(roomCode) : roomManager.createRoom();
   let seat = -1;
 
   socket.addEventListener("open", () => {

@@ -9,7 +9,7 @@ import {
 } from "./game.ts";
 import { getAllCharacters } from "./skills.ts";
 import { updateElo, predictEloChange, getElo } from "./elo.ts";
-import type { GameState, ServerMsg, ClientMsg, CharacterInfo } from "./types.ts";
+import type { GameState, ServerMsg, CharacterInfo } from "./types.ts";
 
 // ---------- 常量 ----------
 
@@ -261,7 +261,7 @@ export class Room {
         type: "character_select",
         characters: chars,
         timeoutSec: CHAR_SELECT_TIMEOUT_SEC,
-        opponent: oppInfo,
+        opponent: oppInfo ?? undefined,
         elo: { my: myElo, prediction },
       });
     }

@@ -30,7 +30,7 @@ async function handleAuthCallback() {
 async function initAuth() {
   try { const r = await fetch(`${HTTP_URL}/info`); const info = await r.json();
     if (info.auth?.mode==="zitadel_oidc") { AUTH.enabled=true; AUTH.provider=info.auth.provider; AUTH.clientId=info.auth.clientId; }
-  } catch {}
+  } catch { /* noop */ }
   const saved = sessionStorage.getItem("auth_token"); if (saved) AUTH.token = saved;
   if (AUTH.enabled && location.search.includes("code=")) { if (await handleAuthCallback()) { checkReconnect(); return; } }
   if (AUTH.token) checkReconnect();
@@ -136,11 +136,15 @@ function blockGame(msg,att){ST.blocked=true;createOverlay("⚠ 对手已断线",
 
 // ====== 菜单 ======
 function ensureAuth(){if(AUTH.enabled&&!AUTH.token){text("menu-status","请先登录");startLogin();return false;}return true;}
+// deno-lint-ignore no-unused-vars
 function createRoom(){if(!ensureAuth())return;fetch(`${HTTP_URL}/room/create`).then(r=>r.json()).then(info=>{ST.roomCode=info.code;connect(buildWsUrl(`?room=${info.code}`));text("menu-status","");}).catch(()=>text("menu-status","无法连接服务器"));}
 function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim().toUpperCase();if(!code)return;ST.roomCode=code;connect(buildWsUrl(`?room=${code}`));text("menu-status","");}
+// deno-lint-ignore no-unused-vars
 function quickMatch(){if(!ensureAuth())return;connect(buildWsUrl("?mode=matching"));ST.mode="matching";text("menu-status","");}
+// deno-lint-ignore no-unused-vars
 function leaveLobby(){if(ST.ws)ST.ws.close();showScreen("menu");}
 function backToMenu(){stopTimer();if(ST.ws)ST.ws.close();ST.ws=null;ST.gs=null;ST.roomCode=null;ST.myIndex=-1;ST.selectedCards.clear();ST.blocked=false;removeOverlay();hide("game-over-overlay");showScreen("menu");}
+// deno-lint-ignore no-unused-vars
 function showLeaderboard(){fetch(`${HTTP_URL}/leaderboard`+(ST.gs?.playerId?`?userId=${ST.gs.playerId}`:"")).then(r=>r.json()).then(renderLeaderboard).then(()=>showScreen("leaderboard")).catch(()=>text("menu-status","无法获取排行榜"));}
 function renderLeaderboard(data){
   let h=`<div class="lb-header"><span class="lb-rank">#</span><span class="lb-name">玩家</span><span class="lb-elo">ELO</span><span class="lb-stats">胜/负</span></div>`;
@@ -151,6 +155,7 @@ function renderLeaderboard(data){
 
 // ====== 选角 ======
 function renderCharSelect(chars,timeout){let h="";for(const c of chars)h+=`<div class="chcard" onclick="pickCharacter('${c.id}')"><h3>${c.name}</h3><div class="hp">♥ × ${c.maxHp}</div><div class="sk">${c.skills.length?c.skills.join(" · "):"无技能"}</div></div>`;html("char-list",h);text("char-timer",`${timeout}s`);}
+// deno-lint-ignore no-unused-vars
 function pickCharacter(id){document.querySelectorAll(".chcard").forEach(e=>e.classList.remove("selected"));const c=[...document.querySelectorAll(".chcard")].find(e=>e.innerHTML.includes(id));if(c)c.classList.add("selected");send({action:"pick_character",id});text("char-status","已选择");}
 
 // ====== 游戏渲染 ======
@@ -248,9 +253,13 @@ function renderActions(gs){
 }
 
 // ====== 卡牌操作 ======
+// deno-lint-ignore no-unused-vars
 function toggleCard(id){if(ST.blocked)return;const gs=ST.gs;if(!gs)return;const isDiscard=gs.phase==="discard"&&gs.turnPlayer===ST.myIndex;if(ST.selectedCards.has(id))ST.selectedCards.delete(id);else{if(isDiscard)ST.selectedCards.add(id);else{ST.selectedCards.clear();ST.selectedCards.add(id);}}renderHand(gs.you.hand);renderActions(gs);renderCardInfo();}
+// deno-lint-ignore no-unused-vars
 function playSelected(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"play_card",card_id:ids[0],target:ST.myIndex===0?1:0});ST.selectedCards.clear();}
+// deno-lint-ignore no-unused-vars
 function respondCard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"play_card",card_id:ids[0]});ST.selectedCards.clear();}
+// deno-lint-ignore no-unused-vars
 function doDiscard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"discard",card_ids:ids});ST.selectedCards.clear();}
 
 // ====== 游戏结束 ======

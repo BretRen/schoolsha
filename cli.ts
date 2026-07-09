@@ -18,7 +18,7 @@ const CYA = "\x1b[36m";
 const WHITE = "\x1b[37m";
 const BG_R = "\x1b[41m";
 const BG_G = "\x1b[42m";
-const BG_B = "\x1b[44m";
+const _BG_B = "\x1b[44m";
 
 // ─── 连接 ──────────────────────────────────────────────
 const ws = new WebSocket(WS_URL);
@@ -239,7 +239,7 @@ function render() {
 }
 
 // ─── 输入处理 ──────────────────────────────────────────────
-let inputBuf = "";
+let _inputBuf = "";
 
 async function awaitInput() {
   await Deno.stdout.write(new TextEncoder().encode(`  ${CYA}>${R} `));

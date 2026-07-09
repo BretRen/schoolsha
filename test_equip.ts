@@ -1,7 +1,6 @@
 // Unit test: equip mechanics (runs without WebSocket)
 import { Card, GameState, Suit, CardType, Player } from "./types.ts";
-import { tryUseCard, handleTimeout, registerCardEffect, getCardEffect } from "./effects.ts";
-import type { GameEvent } from "./events.ts";
+import { tryUseCard, handleTimeout, registerCardEffect as _registerCardEffect, getCardEffect } from "./effects.ts";
 
 // Build a minimal game state with known cards
 function makeCard(id: string, name: string, type: string, suit: string, num: number): Card {

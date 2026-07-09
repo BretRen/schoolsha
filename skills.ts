@@ -66,7 +66,7 @@ export function getSkill(id: string): SkillDef | undefined {
 
 /** 角色被动/锁定技挂载到事件总线 */
 export function mountPassiveSkills(
-  state: GameState,
+  _state: GameState,
   playerIdx: number,
   charId: string,
 ): (() => void)[] {

@@ -137,8 +137,8 @@ function blockGame(msg,att){ST.blocked=true;createOverlay("⚠ 对手已断线",
 // ====== 菜单 ======
 function ensureAuth(){if(AUTH.enabled&&!AUTH.token){text("menu-status","请先登录");startLogin();return false;}return true;}
 // deno-lint-ignore no-unused-vars
-function createRoom(){if(!ensureAuth())return;fetch(`${HTTP_URL}/room/create`).then(r=>r.json()).then(info=>{ST.roomCode=info.code;connect(buildWsUrl(`?room=${info.code}`));text("menu-status","");}).catch(()=>text("menu-status","无法连接服务器"));}
-function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim().toUpperCase();if(!code)return;ST.roomCode=code;connect(buildWsUrl(`?room=${code}`));text("menu-status","");}
+function createRoom(){if(!ensureAuth())return;fetch(`${HTTP_URL}/room/create`).then(r=>r.json()).then(info=>{ST.roomCode=info.code;ST.mode="room";addActiveRoom(info.code);showScreen("lobby");text("lobby-code",info.code);text("lobby-invite",info.inviteUrl);connect(buildWsUrl(`?room=${info.code}`));text("menu-status","");}).catch(()=>text("menu-status","无法连接服务器"));}
+function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim().toUpperCase();if(!code)return;ST.roomCode=code;ST.mode="room";addActiveRoom(code);showScreen("lobby");connect(buildWsUrl(`?room=${code}`));text("menu-status","");}
 // deno-lint-ignore no-unused-vars
 function quickMatch(){if(!ensureAuth())return;connect(buildWsUrl("?mode=matching"));ST.mode="matching";text("menu-status","");}
 // deno-lint-ignore no-unused-vars

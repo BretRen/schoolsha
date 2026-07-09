@@ -121,6 +121,8 @@ export interface ServerStateView {
   opponentName: string;
   /** 对手的唯一 ID */
   opponentId: string;
+  /** 当前手牌上限（含技能加成） */
+  handLimit: number;
 }
 
 export type ServerMsg =

@@ -166,6 +166,10 @@ Deno.serve({ port: PORT }, async (req) => {
     }
     if (url.pathname.startsWith("/web/")) {
       const filePath = url.pathname.slice(1);
+      // 防止路径遍历攻击
+      if (filePath.includes("..") || filePath.includes("~")) {
+        return new Response("Forbidden", { status: 403 });
+      }
       const ext = filePath.split(".").pop() || "";
       const mime: Record<string, string> = {
         html: "text/html", css: "text/css", js: "application/javascript",

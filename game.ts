@@ -305,7 +305,7 @@ export function markDisconnected(state: GameState, playerIdx: number): boolean {
   state.disconnectCount[playerIdx]++;
   console.log(`P${playerIdx} disconnected (${state.disconnectCount[playerIdx]}/${MAX_DISCONNECTS})`);
 
-  if (state.disconnectCount[playerIdx] > MAX_DISCONNECTS) {
+  if (state.disconnectCount[playerIdx] > MAX_DISCONNECTS && !state.gameOver) {
     console.log(`P${playerIdx} exceeded disconnect limit, opponent wins`);
     state.gameOver = true;
     state.winner = 1 - playerIdx;
@@ -324,7 +324,7 @@ export function markReconnected(state: GameState, playerIdx: number) {
 export function checkDisconnectTimeout(state: GameState, playerIdx: number): boolean {
   const at = state.disconnectedAt[playerIdx];
   if (at === null) return false;
-  if (Date.now() - at > 30_000) {
+  if (Date.now() - at > 30_000 && !state.gameOver) {
     console.log(`P${playerIdx} disconnect timeout (30s), opponent wins`);
     state.gameOver = true;
     state.winner = 1 - playerIdx;
@@ -383,5 +383,6 @@ export function getPlayerView(
     playerId: "",
     opponentName: "",
     opponentId: "",
+    handLimit: getHandLimit(state, playerIdx, me.characterId ?? ""),
   };
 }

@@ -245,7 +245,7 @@ function renderActions(gs){
     if(gs.you.skills?.length)for(const s of gs.you.skills)btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'use_skill',skill_id:'${s}'})">技能: ${s}</button>`;
     btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'end_phase'})">结束出牌</button>`;
   }else if(isMyTurn&&gs.phase==="discard"&&!p){
-    const need=gs.you.hand.length-gs.you.hp;
+    const need=gs.you.hand.length-(gs.handLimit||gs.you.hp);
     if(need>0&&ST.selectedCards.size>0)btns+=`<button class="btn btn-error btn-sm" onclick="doDiscard()">弃牌 (${ST.selectedCards.size}/${need})</button>`;
     if(need<=0)btns+=`<span class="text-sm opacity-60">无需弃牌</span>`;
   }

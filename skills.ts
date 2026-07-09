@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { GameState } from "./types.ts";
-import { onEvent } from "./events.ts";
+import { onEvent, emit } from "./events.ts";
 import { drawCards } from "./cards.ts";
 import charactersConfig from "./characters.json" with { type: "json" };
 import skillsConfig from "./skills.json" with { type: "json" };
@@ -192,6 +192,14 @@ function executeSkillEffect(state: GameState, playerIdx: number, skill: SkillDef
     case "damage": {
       const target = 1 - playerIdx;
       state.players[target].hp -= effect.amount;
+      if (state.players[target].hp < 0) state.players[target].hp = 0;
+      emit({ type: "damage", source: playerIdx, target, amount: effect.amount }, state);
+      if (state.players[target].hp <= 0 && !state.gameOver) {
+        state.players[target].alive = false;
+        state.gameOver = true;
+        state.winner = playerIdx;
+        emit({ type: "player_death", player: target }, state);
+      }
       break;
     }
   }

@@ -249,11 +249,16 @@ Deno.serve({ port: PORT }, async (req) => {
   // ---- 房间模式 WebSocket ----
   const { socket, response } = Deno.upgradeWebSocket(req);
 
-  const room = roomCode ? roomManager.getOrCreateRoom(roomCode) : roomManager.createRoom();
+  const room = roomCode ? (roomManager.getRoom(roomCode) ?? null) : roomManager.createRoom();
   let seat = -1;
 
   socket.addEventListener("open", () => {
     if (authError) { send(socket, { type: "error", message: authError }); socket.close(); return; }
+    if (!room) {
+      send(socket, { type: "error", message: "房间不存在或已失效" });
+      socket.close();
+      return;
+    }
     room.touch();
     const nameTag = displayName || "?";
 
@@ -329,6 +334,7 @@ Deno.serve({ port: PORT }, async (req) => {
   });
 
   socket.addEventListener("message", (event) => {
+    if (!room) return;
     // 限流检查
     if (!checkRateLimit(`msg:${userId}`)) return;
 
@@ -381,6 +387,7 @@ Deno.serve({ port: PORT }, async (req) => {
   });
 
   socket.addEventListener("close", () => {
+    if (!room) return;
     const idx = room.clients.findIndex((c) => c?.socket === socket);
     if (idx === -1) return;
 

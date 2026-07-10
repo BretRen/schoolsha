@@ -19,7 +19,7 @@ export { cardLabel };
 
 // ---------- 常量 ----------
 
-const TURN_TIMEOUT_SEC = 60;
+const TURN_TIMEOUT_SEC = 20;
 
 // ---------- 创建新游戏 ----------
 
@@ -213,6 +213,8 @@ function handlePlayCard(
 ): string | null {
   const error = tryUseCard(state, playerIdx, cardId, target);
   if (error) return error;
+  // 每次出牌重置倒计时
+  state.turnStartTime = Date.now();
   if (state.gameOver) return null;
   if (state.pendingResponse) return null;
   if (!state.players[state.turnPlayer].alive) return null;

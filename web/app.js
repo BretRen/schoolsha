@@ -324,6 +324,10 @@ function stopTimers() {
   if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
   if (_pendingTimer) { clearInterval(_pendingTimer); _pendingTimer = null; }
 }
+function stopTurnTimer() {
+  if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+  Alpine.store("g").turnTimerText = "";
+}
 
 function startPendingTimer(timeout) {
   if (_pendingTimer) clearInterval(_pendingTimer);

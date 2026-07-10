@@ -149,7 +149,7 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'game'"
-     x-effect="(function(){ if($store.g.screen==='game' && $store.g.gs && !$store.g.pending && $store.g.gs.turnTimeLeft !== $store.g._lastTurnTime) { $store.g._lastTurnTime = $store.g.gs.turnTimeLeft; startTurnTimer($store.g.gs.turnTimeLeft); } })()">
+     x-effect="(function(){ if($store.g.screen==='game' && $store.g.gs && !$store.g.pending && $store.g.gs.turnTimeLeft !== $store.g._lastTurnTime) { $store.g._lastTurnTime = $store.g.gs.turnTimeLeft; startTurnTimer($store.g.gs.turnTimeLeft); } else if($store.g.pending) { stopTurnTimer(); } })()">
 
   <!-- 左：自己面板 -->
   <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
@@ -194,7 +194,7 @@
 
     <!-- Pending -->
     <div x-show="$store.g.pending" style="background:#2d0a0a;color:#fca5a5;padding:6px 10px;border-radius:6px;text-align:center;font-size:11px;margin-bottom:4px;flex-shrink:0"
-         x-effect="if($store.g.pending && $store.g.isMyResp && $store.g.pending.timeout) startPendingTimer($store.g.pending.timeout); else stopPendingTimer()">
+         x-effect="(function(){ if($store.g.pending && $store.g.isMyResp && $store.g.pending.timeout) { stopTurnTimer(); startPendingTimer($store.g.pending.timeout); } else { stopPendingTimer(); } })()">
       ⚠ <strong x-text="$store.g.pendingPrefix()"></strong>需要响应：<span x-text="$store.g.pendingLabel()"></span>
       <span style="color:#f59e0b;font-weight:bold" x-text="$store.g.pendingTimerText"></span>
     </div>
@@ -247,19 +247,6 @@
       </template>
     </div>
 
-    <!-- Hand -->
-    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;padding:4px 0;min-height:56px;max-height:170px;overflow-y:auto;flex-shrink:0">
-      <template x-for="c in $store.g.me?.hand||[]" :key="c.id">
-        <div class="gcard" :class="c.suit + ($store.g.isCardSelected(c.id)?' selected':'') + ($store.g.isCardDisabled(c)?' disabled':'')"
-             :title="$store.g.disabledReason(c)"
-             @click="$store.g.toggleCard(c.id)">
-          <span class="gsuit" x-text="suitSym(c.suit)"></span>
-          <span class="gname" x-text="c.name"></span>
-          <span class="gnum" x-text="c.number"></span>
-        </div>
-      </template>
-    </div>
-
     <!-- Action bar -->
     <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:4px 0 8px;min-height:32px;align-items:center;flex-shrink:0">
       <!-- Skill discard -->
@@ -296,6 +283,19 @@
           </button>
         </template>
         <span x-show="$store.g.needDiscard() <= 0" class="text-sm opacity-60">无需弃牌</span>
+      </template>
+    </div>
+
+    <!-- Hand -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;padding:4px 0;min-height:56px;max-height:170px;overflow-y:auto;flex-shrink:0">
+      <template x-for="c in $store.g.me?.hand||[]" :key="c.id">
+        <div class="gcard" :class="c.suit + ($store.g.isCardSelected(c.id)?' selected':'') + ($store.g.isCardDisabled(c)?' disabled':'')"
+             :title="$store.g.disabledReason(c)"
+             @click="$store.g.toggleCard(c.id)">
+          <span class="gsuit" x-text="suitSym(c.suit)"></span>
+          <span class="gname" x-text="c.name"></span>
+          <span class="gnum" x-text="c.number"></span>
+        </div>
       </template>
     </div>
   </div>

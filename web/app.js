@@ -293,6 +293,7 @@ const RESP_NAMES = {
   barbarian:"【突击测验】！请出【作业】",
   volley:"【点名批评】！请出【豁免】",
   borrow_knife:"【告密】！请出武器牌",
+  steal:"【神偷】！选择要偷的牌（10秒）",
 };
 const RESP_NAMES_OPP = {
   dodge:"等待对手出【豁免】响应你的【作业】",
@@ -301,13 +302,22 @@ const RESP_NAMES_OPP = {
   barbarian:"等待对手出【作业】响应【突击测验】",
   volley:"等待对手出【豁免】响应【点名批评】",
   borrow_knife:"等待对手出武器牌响应【告密】",
+  steal:"对手正在选择要偷的牌...",
 };
 
 function renderPending(gs){
-  const p=gs.pendingResponse;if(!p){hide("pending-msg");return;}
+  const p=gs.pendingResponse;if(!p){hide("pending-msg");hide("steal-zone");return;}
   const isMe=p.target===ST.myIndex;
   html("pending-msg",`<strong>⚠ ${isMe?"你":"对手"}需要响应</strong>：${isMe?(RESP_NAMES[p.type]||p.type):(RESP_NAMES_OPP[p.type]||p.type)}`);
   show("pending-msg");
+  if(isMe && p.type==="steal" && p.selectableCards){
+    let h='<div class="flex gap-2 flex-wrap justify-center py-2">';
+    for(const c of p.selectableCards){
+      h+=`<div class="gcard ${c.suit}" onclick="send({action:'steal_card',card_id:'${c.id}'})"><span class="gsuit">${suitSym(c.suit)}</span><span class="gname">${c.name}</span><span class="gnum">${c.number}</span></div>`;
+    }
+    h+='</div>';
+    html("steal-zone",h);show("steal-zone");
+  }else{hide("steal-zone");}
 }
 
 function renderActions(gs){

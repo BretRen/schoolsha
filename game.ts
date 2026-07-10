@@ -4,7 +4,7 @@
 
 import type { GameState, Player, Phase, ServerStateView, PlayerView, ClientMsg } from "./types.ts";
 import { createDeck, shuffle, drawCards } from "./cards.ts";
-import { tryUseCard, handleTimeout } from "./effects.ts";
+import { tryUseCard, handleTimeout, handleStealCard } from "./effects.ts";
 import { cardLabel } from "./cards.ts";
 import { emit } from "./events.ts";
 import {
@@ -200,6 +200,9 @@ export function handleMessage(
       handleTimeout(state);
       return null;
     }
+
+    case "steal_card":
+      return handleStealCard(state, playerIdx, msg.card_id);
 
     default:
       return `未知操作: ${action}`;

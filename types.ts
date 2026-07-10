@@ -46,7 +46,7 @@ export interface Player {
   armor: Card | null;
 }
 
-export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife";
+export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal";
 
 export interface PendingResponse {
   type: PendingType;
@@ -54,6 +54,8 @@ export interface PendingResponse {
   target: number;
   card?: Card;
   timeout: number;
+  /** steal 类型时，可选的牌列表 */
+  selectableCards?: Card[];
 }
 
 export interface GameState {
@@ -103,7 +105,9 @@ export type ClientMsg =
   | { action: "use_skill"; skill_id: string; target?: number }
   | { action: "end_phase" }
   | { action: "discard"; card_ids: string[] }
+  | { action: "steal_card"; card_id: string }
   | { action: "pass" }
+  | { action: "respond"; card_id: string }
   | { action: "reconnect"; seat: number };
 
 export interface CharacterInfo {

@@ -349,9 +349,18 @@ registerCardEffect("神偷", {
   }),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    stealRandomCard(s, 1 - playerIdx, playerIdx);
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "神偷", target: 1 - playerIdx });
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+    const opponent = 1 - playerIdx;
+    const opp = s.players[opponent];
+    const pool: Card[] = [...opp.hand];
+    if (opp.weapon) pool.push(opp.weapon);
+    if (opp.armor) pool.push(opp.armor);
+    s.pendingResponse = {
+      type: "steal", source: playerIdx, target: playerIdx,
+      card, timeout: Date.now() + 10_000,
+      selectableCards: pool,
+    };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "神偷", target: opponent });
+    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
 });
 
@@ -617,9 +626,45 @@ export function tryRespond(
   if (pending.type === "near_death") return "需要出【补给】或【小抄】";
   if (pending.type === "duel" || pending.type === "barbarian") return "需要出【作业】";
   if (pending.type === "volley") return "需要出【豁免】";
+  if (pending.type === "steal") return "请选择要偷的牌";
   if (pending.type === "borrow_knife") return "需要弃一张牌";
 
   return "无效响应";
+}
+
+
+// ============================================================
+// steal 选牌处理
+// ============================================================
+
+export function handleStealCard(state: GameState, playerIdx: number, cardId: string): string | null {
+  const pending = state.pendingResponse;
+  if (!pending || pending.type !== "steal") return "没有正在进行的偷牌";
+  if (playerIdx !== pending.target) return "不是你在选择";
+  
+  const pool = pending.selectableCards;
+  if (!pool) return "无可选牌";
+  const card = pool.find(c => c.id === cardId);
+  if (!card) return "无效选择";
+  
+  const fromIdx = 1 - playerIdx;
+  const from = state.players[fromIdx];
+  
+  // 从对手手中或装备区移除
+  if (from.hand.some(c => c.id === cardId)) {
+    removeCard(from.hand, cardId);
+  } else if (from.weapon?.id === cardId) {
+    from.weapon = null;
+  } else if (from.armor?.id === cardId) {
+    from.armor = null;
+  }
+  
+  state.players[playerIdx].hand.push(card);
+  state.pendingResponse = null;
+  state.discard.push(pending.card!);
+  addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
+  emit({ type: "card_played", player: playerIdx, card }, state);
+  return null;
 }
 
 export function handleTimeout(state: GameState) {

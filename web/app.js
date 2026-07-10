@@ -154,6 +154,21 @@ function removeOverlay() {
   if (_overlayTimer) { clearInterval(_overlayTimer); _overlayTimer = null; }
   const el = document.getElementById("block-overlay"); if (el) el.remove();
 }
+function showLoginOverlay() {
+  removeOverlay();
+  const el = document.createElement("div"); el.id = "block-overlay";
+  el.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:999";
+  el.innerHTML = `<div style="background:var(--c-card);border:2px solid var(--c-accent);border-radius:16px;padding:40px 32px;text-align:center;max-width:340px;display:flex;flex-direction:column;gap:16px">
+    <div style="font-size:48px">🔐</div>
+    <h2 style="font-size:22px;font-weight:bold">请先登录</h2>
+    <p style="opacity:.6;font-size:14px">需要登录后才能进行游戏操作</p>
+    <button class="btn btn-primary w-full" id="login-overlay-btn">登录</button>
+  </div>`;
+  document.body.appendChild(el);
+  el.querySelector("#login-overlay-btn").onclick = () => startLogin();
+}
+function hideLoginOverlay() { removeOverlay(); }
+
 
 // ====== WebSocket ======
 function buildWsUrl(path) { let url = `${WS_URL}${path}`; if (AUTH.token) url += (path.includes("?") ? "&" : "?") + `token=${encodeURIComponent(AUTH.token)}`; return url; }
@@ -247,7 +262,7 @@ function send(msg) {
   if (store.ws?.readyState === WebSocket.OPEN) store.ws.send(JSON.stringify(msg));
 }
 
-function ensureAuth() { if (AUTH.enabled && !AUTH.token) { startLogin(); return false; } return true; }
+function ensureAuth() { if (AUTH.enabled && !AUTH.token) { showLoginOverlay(); return false; } return true; }
 
 let _creating = false;
 function createRoom() {
@@ -501,7 +516,25 @@ document.addEventListener("alpine:init", () => {
 // ====== Bootstrap ======
 (async () => {
   await initAuth();
-  if (AUTH.enabled) { document.getElementById("auth-section")?.classList.remove("hidden"); }
+  if (AUTH.enabled) {
+    if (AUTH.token) {
+      hideLoginOverlay();
+      const sec = document.getElementById("auth-section");
+      if (sec) { sec.classList.remove("hidden"); }
+      // Fetch user info
+      fetch(`${AUTH.provider}/oidc/v1/userinfo`, { headers: { Authorization: `Bearer ${AUTH.token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data) {
+            const name = data.nickname || data.name || data.preferred_username || "";
+            const el = document.getElementById("auth-user");
+            if (el) el.textContent = name || "已登录";
+          }
+        }).catch(() => {});
+    } else {
+      showLoginOverlay();
+    }
+  }
 })();
 
 // Start turn timer (called reactively)

@@ -58,7 +58,7 @@ function serveStatic(filePath: string, mime: string): Response {
     const content = Deno.readFileSync(filePath);
     const headers: Record<string, string> = { "content-type": `${mime}; charset=utf-8` };
     if (mime === "text/html") {
-      headers["content-security-policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' ws: wss: https://auth.pdnode.com; img-src 'self' data:;";
+      headers["content-security-policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' ws: wss: https://auth.pdnode.com; img-src 'self' data:;";
     }
     return new Response(content, { headers });
   } catch {

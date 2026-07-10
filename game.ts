@@ -203,7 +203,7 @@ export function handleMessage(
     }
 
     case "steal_card":
-      return handleStealCard(state, playerIdx, msg.card_id);
+      return handleStealCard(state, playerIdx, msg.position);
 
     default:
       return `未知操作: ${action}`;
@@ -364,7 +364,7 @@ export function getPlayerView(
     characterId: opponent.characterId,
     weapon: opponent.weapon,
     armor: opponent.armor,
-    skills: (oppChar?.skills ?? []).map(id => getSkill(id)?.name || id),
+    skills: (oppChar?.skills ?? []).map(id => ({ id, name: getSkill(id)?.name || id, type: getSkill(id)?.type || "active" })),
   };
 
   const char = me.characterId ? getCharacter(me.characterId) : null;
@@ -379,7 +379,7 @@ export function getPlayerView(
   return {
     phase: state.phase,
     turnPlayer: state.turnPlayer,
-    you: { ...me, skills: (char?.skills ?? []).map(id => getSkill(id)?.name || id) },
+    you: { ...me, skills: (char?.skills ?? []).map(id => ({ id, name: getSkill(id)?.name || id, type: getSkill(id)?.type || "active" })) },
     opponent: oppView,
     attackUsed: state.attackUsed,
     pendingResponse: pendingView,

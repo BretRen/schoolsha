@@ -357,8 +357,9 @@ registerCardEffect("神偷", {
     s.pendingResponse = {
       type: "steal", source: playerIdx, target: playerIdx,
       card, timeout: Date.now() + 10_000,
-      selectableCards: pool,
+      poolSize: pool.length,
     };
+    // 注意：不传 selectableCards — 盲选，客户端只知道数量
     addLog(s, { id: "card_played", player: playerIdx, cardName: "神偷", target: opponent });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
@@ -371,9 +372,19 @@ registerCardEffect("告密", {
   }),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    discardFromPool(s, 1 - playerIdx);
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "告密", target: 1 - playerIdx });
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+    const opponent = 1 - playerIdx;
+    const opp = s.players[opponent];
+    const pool: Card[] = [...opp.hand];
+    if (opp.weapon) pool.push(opp.weapon);
+    if (opp.armor) pool.push(opp.armor);
+    s.pendingResponse = {
+      type: "steal", source: playerIdx, target: playerIdx,
+      card, timeout: Date.now() + 10_000,
+      poolSize: pool.length,
+      stealAction: "discard",
+    };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "告密", target: opponent });
+    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
 });
 
@@ -637,29 +648,39 @@ export function tryRespond(
 // steal 选牌处理
 // ============================================================
 
-export function handleStealCard(state: GameState, playerIdx: number, cardId: string): string | null {
+export function handleStealCard(state: GameState, playerIdx: number, position?: number): string | null {
   const pending = state.pendingResponse;
   if (!pending || pending.type !== "steal") return "没有正在进行的偷牌";
   if (playerIdx !== pending.target) return "不是你在选择";
-  
-  const pool = pending.selectableCards;
-  if (!pool) return "无可选牌";
-  const card = pool.find(c => c.id === cardId);
-  if (!card) return "无效选择";
-  
-  const fromIdx = 1 - playerIdx;
-  const from = state.players[fromIdx];
-  
+
+  const opponent = 1 - playerIdx;
+  const opp = state.players[opponent];
+
+  // 构建池（同 onUse 顺序：手牌 + 武器 + 护甲）
+  const pool: Card[] = [...opp.hand];
+  if (opp.weapon) pool.push(opp.weapon);
+  if (opp.armor) pool.push(opp.armor);
+  if (pool.length === 0) return "无可选牌";
+
+  // 盲选：根据位置（1-indexed），超时时由 handleTimeout 随机选
+  const pos = (position != null && position >= 1 && position <= pool.length) ? position : Math.floor(Math.random() * pool.length) + 1;
+  const card = pool[pos - 1];
+
   // 从对手手中或装备区移除
-  if (from.hand.some(c => c.id === cardId)) {
-    removeCard(from.hand, cardId);
-  } else if (from.weapon?.id === cardId) {
-    from.weapon = null;
-  } else if (from.armor?.id === cardId) {
-    from.armor = null;
+  if (opp.hand.some(c => c.id === card.id)) {
+    removeCard(opp.hand, card.id);
+  } else if (opp.weapon?.id === card.id) {
+    opp.weapon = null;
+  } else if (opp.armor?.id === card.id) {
+    opp.armor = null;
   }
-  
-  state.players[playerIdx].hand.push(card);
+
+  // 偷或弃
+  if (pending.stealAction === "discard") {
+    state.discard.push(card);
+  } else {
+    state.players[playerIdx].hand.push(card);
+  }
   state.pendingResponse = null;
   state.discard.push(pending.card!);
   addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
@@ -707,6 +728,12 @@ export function handleTimeout(state: GameState) {
     if (state.players[target].hp <= 0) {
       setNearDeathPending(state, pending.source);
     }
+    return;
+  }
+
+  // steal 超时 → 随机选一张
+  if (pending.type === "steal") {
+    handleStealCard(state, pending.target!);
     return;
   }
 

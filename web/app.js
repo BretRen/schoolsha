@@ -212,14 +212,14 @@ function renderGame(){
   if(gs.opponentDisconnected)show("opp-disconnected");else hide("opp-disconnected");
   // 对手技能
   const oppSkills=gs.opponent.skills||[];
-  text("opp-skills",oppSkills.length?oppSkills.map(s=>`• ${s}`).join("<br>"):"");
+  text("opp-skills",oppSkills.length?oppSkills.map(s=>`• ${s.name}`).join("<br>"):"");
 
   const me=gs.you;
   text("my-name",gs.playerName||"你");$("my-hp").textContent=hpStr(me.hp,me.maxHp);
   let meq="";if(me.weapon)meq+=`🗡 ${cn(me.weapon)} `;if(me.armor)meq+=`🛡 ${cn(me.armor)}`;text("my-equip",meq);
   // 自己技能
   const mySkills=me.skills||[];
-  text("my-skills",mySkills.length?mySkills.map(s=>`• ${s}`).join("<br>"):"");
+  text("my-skills",mySkills.length?mySkills.map(s=>`• ${s.name}`).join("<br>"):"");
 
   const pn={judge:"判定",draw:"摸牌",play:"出牌",discard:"弃牌",end:"结束"};
   text("phase-label",pn[gs.phase]||gs.phase);text("deck-count",`牌堆: ${gs.deckCount}`);
@@ -293,7 +293,7 @@ const RESP_NAMES = {
   barbarian:"【突击测验】！请出【作业】",
   volley:"【点名批评】！请出【豁免】",
   borrow_knife:"【告密】！请出武器牌",
-  steal:"【神偷】！选择要偷的牌（10秒）",
+  steal:"选择对手一张牌（10秒）",
 };
 const RESP_NAMES_OPP = {
   dodge:"等待对手出【豁免】响应你的【作业】",
@@ -302,7 +302,7 @@ const RESP_NAMES_OPP = {
   barbarian:"等待对手出【作业】响应【突击测验】",
   volley:"等待对手出【豁免】响应【点名批评】",
   borrow_knife:"等待对手出武器牌响应【告密】",
-  steal:"对手正在选择要偷的牌...",
+  steal:"对手正在选择要弃的牌...",
 };
 
 function renderPending(gs){
@@ -310,10 +310,10 @@ function renderPending(gs){
   const isMe=p.target===ST.myIndex;
   html("pending-msg",`<strong>⚠ ${isMe?"你":"对手"}需要响应</strong>：${isMe?(RESP_NAMES[p.type]||p.type):(RESP_NAMES_OPP[p.type]||p.type)}`);
   show("pending-msg");
-  if(isMe && p.type==="steal" && p.selectableCards){
+  if(isMe && p.type==="steal" && p.poolSize){
     let h='<div class="flex gap-2 flex-wrap justify-center py-2">';
-    for(const c of p.selectableCards){
-      h+=`<div class="gcard ${c.suit}" onclick="send({action:'steal_card',card_id:'${c.id}'})"><span class="gsuit">${suitSym(c.suit)}</span><span class="gname">${c.name}</span><span class="gnum">${c.number}</span></div>`;
+    for(let i=1;i<=p.poolSize;i++){
+      h+=`<div class="gcard facedown" onclick="send({action:'steal_card',position:${i}})"><span class="gsuit">?</span><span class="gname">第${i}张</span></div>`;
     }
     h+='</div>';
     html("steal-zone",h);show("steal-zone");
@@ -343,7 +343,7 @@ function renderActions(gs){
     if(ST.selectedCards.size>0)btns+=`<button class="btn btn-primary btn-sm" onclick="respondCard()">出牌响应</button>`;
   }else if(isMyTurn&&gs.phase==="play"&&!p){
     if(ST.selectedCards.size>0)btns+=`<button class="btn btn-primary btn-sm" onclick="playSelected()">出牌</button>`;
-    if(gs.you.skills?.length)for(const s of gs.you.skills)btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'use_skill',skill_id:'${s}'})">技能: ${s}</button>`;
+    if(gs.you.skills?.length)for(const s of gs.you.skills)if(s.type==="active")btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'use_skill',skill_id:'${s.id}'})">技能: ${s.name}</button>`;
     btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'end_phase'})">结束出牌</button>`;
   }else if(isMyTurn&&gs.phase==="discard"&&!p){
     const need=gs.you.hand.length-(gs.handLimit||gs.you.hp);

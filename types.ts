@@ -54,8 +54,12 @@ export interface PendingResponse {
   target: number;
   card?: Card;
   timeout: number;
-  /** steal 类型时，可选的牌列表 */
+  /** steal 类型时，可选的牌列表（明选，旧版） */
   selectableCards?: Card[];
+  /** steal 类型时，对手牌数量（盲选） */
+  poolSize?: number;
+  /** 选牌后的动作：偷(默认) 或 弃 */
+  stealAction?: "steal" | "discard";
 }
 
 export interface GameState {
@@ -105,7 +109,7 @@ export type ClientMsg =
   | { action: "use_skill"; skill_id: string; target?: number }
   | { action: "end_phase" }
   | { action: "discard"; card_ids: string[] }
-  | { action: "steal_card"; card_id: string }
+  | { action: "steal_card"; card_id?: string; position?: number }
   | { action: "pass" }
   | { action: "respond"; card_id: string }
   | { action: "reconnect"; seat: number };
@@ -117,6 +121,12 @@ export interface CharacterInfo {
   skills: string[];
 }
 
+export interface SkillView {
+  id: string;
+  name: string;
+  type: string; // "active" | "passive" | "locked"
+}
+
 export interface PlayerView {
   hp: number;
   maxHp: number;
@@ -125,7 +135,7 @@ export interface PlayerView {
   characterId: string | null;
   weapon: Card | null;
   armor: Card | null;
-  skills: string[];
+  skills: SkillView[];
 }
 
 export interface ServerStateView {
@@ -133,7 +143,7 @@ export interface ServerStateView {
   turnPlayer: number;
   you: {
     hp: number; maxHp: number; hand: Card[]; alive: boolean;
-    characterId: string | null; skills: string[];
+    characterId: string | null; skills: SkillView[];
     weapon: Card | null; armor: Card | null;
   };
   opponent: PlayerView;

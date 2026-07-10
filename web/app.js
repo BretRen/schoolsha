@@ -33,7 +33,16 @@ async function initAuth() {
   } catch { /* noop */ }
   const saved = sessionStorage.getItem("auth_token"); if (saved) AUTH.token = saved;
   if (AUTH.enabled && location.search.includes("code=")) { await handleAuthCallback(); }
-  if (AUTH.token) fetchDisconnectedGames();
+  if (AUTH.token) {
+    // 邀请链接：OAuth 前存了房间码，现在自动加入
+    const inviteRoom = sessionStorage.getItem("invite_room");
+    if (inviteRoom) {
+      sessionStorage.removeItem("invite_room");
+      joinRoomByCode(inviteRoom);
+      return;
+    }
+    fetchDisconnectedGames();
+  }
 }
 
 // ====== 重连 ======
@@ -159,7 +168,8 @@ function ensureAuth(){if(AUTH.enabled&&!AUTH.token){text("menu-status","请先�
 let _creating=false;
 // deno-lint-ignore no-unused-vars
 function createRoom(){if(!ensureAuth()||_creating)return;_creating=true;fetch(`${HTTP_URL}/room/create`).then(r=>r.json()).then(info=>{ST.roomCode=info.code;ST.mode="room";addActiveRoom(info.code);showScreen("lobby");text("lobby-code",info.code);text("lobby-invite",info.inviteUrl);connect(buildWsUrl(`?room=${info.code}`));text("menu-status","");}).catch(()=>text("menu-status","无法连接服务器")).finally(()=>{_creating=false;});}
-function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim().toUpperCase();if(!code)return;ST.roomCode=code;ST.mode="room";addActiveRoom(code);showScreen("lobby");connect(buildWsUrl(`?room=${code}`));text("menu-status","");}
+function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim().toUpperCase();if(!code)return;joinRoomByCode(code);}
+function joinRoomByCode(code){ST.roomCode=code;ST.mode="room";addActiveRoom(code);showScreen("lobby");connect(buildWsUrl(`?room=${code}`));text("menu-status","");}
 // deno-lint-ignore no-unused-vars
 function quickMatch(){if(!ensureAuth())return;connect(buildWsUrl("?mode=matching"));ST.mode="matching";text("menu-status","");}
 // deno-lint-ignore no-unused-vars

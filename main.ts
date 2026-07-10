@@ -69,7 +69,7 @@ function serveStatic(filePath: string, mime: string): Response {
 // ---------- 邀请落地页 ----------
 
 function inviteHTML(code: string): string {
-  const link = deepLink(code);
+  const gameUrl = `${PUBLIC_URL}/?room=${code}`;
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -110,14 +110,14 @@ function inviteHTML(code: string): string {
   <h1>🏫 学校杀</h1>
   <p>好友邀请你加入对战</p>
   <div class="code">${code}</div>
-  <a class="btn" href="${link}">打开游戏</a>
+  <a class="btn" href="${gameUrl}">加入游戏</a>
   <p class="hint">
-    如未自动跳转，请确保已安装游戏客户端<br>
-    或复制上方房间码手动加入
+    如未自动跳转，点击上方按钮进入
   </p>
 </div>
 <script>
-  window.location.href = "${link}";
+  sessionStorage.setItem("invite_room", "${code}");
+  window.location.href = "/";
 </script>
 </body>
 </html>`;

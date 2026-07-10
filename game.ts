@@ -351,6 +351,7 @@ export function getPlayerView(
   const me = state.players[playerIdx];
   const opponent = state.players[1 - playerIdx];
 
+  const oppChar = opponent.characterId ? getCharacter(opponent.characterId) : null;
   const oppView: PlayerView = {
     hp: opponent.hp,
     maxHp: opponent.maxHp,
@@ -359,6 +360,7 @@ export function getPlayerView(
     characterId: opponent.characterId,
     weapon: opponent.weapon,
     armor: opponent.armor,
+    skills: oppChar?.skills ?? [],
   };
 
   const char = me.characterId ? getCharacter(me.characterId) : null;

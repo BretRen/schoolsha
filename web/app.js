@@ -208,12 +208,18 @@ function renderGame(){
   const opp=gs.opponent;
   text("opp-name",gs.opponentName||"对手");$("opp-hp").textContent=hpStr(opp.hp,opp.maxHp);
   text("opp-cards",`手牌: ${opp.handCount}`);
-  let oe="";if(opp.weapon)oe+=`武器: ${cn(opp.weapon)} `;if(opp.armor)oe+=`防具: ${cn(opp.armor)}`;text("opp-equip",oe);
+  let oe="";if(opp.weapon)oe+=`🗡 ${cn(opp.weapon)} `;if(opp.armor)oe+=`🛡 ${cn(opp.armor)}`;text("opp-equip",oe);
   if(gs.opponentDisconnected)show("opp-disconnected");else hide("opp-disconnected");
+  // 对手技能
+  const oppSkills=gs.opponent.skills||[];
+  text("opp-skills",oppSkills.length?oppSkills.map(s=>`• ${s}`).join("<br>"):"");
 
   const me=gs.you;
   text("my-name",gs.playerName||"你");$("my-hp").textContent=hpStr(me.hp,me.maxHp);
-  let meq="";if(me.weapon)meq+=`武器: ${cn(me.weapon)} `;if(me.armor)meq+=`防具: ${cn(me.armor)}`;text("my-equip",meq);
+  let meq="";if(me.weapon)meq+=`🗡 ${cn(me.weapon)} `;if(me.armor)meq+=`🛡 ${cn(me.armor)}`;text("my-equip",meq);
+  // 自己技能
+  const mySkills=me.skills||[];
+  text("my-skills",mySkills.length?mySkills.map(s=>`• ${s}`).join("<br>"):"");
 
   const pn={judge:"判定",draw:"摸牌",play:"出牌",discard:"弃牌",end:"结束"};
   text("phase-label",pn[gs.phase]||gs.phase);text("deck-count",`牌堆: ${gs.deckCount}`);

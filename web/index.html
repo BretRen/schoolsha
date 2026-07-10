@@ -111,40 +111,52 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen hidden">
-  <div class="w-full rounded-[10px] p-3" style="background:var(--c-card);border:1px solid var(--c-border)">
-    <div class="flex items-center gap-3">
-      <span id="opp-name" class="font-bold text-lg"></span>
-      <span id="opp-hp" class="font-mono"></span>
-      <span id="opp-cards" class="text-sm opacity-60 ml-auto"></span>
+  <!-- 顶部信息栏 -->
+  <div class="w-full flex items-center gap-3 py-2 flex-wrap">
+    <span id="phase-label" class="text-sm px-3 py-1 rounded-md font-semibold" style="background:var(--c-accent);color:white"></span>
+    <span id="turn-timer" class="font-mono text-sm" style="color:var(--c-gold)"></span>
+    <span id="deck-count" class="text-sm opacity-60 ml-auto"></span>
+  </div>
+  <div id="pending-msg" class="hidden bg-red-950 text-red-300 px-4 py-3 rounded-lg text-center text-sm my-2 w-full"></div>
+
+  <!-- 三栏布局 -->
+  <div class="w-full flex gap-3" style="min-height:200px">
+    <!-- 左：对手 -->
+    <div class="flex flex-col gap-2 p-3 rounded-lg" style="width:140px;flex-shrink:0;background:var(--c-card);border:1px solid var(--c-border)">
+      <div id="opp-name" class="font-bold text-lg text-center truncate"></div>
+      <div id="opp-hp" class="font-mono text-center"></div>
+      <div id="opp-cards" class="text-xs opacity-60 text-center"></div>
+      <div id="opp-equip" class="text-xs mt-1" style="color:var(--c-gold)"></div>
+      <div id="opp-disconnected" class="hidden bg-red-900 text-red-300 text-xs px-2 py-1 rounded mt-1 text-center">已断线</div>
+      <div id="opp-elos" class="text-xs opacity-50 mt-1 text-center"></div>
+      <div id="opp-skills" class="text-xs mt-2" style="color:var(--c-accent)"></div>
     </div>
-    <div id="opp-equip" class="text-xs mt-1" style="color:var(--c-gold)"></div>
-    <div id="opp-disconnected" class="hidden bg-red-900 text-red-300 text-xs px-2 py-0.5 rounded mt-1 inline-block">已断线</div>
+
+    <!-- 中：共享内容 -->
+    <div class="flex flex-col flex-1 min-w-0">
+      <!-- 弃牌/出牌区 -->
+      <div id="center-zone" class="text-xs opacity-40 text-center py-2 min-h-[24px]"></div>
+      <!-- 日志 -->
+      <div id="game-log" class="flex-1 overflow-y-auto text-xs opacity-50 py-1" style="min-height:60px;max-height:120px"></div>
+      <!-- 选中牌说明 -->
+      <div id="card-info" class="text-center text-sm py-2 min-h-[24px]" style="color:var(--c-gold)"></div>
+    </div>
+
+    <!-- 右：自己 -->
+    <div class="flex flex-col gap-2 p-3 rounded-lg" style="width:140px;flex-shrink:0;background:var(--c-card);border:1px solid var(--c-border)">
+      <div id="my-name" class="font-bold text-lg text-center truncate"></div>
+      <div id="my-hp" class="font-mono text-center"></div>
+      <div id="my-equip" class="text-xs mt-1" style="color:var(--c-gold)"></div>
+      <div id="my-elos" class="text-xs opacity-50 mt-1 text-center"></div>
+      <div id="my-skills" class="text-xs mt-2" style="color:var(--c-accent)"></div>
+    </div>
   </div>
 
-  <div class="w-full">
-    <div class="flex items-center gap-3 py-2 flex-wrap">
-      <span id="phase-label" class="text-sm px-3 py-1 rounded-md font-semibold" style="background:var(--c-accent);color:white"></span>
-      <span id="turn-timer" class="font-mono text-sm" style="color:var(--c-gold)"></span>
-      <span id="deck-count" class="text-sm opacity-60 ml-auto"></span>
-    </div>
-    <div id="pending-msg" class="hidden bg-red-950 text-red-300 px-4 py-3 rounded-lg text-center text-sm my-2"></div>
-  </div>
-
-  <div class="w-full rounded-[10px] p-3" style="background:var(--c-card);border:1px solid var(--c-border)">
-    <div class="flex items-center gap-3">
-      <span id="my-name" class="font-bold text-lg"></span>
-      <span id="my-hp" class="font-mono"></span>
-    </div>
-    <div id="my-equip" class="text-xs mt-1" style="color:var(--c-gold)"></div>
-  </div>
-
+  <!-- 手牌区 -->
   <div id="my-hand" class="flex gap-2 flex-wrap justify-center py-3 min-h-[50px]"></div>
 
-  <div id="card-info-wrap" class="text-center min-h-[20px]"><span id="card-info" class="text-sm opacity-60"></span></div>
-
+  <!-- 操作按钮 -->
   <div id="action-bar" class="flex gap-2 flex-wrap justify-center min-h-[40px] items-center"></div>
-
-  <div id="game-log" class="max-h-[120px] overflow-y-auto text-xs opacity-50 w-full py-1"></div>
 </div>
 
 <!-- ═══════ 排行榜 ═══════ -->

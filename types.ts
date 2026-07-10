@@ -121,6 +121,7 @@ export interface PlayerView {
   characterId: string | null;
   weapon: Card | null;
   armor: Card | null;
+  skills: string[];
 }
 
 export interface ServerStateView {

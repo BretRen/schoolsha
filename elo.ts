@@ -44,7 +44,9 @@ function loadElo(): Record<string, EloEntry> {
 }
 
 function saveElo(data: Record<string, EloEntry>): void {
-  Deno.writeTextFileSync(ELO_FILE, JSON.stringify(data, null, 2));
+  const tmp = ELO_FILE + ".tmp";
+  Deno.writeTextFileSync(tmp, JSON.stringify(data, null, 2));
+  Deno.renameSync(tmp, ELO_FILE);
 }
 
 // ---------- ELO 计算 ----------
@@ -62,29 +64,32 @@ export function updateElo(
   winnerName: string,
   loserName: string,
 ): { winnerChange: number; loserChange: number; winnerNewElo: number; loserNewElo: number } {
-  const data = loadElo();
+  // 整个 read-modify-write 在锁内，防竞态
+  let result: { winnerChange: number; loserChange: number; winnerNewElo: number; loserNewElo: number };
+  withEloLock(() => {
+    const data = loadElo();
 
-  if (!data[winnerId]) data[winnerId] = { elo: INITIAL_ELO, wins: 0, losses: 0, displayName: winnerName || winnerId };
-  if (!data[loserId]) data[loserId] = { elo: INITIAL_ELO, wins: 0, losses: 0, displayName: loserName || loserId };
-  if (winnerName) data[winnerId].displayName = winnerName;
-  if (loserName) data[loserId].displayName = loserName;
+    if (!data[winnerId]) data[winnerId] = { elo: INITIAL_ELO, wins: 0, losses: 0, displayName: winnerName || winnerId };
+    if (!data[loserId]) data[loserId] = { elo: INITIAL_ELO, wins: 0, losses: 0, displayName: loserName || loserId };
+    if (winnerName) data[winnerId].displayName = winnerName.slice(0, 64);
+    if (loserName) data[loserId].displayName = loserName.slice(0, 64);
 
-  const w = data[winnerId], l = data[loserId];
-  const oldW = w.elo, oldL = l.elo;
+    const w = data[winnerId], l = data[loserId];
+    const oldW = w.elo, oldL = l.elo;
 
-  const eWinner = 1 / (1 + Math.pow(10, (l.elo - w.elo) / 400));
-  const eLoser = 1 / (1 + Math.pow(10, (w.elo - l.elo) / 400));
+    const eWinner = 1 / (1 + Math.pow(10, (l.elo - w.elo) / 400));
+    const eLoser = 1 / (1 + Math.pow(10, (w.elo - l.elo) / 400));
 
-  w.elo = Math.round(w.elo + K_FACTOR * (1 - eWinner));
-  l.elo = Math.round(l.elo + K_FACTOR * (0 - eLoser));
-  if (w.elo < 0) w.elo = 0;
-  if (l.elo < 0) l.elo = 0;
+    w.elo = Math.round(w.elo + K_FACTOR * (1 - eWinner));
+    l.elo = Math.round(l.elo + K_FACTOR * (0 - eLoser));
+    if (w.elo < 0) w.elo = 0;
+    if (l.elo < 0) l.elo = 0;
 
-  w.wins++; l.losses++;
-  // 用锁保护写入
-  withEloLock(() => saveElo(data));
-
-  return { winnerChange: w.elo - oldW, loserChange: l.elo - oldL, winnerNewElo: w.elo, loserNewElo: l.elo };
+    w.wins++; l.losses++;
+    saveElo(data);
+    result = { winnerChange: w.elo - oldW, loserChange: l.elo - oldL, winnerNewElo: w.elo, loserNewElo: l.elo };
+  });
+  return result!;
 }
 
 /**

@@ -90,12 +90,12 @@ function createOverlay(title,body,seconds,cfn,onAction,onCancel,noIgnore) {
       <button class="btn btn-primary btn-sm" id="bl-action">${onAction?'重新连接':''}</button>
       ${ignoreHtml}</div></div>`;
   document.body.appendChild(el);
-  const t=setInterval(()=>{r--;if(r<=0){clearInterval(t);removeOverlay();if(onCancel)onCancel();}upd();},1000);
+  const t=setInterval(()=>{r--;if(r<=0){clearInterval(t);el._timer=null;removeOverlay();if(onCancel)onCancel();}upd();},1000);el._timer=t;
   if(onAction)el.querySelector("#bl-action").onclick=()=>{clearInterval(t);removeOverlay();onAction();};
   else el.querySelector("#bl-action").style.display="none";
   if(!noIgnore)el.querySelector("#bl-ignore").onclick=()=>{clearInterval(t);removeOverlay();if(onCancel)onCancel();};
 }
-function removeOverlay(){const el=document.getElementById("block-overlay");if(el)el.remove();}
+function removeOverlay(){const el=document.getElementById("block-overlay");if(el){if(el._timer){clearInterval(el._timer);el._timer=null;}el.remove();}}
 
 // ====== 状态 ======
 const ST = { screen:"menu",ws:null,roomCode:null,mode:null,myIndex:-1,gs:null,selectedCards:new Set,selectTarget:null,timerInterval:null,serverTimer:60,lastHandSig:"",blocked:false,eloResult:null };
@@ -147,10 +147,10 @@ function connect(wsUrl){
   ST.ws=new WebSocket(wsUrl);ST.selectedCards.clear();ST.selectTarget=null;stopTimer();ST.blocked=false;removeOverlay();
   ST.ws.onopen=()=>{$("menu-status").textContent="";};
   ST.ws.onmessage=ev=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handle(msg);};
-  ST.ws.onclose=()=>{stopTimer();if(ST.screen==="game"||ST.screen==="char"){if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)addActiveRoom(ST.roomCode);showScreen("menu");text("menu-status","连接断开");if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)fetchDisconnectedGames();}};
+  ST.ws.onclose=()=>{stopTimer();if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}if(ST.screen==="game"||ST.screen==="char"){if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)addActiveRoom(ST.roomCode);showScreen("menu");text("menu-status","连接断开");if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)fetchDisconnectedGames();}};
   ST.ws.onerror=()=>{if(AUTH.enabled&&AUTH.token){text("menu-status","令牌失效");AUTH.token=null;sessionStorage.removeItem("auth_token");startLogin();}else if(AUTH.enabled)startLogin();else text("menu-status","连接失败");};
 }
-function send(msg){if(ST.ws?.readyState===WebSocket.OPEN)ST.ws.send(JSON.stringify(msg));}
+function send(msg){if(ST.blocked)return;if(ST.ws?.readyState===WebSocket.OPEN)ST.ws.send(JSON.stringify(msg));}
 
 // ====== 倒计时 ======
 function startTimer(s){stopTimer();ST.serverTimer=s;ST.pendingTimer=null;const el=$("turn-timer");if(!el)return;el.textContent=`${s}s`;ST.timerInterval=setInterval(()=>{ST.serverTimer--;if(ST.serverTimer<0)ST.serverTimer=0;el.textContent=`${ST.serverTimer}s`;},1000);}
@@ -191,7 +191,7 @@ function joinRoomByCode(code){ST.roomCode=code;ST.mode="room";addActiveRoom(code
 function quickMatch(){if(!ensureAuth())return;connect(buildWsUrl("?mode=matching"));ST.mode="matching";text("menu-status","");}
 // deno-lint-ignore no-unused-vars
 function leaveLobby(){if(ST.ws)ST.ws.close();clearActiveRooms();showScreen("menu");}
-function backToMenu(){stopTimer();if(ST.ws)ST.ws.close();ST.ws=null;ST.gs=null;ST.roomCode=null;ST.myIndex=-1;ST.selectedCards.clear();ST.blocked=false;removeOverlay();hide("game-over-overlay");clearActiveRooms();showScreen("menu");}
+function backToMenu(){stopTimer();if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}if(ST.ws)ST.ws.close();ST.ws=null;ST.gs=null;ST.roomCode=null;ST.myIndex=-1;ST.selectedCards.clear();ST.blocked=false;ST.matchStartTime=null;_lastLogLen=0;_lastPlayId=null;_lastDiscardIds=[];removeOverlay();hide("game-over-overlay");clearActiveRooms();showScreen("menu");}
 // deno-lint-ignore no-unused-vars
 function showLeaderboard(){fetch(`${HTTP_URL}/leaderboard`+(ST.gs?.playerId?`?userId=${ST.gs.playerId}`:"")).then(r=>r.json()).then(renderLeaderboard).then(()=>showScreen("leaderboard")).catch(()=>text("menu-status","无法获取排行榜"));}
 function renderLeaderboard(data){
@@ -355,7 +355,6 @@ function renderCenterZone(gs){
   if(gs.log){for(let i=gs.log.length-1;i>=0;i--){const e=gs.log[i];if(e.id==="card_played"){lastPlay=e;break;}}}
   if(lastPlay&&lastPlay.cardName&&lastPlay.id!==_lastPlayId){
     _lastPlayId=lastPlay.id;
-    const suitMap={spade:"♠",heart:"♥",club:"♣",diamond:"♦"};
     playZone.innerHTML=`<div class="mini-card animate-card-in"><span class="ms">🃏</span><span class="mn">${lastPlay.cardName}</span></div>`;
     show("play-zone");
     setTimeout(()=>{if(_lastPlayId===lastPlay.id)_lastPlayId=null;},3000);

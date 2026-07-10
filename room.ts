@@ -51,7 +51,7 @@ export class Room {
   /** 是否为匹配对战的房间（否则为手动创建/加入的房间） */
   isMatch = false;
 
-  private selectTimer: ReturnType<typeof setTimeout> | null = null;
+  selectTimer: ReturnType<typeof setTimeout> | null = null;
   private timeoutInterval: ReturnType<typeof setInterval> | null = null;
 
   constructor(code: string) {
@@ -143,6 +143,10 @@ export class Room {
   }
 
   /** 双方都选了角色 → 开始游戏 */
+  clearSelectTimer(): void {
+    if (this.selectTimer) { clearTimeout(this.selectTimer); this.selectTimer = null; }
+  }
+
   startGame(): void {
     if (this.gameStarted) return;
     if (this.selectTimer) clearTimeout(this.selectTimer);

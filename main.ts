@@ -438,7 +438,8 @@ Deno.serve({ port: PORT }, async (req) => {
     if (room.game && !room.game.gameOver) {
       room.handleDisconnect(idx);
     } else if (!room.game) {
-      // 选角阶段有人离开 → 通知另一位重新等待
+      // 选角阶段有人离开 → 清除选角定时器防僵尸局，通知另一位
+      if (room.selectTimer) { clearTimeout(room.selectTimer); room.selectTimer = null; }
       room.picks = [null, null];
       const other = room.clients[1 - idx];
       if (other) {

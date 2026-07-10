@@ -46,7 +46,6 @@ type Condition = (s: GameState, p: number) => boolean;
 const isTurn: Condition = (s, p) => p === s.turnPlayer;
 const playPhase: Condition = (s) => s.phase === "play";
 const noPending: Condition = (s) => !s.pendingResponse;
-const _noAttack: Condition = (s) => !s.attackUsed;
 const hpBelowMax: Condition = (s, p) => s.players[p].hp < s.players[p].maxHp;
 /** AI武器：无视attackUsed限制 */
 const canAttack: Condition = (s, p) =>
@@ -116,53 +115,22 @@ function setNearDeathPending(s: GameState, source: number) {
   };
 }
 
-function stealRandomCard(s: GameState, from: number, to: number): boolean {
-  const target = s.players[from];
-  // 手牌 + 装备 全都可以偷
-  const pool: { card: Card; source: "hand" | "weapon" | "armor" }[] = [];
-  for (const c of target.hand) pool.push({ card: c, source: "hand" });
-  if (target.weapon) pool.push({ card: target.weapon, source: "weapon" });
-  if (target.armor) pool.push({ card: target.armor, source: "armor" });
-  if (pool.length === 0) return false;
-
-  const idx = Math.floor(Math.random() * pool.length);
-  const { card, source } = pool[idx];
-
-  if (source === "hand") {
-    removeCard(target.hand, card.id);
-  } else if (source === "weapon") {
-    target.weapon = null;
-  } else {
-    target.armor = null;
-  }
-
-  s.players[to].hand.push(card);
-  emit({ type: "card_played", player: to, card }, s);
-  return true;
-}
-
 function discardFromPool(s: GameState, player: number): boolean {
   const target = s.players[player];
-  const pool: { card: Card; source: "hand" | "weapon" | "armor" }[] = [];
-  for (const c of target.hand) pool.push({ card: c, source: "hand" });
-  if (target.weapon) pool.push({ card: target.weapon, source: "weapon" });
-  if (target.armor) pool.push({ card: target.armor, source: "armor" });
+  const pool: Card[] = [...target.hand];
+  if (target.weapon) pool.push(target.weapon);
+  if (target.armor) pool.push(target.armor);
   if (pool.length === 0) return false;
 
   const idx = Math.floor(Math.random() * pool.length);
-  const { card, source } = pool[idx];
+  const c = pool[idx];
+  if (target.hand.some(h => h.id === c.id)) removeCard(target.hand, c.id);
+  else if (target.weapon?.id === c.id) target.weapon = null;
+  else target.armor = null;
 
-  if (source === "hand") {
-    removeCard(target.hand, card.id);
-  } else if (source === "weapon") {
-    target.weapon = null;
-  } else {
-    target.armor = null;
-  }
-
-  s.discard.push(card);
-  addLog(s, { id: "card_discarded", player, cardName: card.name });
-  emit({ type: "card_discarded", player, cards: [card] }, s);
+  s.discard.push(c);
+  addLog(s, { id: "card_discarded", player, cardName: c.name });
+  emit({ type: "card_discarded", player, cards: [c] }, s);
   return true;
 }
 
@@ -487,49 +455,14 @@ registerCardEffect("免罚券", {
   },
 });
 
-// --- 装备牌 ---
-
-registerCardEffect("钢笔", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: false,
-  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
-});
-
-registerCardEffect("圆规", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: false,
-  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
-});
-
-registerCardEffect("尺子", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: false,
-  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
-});
-
-registerCardEffect("橡皮", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: false,
-  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
-});
-
-registerCardEffect("校服", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: false,
-  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
-});
-
-registerCardEffect("黑名单", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: false,
-  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
-});
-
-registerCardEffect("涂改液", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: false,
-  onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
-});
+// --- 装备牌（批量注册） ---
+for (const name of ["钢笔", "圆规", "尺子", "橡皮", "校服", "黑名单", "涂改液"]) {
+  registerCardEffect(name, {
+    canUse: all(playPhase, isTurn, noPending),
+    needsTarget: false,
+    onUse: (s, playerIdx, card) => equipCard(s, playerIdx, card),
+  });
+}
 
 // ============================================================
 // tryUseCard / tryRespond / handleTimeout
@@ -726,14 +659,9 @@ export function handleTimeout(state: GameState) {
     const target = pending.target;
     let dmg = 1;
     if (state.wineUsed) { dmg++; state.wineUsed = false; }
-    // 钢笔：伤害+1
     if (state.players[pending.source].weapon?.name === "钢笔") dmg++;
+    state.pendingResponse = null; // 先清原始 pending，dealDamage 内会设 near_death
     dealDamage(state, pending.source, target, dmg);
-    state.pendingResponse = null;
-
-    if (state.players[target].hp <= 0) {
-      setNearDeathPending(state, pending.source);
-    }
     return;
   }
 
@@ -752,12 +680,8 @@ export function handleTimeout(state: GameState) {
   const plainTypes = ["duel", "barbarian", "volley", "borrow_knife"] as string[];
   if (plainTypes.includes(pending.type)) {
     const target = pending.target;
+    state.pendingResponse = null; // 先清，dealDamage 内处理 near_death
     dealDamage(state, pending.source, target, 1);
-    state.pendingResponse = null;
-
-    if (state.players[target].hp <= 0) {
-      setNearDeathPending(state, pending.source);
-    }
     return;
   }
 

@@ -200,7 +200,7 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'game'"
-     x-effect="(function(){ if($store.g.screen==='game' && $store.g.gs && !$store.g.pending && $store.g.gs.turnTimeLeft !== $store.g._lastTurnTime) { $store.g._lastTurnTime = $store.g.gs.turnTimeLeft; startTurnTimer($store.g.gs.turnTimeLeft); } else if($store.g.pending) { stopTurnTimer(); } })()">
+     x-effect="(function(){ const p=$store.g.pending; if(!p && $store.g._hadPending) { $store.g._hadPending=false; if($store.g.gs?.phase==='play'||$store.g.gs?.phase==='discard') { startTurnTimer($store.g.gs.turnTimeLeft); } } else if(p) { $store.g._hadPending=true; stopTurnTimer(); if($store.g.isMyResp && p.timeout) { startPendingTimer(p.timeout); } else { stopPendingTimer(); } } else if(!p) { stopPendingTimer(); } })()">
 
   <!-- 左：自己面板 -->
   <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
@@ -244,8 +244,7 @@
     </div>
 
     <!-- Pending -->
-    <div x-show="$store.g.pending" style="background:#2d0a0a;color:#fca5a5;padding:6px 10px;border-radius:6px;text-align:center;font-size:11px;margin-bottom:4px;flex-shrink:0"
-         x-effect="(function(){ if($store.g.pending && $store.g.isMyResp && $store.g.pending.timeout) { stopTurnTimer(); startPendingTimer($store.g.pending.timeout); } else { stopPendingTimer(); } })()">
+    <div x-show="$store.g.pending" style="background:#2d0a0a;color:#fca5a5;padding:6px 10px;border-radius:6px;text-align:center;font-size:11px;margin-bottom:4px;flex-shrink:0">
       ⚠ <strong x-text="$store.g.pendingPrefix()"></strong>需要响应：<span x-text="$store.g.pendingLabel()"></span>
       <span style="color:#f59e0b;font-weight:bold" x-text="$store.g.pendingTimerText"></span>
     </div>
@@ -263,11 +262,11 @@
     </div>
 
     <!-- Play / Discard zone -->
-    <div style="display:flex;gap:12px;justify-content:center;min-height:32px;align-items:center;margin-bottom:3px;flex-shrink:0">
+    <div x-effect="$store.g._playVersion" style="display:flex;gap:12px;justify-content:center;min-height:36px;align-items:center;margin-bottom:3px;flex-shrink:0">
       <template x-if="$store.g.recentPlayCard()">
-        <div class="mini-card animate-card-in">
-          <span class="ms">🃏</span>
-          <span class="mn" x-text="$store.g.recentPlayCard()?.cardName"></span>
+        <div class="mini-card animate-card-in" style="font-size:13px;padding:4px 12px">
+          <span class="ms" style="font-size:14px">🃏</span>
+          <span class="mn" style="font-weight:bold" x-text="($store.g.recentPlayCard()?.player===$store.g.myIndex?'你':'对手')+' 出了 ['+$store.g.recentPlayCard()?.cardName+']'"></span>
         </div>
       </template>
       <template x-for="(d,i) in $store.g.recentDiscards()" :key="i">

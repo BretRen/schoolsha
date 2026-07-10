@@ -234,6 +234,7 @@ function handleMsg(msg) {
       break;
     case "game_state":
       store.gs = msg.state; store.myIndex = msg.yourIndex;
+      store._playVersion++;
       if (store.screen !== "game") { store.screen = "game"; clearInterval(store.charTimer); }
       if (msg.eloResult) store.eloResult = msg.eloResult;
       if (store.gs.gameOver) { stopTimers(); }
@@ -396,6 +397,8 @@ document.addEventListener("alpine:init", () => {
     lobbyCode: "", lobbyInvite: "", lobbyStatus: "等待另一位玩家...",
     lbData: null,
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
+    _hadPending: false,
+    _playVersion: 0,
 
     // Computed helpers
     get isMyTurn() { return this.gs?.turnPlayer === this.myIndex; },

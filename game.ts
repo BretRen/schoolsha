@@ -205,6 +205,7 @@ export function handleMessage(
       if (!state.pendingResponse) return "没有需要响应的";
       if (playerIdx !== state.pendingResponse.target) return "不是你需要响应";
       handleTimeout(state);
+      state.turnStartTime = Date.now();
       return null;
     }
 

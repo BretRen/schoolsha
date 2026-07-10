@@ -50,7 +50,7 @@ export interface Player {
   armor: Card | null;
 }
 
-export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal" | "skill_discard" | "opponent_discard" | "judge_armor";
+export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal" | "skill_discard" | "opponent_discard" | "judge_armor" | "pick_discard";
 
 export interface PendingResponse {
   type: PendingType;

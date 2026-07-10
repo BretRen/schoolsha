@@ -365,24 +365,19 @@ registerCardEffect("陷害", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opp = s.players[1 - playerIdx];
-    // 构建池：手牌 + 武器 + 防具
     const pool: Card[] = [...opp.hand];
     if (opp.weapon) pool.push(opp.weapon);
     if (opp.armor) pool.push(opp.armor);
-    // 随机弃 2 张
-    for (let i = 0; i < 2 && pool.length > 0; i++) {
-      const idx = Math.floor(Math.random() * pool.length);
-      const c = pool.splice(idx, 1)[0];
-      if (opp.hand.some(h => h.id === c.id)) {
-        removeCard(opp.hand, c.id);
-      } else if (opp.weapon?.id === c.id) {
-        opp.weapon = null;
-      } else if (opp.armor?.id === c.id) {
-        opp.armor = null;
-      }
-      s.discard.push(c);
-      addLog(s, { id: "card_discarded", player: 1 - playerIdx, cardName: c.name });
-    }
+    // 让攻击方从对手牌中选择 2 张弃置
+    s.pendingResponse = {
+      type: "pick_discard",
+      source: playerIdx,
+      target: playerIdx,
+      card,
+      selectableCards: pool,
+      discardCount: 2,
+      timeout: Date.now() + 15000,
+    };
     addLog(s, { id: "card_played", player: playerIdx, cardName: "陷害", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
@@ -708,6 +703,12 @@ export function handleTimeout(state: GameState) {
     return;
   }
 
+  // pick_discard 超时 → 取消，牌浪费
+  if (pending.type === "pick_discard") {
+    state.pendingResponse = null;
+    return;
+  }
+
   state.pendingResponse = null;
 }
 
@@ -742,39 +743,43 @@ export function handleActivateArmor(state: GameState, playerIdx: number): string
   return null;
 }
 
-function handleSkillDiscardTimeout(state: GameState, playerIdx: number) {
+// 陷害等：攻击方从对手牌中选牌弃置
+export function handlePickDiscard(state: GameState, playerIdx: number, cardIds: string[]): string | null {
   const pending = state.pendingResponse;
-  if (!pending) return;
-  const skill = getSkill(pending.pendingSkillId!);
-  if (!skill) { state.pendingResponse = null; return; }
-  const player = state.players[playerIdx];
-  const count = skill.cost?.discard ?? 0;
-  // 随机弃牌
-  for (let i = 0; i < count; i++) {
-    if (player.hand.length === 0) break;
-    const idx = Math.floor(Math.random() * player.hand.length);
-    const [card] = player.hand.splice(idx, 1);
-    state.discard.push(card);
-    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
+  if (!pending || pending.type !== "pick_discard") return "没有待选择的弃牌";
+  if (playerIdx !== pending.target) return "不是你需要选择";
+
+  const count = pending.discardCount || 1;
+  if (cardIds.length !== count) return `需要选 ${count} 张牌`;
+
+  const pool = pending.selectableCards || [];
+  const oppIdx = 1 - pending.source;
+  const opp = state.players[oppIdx];
+
+  for (const id of cardIds) {
+    const c = pool.find(c => c.id === id);
+    if (!c) return `无效的牌 ${id}`;
+    if (opp.hand.some(h => h.id === c.id)) {
+      removeCard(opp.hand, c.id);
+    } else if (opp.weapon?.id === c.id) {
+      opp.weapon = null;
+    } else if (opp.armor?.id === c.id) {
+      opp.armor = null;
+    }
+    state.discard.push(c);
+    addLog(state, { id: "card_discarded", player: oppIdx, cardName: c.name });
   }
+
   state.pendingResponse = null;
-  if (skill.perTurn) {
-    state.skillUseCount[pending.pendingSkillId!] = (state.skillUseCount[pending.pendingSkillId!] ?? 0) + 1;
-  }
-  executeSkillEffect(state, playerIdx, skill);
-  addLog(state, { id: "skill_used", player: playerIdx, skillName: skill.name });
+  return null;
+}
+
+function handleSkillDiscardTimeout(state: GameState, playerIdx: number) {
+  // 超时取消技能，不随机弃牌
+  state.pendingResponse = null;
 }
 
 function handleOpponentDiscardTimeout(state: GameState, targetIdx: number) {
-  const pending = state.pendingResponse;
-  if (!pending) return;
-  const player = state.players[targetIdx];
-  const count = pending.discardCount ?? 1;
-  for (let i = 0; i < count && player.hand.length > 0; i++) {
-    const idx = Math.floor(Math.random() * player.hand.length);
-    const [card] = player.hand.splice(idx, 1);
-    state.discard.push(card);
-    addLog(state, { id: "card_discarded", player: targetIdx, cardName: card.name });
-  }
+  // 超时取消，不随机弃牌
   state.pendingResponse = null;
 }

@@ -94,6 +94,7 @@ const RESP_NAMES = {
   skill_discard: "请弃一张手牌以发动技能",
   opponent_discard: "对手技能生效！请选择要弃的牌",
   judge_armor: "是否发动【涂改液】翻牌判定？（8秒）",
+  pick_discard: "【陷害】从对手牌中选择 2 张弃置（15秒）",
 };
 const RESP_NAMES_OPP = {
   dodge: "等待对手出【豁免】响应你的【作业】",
@@ -106,6 +107,7 @@ const RESP_NAMES_OPP = {
   skill_discard: "对手正在弃牌发动技能...",
   opponent_discard: "等待对手弃牌响应你的技能...",
   judge_armor: "等待对手决定是否发动【涂改液】...",
+  pick_discard: "正在选择要弃置的牌...",
 };
 const PN = { judge: "判定", draw: "摸牌", play: "出牌", discard: "弃牌", end: "结束" };
 
@@ -238,9 +240,10 @@ function handleMsg(msg) {
       store.gs = msg.state; store.myIndex = msg.yourIndex;
       store._playVersion++;
       store._judgeVersion++;
+      if (store.gs?.pendingResponse?.type !== "pick_discard") store._pickSelections = {};
       if (store.screen !== "game") { store.screen = "game"; clearInterval(store.charTimer); }
       if (msg.eloResult) store.eloResult = msg.eloResult;
-      if (store.gs.gameOver) { stopTimers(); }
+      if (store.gs.gameOver) { stopTimers(); store._pickSelections = {}; }
       break;
     case "disconnected":
       store.blocked = true; stopTimers();
@@ -402,6 +405,7 @@ document.addEventListener("alpine:init", () => {
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
     _hadPending: false,
     _playVersion: 0, _judgeVersion: 0,
+    _pickSelections: {},
 
     // Computed helpers
     get isMyTurn() { return this.gs?.turnPlayer === this.myIndex; },
@@ -500,6 +504,33 @@ document.addEventListener("alpine:init", () => {
     doPass() { send({ action: "pass" }); },
     doEndPhase() { send({ action: "end_phase" }); },
     doActivateArmor() { send({ action: "activate_armor" }); },
+    // pick_discard（陷害等）
+    pickDiscardCards() {
+      if (!this.pending || this.pending.type !== "pick_discard") return [];
+      return this.pending.selectableCards || [];
+    },
+    pickDiscardCount() {
+      if (!this.pending || this.pending.type !== "pick_discard") return 0;
+      return Object.keys(this._pickSelections).length;
+    },
+    pickDiscardNeed() {
+      return this.pending?.discardCount || 1;
+    },
+    togglePickCard(id) {
+      if (this.blocked) return;
+      const sel = this._pickSelections;
+      const need = this.pickDiscardNeed();
+      if (sel[id]) { delete sel[id]; }
+      else { if (Object.keys(sel).length >= need) return; sel[id] = true; }
+      this._pickSelections = Object.assign({}, sel);
+    },
+    isPickSelected(id) { return !!this._pickSelections[id]; },
+    doPickDiscard() {
+      const ids = Object.keys(this._pickSelections);
+      if (ids.length !== this.pickDiscardNeed()) return;
+      send({ action: "pick_discard", card_ids: ids });
+      this._pickSelections = {};
+    },
     doUseSkill(skillId) { send({ action: "use_skill", skill_id: skillId }); },
     stealWithAnim(pos) {
       if (this.blocked) return;

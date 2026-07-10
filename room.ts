@@ -41,6 +41,8 @@ export class Room {
   disconnectedUserId: (string | null)[] = [null, null];
   /** 角色选择暂存：每名玩家选的角色 ID */
   picks: (string | null)[] = [null, null];
+  /** 角色选择锁定状态 */
+  locked: boolean[] = [false, false];
   createdAt: number;
   /** 最后有活跃连接的时间 */
   lastActiveAt: number;

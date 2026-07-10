@@ -7,7 +7,7 @@ import {
   markDisconnected, markReconnected, checkDisconnectTimeout,
   anyoneDisconnected,
 } from "./game.ts";
-import { getAllCharacters } from "./skills.ts";
+import { getAllCharacters, getSkill } from "./skills.ts";
 import { updateElo, predictEloChange, getElo } from "./elo.ts";
 import type { GameState, ServerMsg, CharacterInfo } from "./types.ts";
 
@@ -254,7 +254,7 @@ export class Room {
       id: c.id,
       name: c.name,
       maxHp: c.maxHp,
-      skills: c.skills,
+      skills: c.skills.map(sid => ({ id: sid, name: getSkill(sid)?.name ?? sid })),
     }));
     for (const c of this.clients) {
       if (!c) continue;

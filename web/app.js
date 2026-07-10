@@ -214,7 +214,7 @@ function handleMsg(msg) {
         store.charStatus = `对手: ${esc(msg.opponent.displayName)}${store.mode === "matching" ? ` (ELO ${msg.opponent.elo})` : ""}`;
         if (msg.elo?.prediction) {
           const p = msg.elo.prediction;
-          store.charStatus += ` — ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>`;
+          store.charStatus += ` — ELO ${msg.elo.my} → <span style="color:#22c55e">胜 +${p.win}</span> · <span style="color:#ef4444">负 ${p.lose}</span>`;
         }
       } else { store.charStatus = ""; }
       break;

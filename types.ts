@@ -126,7 +126,7 @@ export interface CharacterInfo {
   id: string;
   name: string;
   maxHp: number;
-  skills: string[];
+  skills: { id: string; name: string }[];
 }
 
 export interface SkillView {

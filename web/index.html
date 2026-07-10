@@ -149,14 +149,14 @@
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
       <h2 class="text-xl font-bold text-center mb-1">选择你的角色</h2>
       <div class="font-mono text-sm mb-2" style="color:var(--c-gold)" x-text="$store.g.charTimerText"></div>
-      <div class="grid gap-3 w-full mb-3" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+      <div class="grid gap-3 w-full mb-3" style="grid-template-columns:repeat(3,1fr)">
         <template x-for="c in $store.g.characters" :key="c.id">
           <div class="chcard" :class="{'char-selected': $store.g.selectedChar === c.id, 'char-disabled': $store.g.charLocked}"
                @click="$store.g.pickCharacter(c.id)"
                style="transition:all .2s">
             <h3 x-text="c.name" style="font-size:15px;margin:0 0 4px"></h3>
             <div class="hp" x-text="'♥ × ' + c.maxHp" style="font-size:12px"></div>
-            <div class="sk" style="font-size:11px;margin-top:4px;line-height:1.3;opacity:.7" x-text="c.skills.length ? c.skills.join(' · ') : '无技能'"></div>
+            <div class="sk" style="font-size:11px;margin-top:4px;line-height:1.3;opacity:.7" x-text="c.skills.length ? c.skills.map(s => s.name).join(' · ') : '无技能'"></div>
           </div>
         </template>
       </div>
@@ -167,8 +167,8 @@
             <strong x-text="c.name" style="color:var(--c-accent)"></strong>
             <span style="opacity:.5"> · ♥×<span x-text="c.maxHp"></span></span>
             <div class="mt-1" style="opacity:.7;line-height:1.4">
-              <template x-for="s in c.skills" :key="s">
-                <div>• <span x-text="s"></span> — <span x-text="getSkillDesc({id:s,name:s})"></span></div>
+              <template x-for="s in c.skills" :key="s.id">
+                <div>• <span x-text="s.name"></span> — <span x-text="getSkillDesc(s)"></span></div>
               </template>
               <div x-show="!c.skills.length">无技能</div>
             </div>

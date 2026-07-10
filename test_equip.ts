@@ -8,8 +8,8 @@ function makeCard(id: string, name: string, type: string, suit: string, num: num
 }
 
 function makeState(): GameState {
-  const p0: Player = { hp: 3, maxHp: 3, hand: [], alive: true, characterId: "普通学生", weapon: null, armor: null };
-  const p1: Player = { hp: 3, maxHp: 3, hand: [], alive: true, characterId: "普通学生", weapon: null, armor: null };
+  const p0: Player = { hp: 3, maxHp: 3, hand: [], alive: true, characterId: "student", weapon: null, armor: null };
+  const p1: Player = { hp: 3, maxHp: 3, hand: [], alive: true, characterId: "student", weapon: null, armor: null };
   return {
     phase: "play", turnPlayer: 0, players: [p0, p1],
     deck: [], discard: [], attackUsed: false, pendingResponse: null,

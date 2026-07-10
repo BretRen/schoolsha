@@ -1,33 +1,33 @@
 {
   "characters": [
     {
-      "id": "普通学生",
+      "id": "student",
       "name": "普通学生",
       "maxHp": 3,
       "skills": []
     },
     {
-      "id": "班长",
+      "id": "class_president",
       "name": "班长",
       "maxHp": 3,
       "skills": [
-        "权威"
+        "class_president"
       ]
     },
     {
-      "id": "体育生",
+      "id": "athlete",
       "name": "体育生",
       "maxHp": 4,
       "skills": [
-        "强壮"
+        "athletic"
       ]
     },
     {
-      "id": "学霸",
+      "id": "nerd",
       "name": "学霸",
       "maxHp": 3,
       "skills": [
-        "补习"
+        "tutoring"
       ]
     }
   ]

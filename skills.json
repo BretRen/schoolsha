@@ -1,7 +1,7 @@
 {
   "skills": [
     {
-      "id": "权威",
+      "id": "class_president",
       "name": "权威",
       "description": "出牌阶段，弃一张手牌，令对手也弃一张手牌。每回合限一次。",
       "type": "active",
@@ -19,7 +19,7 @@
       "perTurn": 1
     },
     {
-      "id": "强壮",
+      "id": "athletic",
       "name": "强壮",
       "description": "锁定技。你的手牌上限+1。",
       "type": "locked",
@@ -29,7 +29,7 @@
       }
     },
     {
-      "id": "补习",
+      "id": "tutoring",
       "name": "补习",
       "description": "摸牌阶段，你多摸一张牌。",
       "type": "locked",

@@ -393,20 +393,29 @@ document.addEventListener("alpine:init", () => {
       const sel = this.selectedCards;
       if (sel[id]) { delete sel[id]; }
       else {
+        // 弃牌阶段限制选择数量
+        if (isDiscard) {
+          const need = this.needDiscard();
+          if (Object.keys(sel).length >= need) return;
+        }
+        // 技能弃牌限制
+        if (isSkillDiscard) {
+          const need = this.pending?.discardCount || 1;
+          if (Object.keys(sel).length >= need) return;
+        }
         if (!isDiscard && !isSkillDiscard) { for (const k in sel) delete sel[k]; }
         sel[id] = true;
       }
-      this.selectedCards = Object.assign({}, sel); // trigger reactivity
+      this.selectedCards = Object.assign({}, sel);
     },
     isCardDisabled(c) {
-      if (!this.isMyResp || !this.gs) return false;
-      const isDiscard = this.gs.phase === "discard" && this.gs.turnPlayer === this.myIndex;
+      const isDiscard = this.gs?.phase === "discard" && this.gs?.turnPlayer === this.myIndex;
+      // 防御牌在自己出牌阶段（非响应中）不能主动出
+      if (!isDiscard && this.gs?.phase === "play" && this.isMyTurn && !this.pending && DEFENSIVE_ONLY.includes(c.name)) return true;
+      // 非响应阶段所有牌可用
+      if (!this.isMyResp || !this.gs || !this.pending) return false;
       if (isDiscard) return false;
       const p = this.pending;
-      if (!p) return false;
-      // 防御牌在出牌阶段不能主动出
-      if (!this.isMyResp && !isDiscard && this.gs.phase === "play" && DEFENSIVE_ONLY.includes(c.name) && this.isMyTurn) return true;
-      // 响应阶段检查
       const selectable = RESP_CARDS[p.type];
       if (!selectable) return false; // skill_discard etc — all cards allowed
       if (selectable.includes(c.name)) return false;

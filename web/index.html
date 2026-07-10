@@ -135,11 +135,11 @@
 
 <!-- ═══════ 选角 ═══════ -->
 <div id="screen-char" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'char'">
-  <div style="display:flex;gap:16px;width:100%;max-width:800px;align-items:flex-start">
+  <div style="display:flex;gap:20px;width:100%;max-width:1000px;align-items:flex-start">
     <!-- 左：对手信息 -->
-    <div style="width:160px;flex-shrink:0;background:var(--c-card);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--c-border)">
+    <div style="width:170px;flex-shrink:0;background:var(--c-card);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--c-border)">
       <div class="text-xs opacity-50 mb-1">对手</div>
-      <div class="font-bold text-sm mb-2" x-text="$store.g.charStatus?.replace(/对手: /,'') || '等待中'"></div>
+      <div class="font-bold text-sm mb-2" x-html="$store.g.charStatus?.replace(/对手: /,'') || '等待中'"></div>
       <div x-show="$store.g.opponentPicked" class="text-xs" style="color:#f59e0b">✓ 已选择</div>
       <div x-show="$store.g.opponentLocked" class="text-xs" style="color:#22c55e">🔒 已锁定</div>
       <div x-show="!$store.g.opponentPicked" class="text-xs opacity-40">选择中...</div>
@@ -298,41 +298,35 @@
 
     <!-- Action bar -->
     <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:4px 0 8px;min-height:32px;align-items:center;flex-shrink:0">
-      <!-- Skill discard -->
-      <template x-if="$store.g.pending?.type==='skill_discard' && $store.g.isMyResp">
-        <template x-if="$store.g.cardCount >= ($store.g.pending.discardCount||1)">
-          <button class="btn btn-primary btn-sm" @click="$store.g.doConfirmSkill()">
-            确认发动 (<span x-text="$store.g.cardCount"></span>/<span x-text="$store.g.pending.discardCount||1"></span>)
-          </button>
-        </template>
+      <!-- 响应中：skill_discard -->
+      <div x-show="$store.g.pending?.type==='skill_discard' && $store.g.isMyResp" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">
+        <button class="btn btn-primary btn-sm" x-show="$store.g.cardCount >= ($store.g.pending?.discardCount||1)" @click="$store.g.doConfirmSkill()">
+          确认发动 (<span x-text="$store.g.cardCount"></span>/<span x-text="$store.g.pending?.discardCount||1"></span>)
+        </button>
         <button class="btn btn-outline btn-sm" @click="$store.g.doPass()">取消</button>
-      </template>
-      <!-- Other pending response -->
-      <template x-if="$store.g.pending && $store.g.isMyResp && $store.g.pending.type!=='skill_discard'">
+      </div>
+      <!-- 响应中：普通响应 -->
+      <div x-show="$store.g.pending && $store.g.isMyResp && $store.g.pending?.type!=='skill_discard'" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">
         <button class="btn btn-outline btn-sm" @click="$store.g.doPass()">不响应</button>
         <button class="btn btn-primary btn-sm" @click="$store.g.respondCard()" :disabled="$store.g.cardCount <= 0">
           出牌响应<span x-show="$store.g.cardCount <= 0" style="font-size:10px;opacity:.6">（先点击手牌选择）</span>
         </button>
-      </template>
-      <!-- Play phase actions -->
-      <template x-if="$store.g.isMyTurn && $store.g.gs?.phase==='play' && !$store.g.pending">
-        <template x-if="$store.g.cardCount > 0">
-          <button class="btn btn-primary btn-sm" @click="$store.g.playSelected()">出牌</button>
-        </template>
+      </div>
+      <!-- 出牌阶段 -->
+      <div x-show="$store.g.isMyTurn && $store.g.gs?.phase==='play' && !$store.g.pending" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">
+        <button class="btn btn-primary btn-sm" x-show="$store.g.cardCount > 0" @click="$store.g.playSelected()">出牌</button>
         <template x-for="s in ($store.g.me?.skills||[]).filter(s=>s.type==='active')" :key="s.id">
           <button class="btn btn-outline btn-sm" @click="$store.g.doUseSkill(s.id)">技能: <span x-text="s.name"></span></button>
         </template>
         <button class="btn btn-outline btn-sm" @click="$store.g.doEndPhase()">结束出牌</button>
-      </template>
-      <!-- Discard phase -->
-      <template x-if="$store.g.isMyTurn && $store.g.gs?.phase==='discard' && !$store.g.pending">
-        <template x-if="$store.g.needDiscard() > 0 && $store.g.cardCount > 0">
-          <button class="btn btn-error btn-sm" @click="$store.g.doDiscard()">
-            弃牌 (<span x-text="$store.g.cardCount"></span>/<span x-text="$store.g.needDiscard()"></span>)
-          </button>
-        </template>
+      </div>
+      <!-- 弃牌阶段 -->
+      <div x-show="$store.g.isMyTurn && $store.g.gs?.phase==='discard' && !$store.g.pending" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;align-items:center">
+        <button class="btn btn-error btn-sm" x-show="$store.g.needDiscard() > 0 && $store.g.cardCount > 0" @click="$store.g.doDiscard()">
+          弃牌 (<span x-text="$store.g.cardCount"></span>/<span x-text="$store.g.needDiscard()"></span>)
+        </button>
         <span x-show="$store.g.needDiscard() <= 0" class="text-sm opacity-60">无需弃牌</span>
-      </template>
+      </div>
     </div>
 
     <!-- Hand -->

@@ -208,7 +208,7 @@ function renderGame(){
   const opp=gs.opponent;
   text("opp-name",gs.opponentName||"对手");$("opp-hp").textContent=hpStr(opp.hp,opp.maxHp);
   text("opp-cards",`手牌: ${opp.handCount}`);
-  let oe="";if(opp.weapon)oe+=`🗡 ${cn(opp.weapon)} `;if(opp.armor)oe+=`🛡 ${cn(opp.armor)}`;text("opp-equip",oe);
+  let oe="";if(opp.weapon)oe+=`🗡 ${cn(opp.weapon)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(opp.weapon)}</span><br>`;if(opp.armor)oe+=`🛡 ${cn(opp.armor)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(opp.armor)}</span>`;html("opp-equip",oe||"无装备");
   if(gs.opponentDisconnected)show("opp-disconnected");else hide("opp-disconnected");
   // 对手技能
   const oppSkills=gs.opponent.skills||[];
@@ -216,7 +216,7 @@ function renderGame(){
 
   const me=gs.you;
   text("my-name",gs.playerName||"你");$("my-hp").textContent=hpStr(me.hp,me.maxHp);
-  let meq="";if(me.weapon)meq+=`🗡 ${cn(me.weapon)} `;if(me.armor)meq+=`🛡 ${cn(me.armor)}`;text("my-equip",meq);
+  let meq="";if(me.weapon)meq+=`🗡 ${cn(me.weapon)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(me.weapon)}</span><br>`;if(me.armor)meq+=`🛡 ${cn(me.armor)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(me.armor)}</span>`;html("my-equip",meq||"无装备");
   // 自己技能
   const mySkills=me.skills||[];
   text("my-skills",mySkills.length?mySkills.map(s=>`• ${s.name}`).join("<br>"):"");
@@ -292,8 +292,8 @@ const RESP_NAMES = {
   duel:"对手发起【辩论】，请出【作业】",
   barbarian:"【突击测验】！请出【作业】",
   volley:"【点名批评】！请出【豁免】",
-  borrow_knife:"【告密】！请出武器牌",
-  steal:"选择对手一张牌（10秒）",
+  borrow_knife:"【嫁祸】！请弃一张牌",
+  steal: function(p) { return p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）"; },
 };
 const RESP_NAMES_OPP = {
   dodge:"等待对手出【豁免】响应你的【作业】",
@@ -301,14 +301,16 @@ const RESP_NAMES_OPP = {
   duel:"等待对手出【作业】响应【辩论】",
   barbarian:"等待对手出【作业】响应【突击测验】",
   volley:"等待对手出【豁免】响应【点名批评】",
-  borrow_knife:"等待对手出武器牌响应【告密】",
+  borrow_knife:"等待对手弃牌响应【嫁祸】",
   steal:"对手正在选择要弃的牌...",
 };
 
 function renderPending(gs){
   const p=gs.pendingResponse;if(!p){hide("pending-msg");hide("steal-zone");return;}
   const isMe=p.target===ST.myIndex;
-  html("pending-msg",`<strong>⚠ ${isMe?"你":"对手"}需要响应</strong>：${isMe?(RESP_NAMES[p.type]||p.type):(RESP_NAMES_OPP[p.type]||p.type)}`);
+  const label=isMe?(RESP_NAMES[p.type]||p.type):(RESP_NAMES_OPP[p.type]||p.type);
+  const txt=typeof label==="function"?label(p):label;
+  html("pending-msg",`<strong>⚠ ${isMe?"你":"对手"}需要响应</strong>：${txt}`);
   show("pending-msg");
   if(isMe && p.type==="steal" && p.poolSize){
     let h='<div class="flex gap-2 flex-wrap justify-center py-2">';

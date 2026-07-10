@@ -6,11 +6,9 @@ const ELO_FILE = "./elo.json";
 const INITIAL_ELO = 1000;
 const K_FACTOR = 32;
 
-// 简单的文件锁防止并发写 ELO
-let _eloLock: Promise<void> = Promise.resolve();
-function withEloLock(fn: () => void): Promise<void> {
-  _eloLock = _eloLock.then(() => fn());
-  return _eloLock;
+// ELO 操作在 Deno 单线程环境无并发问题，无需锁
+function withEloLock(fn: () => void): void {
+  fn();
 }
 
 // ---------- 数据结构 ----------

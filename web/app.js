@@ -226,7 +226,7 @@ function renderGame(){
   startTimer(gs.turnTimeLeft);
 
   const sig=handSig(me.hand);if(sig!==ST.lastHandSig){ST.lastHandSig=sig;ST.selectedCards.clear();}
-  renderHand(me.hand);renderPending(gs);renderActions(gs);renderCardInfo();renderLog(gs);
+  renderHand(me.hand);renderPending(gs);renderActions(gs);renderCardInfo();renderLog(gs);renderCenterZone(gs);
 }
 
 let _lastLogLen=0;
@@ -318,6 +318,21 @@ function renderPending(gs){
     h+='</div>';
     html("steal-zone",h);show("steal-zone");
   }else{hide("steal-zone");}
+}
+
+
+function renderCenterZone(gs){
+  const el=$("center-zone");if(!el)return;
+  const p=gs.pendingResponse;
+  if(p){
+    const card=p.card;
+    if(card)el.textContent=`出牌: ${card.name}`;
+    return;
+  }
+  if(gs.phase==="discard"){el.textContent="弃牌阶段";return;}
+  const lastLog=gs.log?.[gs.log.length-1];
+  if(lastLog&&lastLog.id==="card_played")el.textContent=`${lastLog.cardName}`;
+  else el.textContent="";
 }
 
 function renderActions(gs){

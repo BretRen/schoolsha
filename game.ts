@@ -13,6 +13,7 @@ import {
   getHandLimit,
   tryUseSkill,
   resetSkillCounts,
+  getSkill,
 } from "./skills.ts";
 
 export { cardLabel };
@@ -363,7 +364,7 @@ export function getPlayerView(
     characterId: opponent.characterId,
     weapon: opponent.weapon,
     armor: opponent.armor,
-    skills: oppChar?.skills ?? [],
+    skills: (oppChar?.skills ?? []).map(id => getSkill(id)?.name || id),
   };
 
   const char = me.characterId ? getCharacter(me.characterId) : null;
@@ -378,7 +379,7 @@ export function getPlayerView(
   return {
     phase: state.phase,
     turnPlayer: state.turnPlayer,
-    you: { ...me, skills: char?.skills ?? [] },
+    you: { ...me, skills: (char?.skills ?? []).map(id => getSkill(id)?.name || id) },
     opponent: oppView,
     attackUsed: state.attackUsed,
     pendingResponse: pendingView,

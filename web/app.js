@@ -329,40 +329,53 @@ function renderPending(gs){
   show("pending-msg");
   if(isMe&&p.timeout)startPendingTimer(p.timeout);
   if(isMe && p.type==="steal" && p.poolSize){
-    let h='<div class="flex gap-2 flex-wrap justify-center py-2">';
+    let h='<div class="flex gap-2 flex-wrap justify-center py-2" id="steal-cards">';
     for(let i=1;i<=p.poolSize;i++){
-      h+=`<div class="gcard facedown" onclick="send({action:'steal_card',position:${i}})"><span class="gsuit">?</span><span class="gname">第${i}张</span></div>`;
+      h+=`<div class="gcard facedown steal-card" onclick="stealWithAnim(${i})" data-pos="${i}"><span class="gsuit">?</span><span class="gname">第${i}张</span></div>`;
     }
     h+='</div>';
     html("steal-zone",h);show("steal-zone");
-  }else{hide("steal-zone");}
+  }else{
+    // Opponent perspective: animate steal cards fading
+    const sz=$("steal-zone");
+    if(sz&&!sz.classList.contains("hidden")&&sz.querySelectorAll(".steal-card").length>0){
+      sz.querySelectorAll(".steal-card").forEach(c=>c.classList.add("steal-fade"));
+      setTimeout(()=>hide("steal-zone"),600);
+    }else{hide("steal-zone");}
+  }
 }
 
 
+let _lastPlayId=null,_lastDiscardIds=[];
 function renderCenterZone(gs){
   const playZone=$("play-zone");const discardZone=$("discard-zone");
   if(!playZone||!discardZone)return;
-  // 从日志中找到最近一次出牌和弃牌
-  let lastPlay=null,lastDiscard=null;
-  if(gs.log){
-    for(let i=gs.log.length-1;i>=0;i--){
-      const e=gs.log[i];
-      if(!lastPlay&&e.id==="card_played")lastPlay=e;
-      if(!lastDiscard&&(e.id==="card_discarded"||e.id==="discard"))lastDiscard=e;
-      if(lastPlay&&lastDiscard)break;
-    }
+  // 最近一次出牌
+  let lastPlay=null;
+  if(gs.log){for(let i=gs.log.length-1;i>=0;i--){const e=gs.log[i];if(e.id==="card_played"){lastPlay=e;break;}}}
+  if(lastPlay&&lastPlay.cardName&&lastPlay.id!==_lastPlayId){
+    _lastPlayId=lastPlay.id;
+    const suitMap={spade:"♠",heart:"♥",club:"♣",diamond:"♦"};
+    playZone.innerHTML=`<div class="mini-card animate-card-in"><span class="ms">🃏</span><span class="mn">${lastPlay.cardName}</span></div>`;
+    show("play-zone");
+    setTimeout(()=>{if(_lastPlayId===lastPlay.id)_lastPlayId=null;},3000);
   }
-  if(lastPlay){playZone.textContent=`🃏 ${lastPlay.cardName}`;playZone.className="animate-card-in";show("play-zone");}
-  else hide("play-zone");
-  if(lastDiscard){discardZone.textContent=`弃: ${lastDiscard.cardName}`;discardZone.className="animate-discard";}
-  else{discardZone.textContent=gs.phase==="discard"?"弃牌阶段":"";}
 
-  // 技能 flash（上一条日志是 skill_used 且最近才出现）
+  // 弃牌区：显示最近3张
+  let discards=[];
+  if(gs.log){for(let i=gs.log.length-1;i>=0&&discards.length<3;i--){const e=gs.log[i];if(e.id==="card_discarded"||e.id==="discard")discards.unshift(e);}}
+  const dk=discards.map(d=>d.cardName||"").join(",");
+  if(dk!==_lastDiscardIds.join(",")){
+    _lastDiscardIds=discards.map(d=>d.cardName||"");
+    discardZone.innerHTML=discards.length?discards.map((d,i)=>`<div class="mini-card animate-discard" style="animation-delay:${i*0.1}s"><span class="mn">${d.cardName||"?"}</span></div>`).join(""):(gs.phase==="discard"?'<span style="font-size:11px;opacity:.4">弃牌阶段</span>':'');
+  }
+
+  // 技能 flash
   if(gs.log){
     const last=gs.log[gs.log.length-1];
     if(last&&last.id==="skill_used"){
       const sf=$("skill-flash");
-      if(sf){sf.textContent=`⚡ ${last.skillName || "技能"} 发动！`;sf.className="animate-skill text-center text-sm font-bold py-2 rounded-lg";show("skill-flash");}
+      if(sf){sf.textContent=`⚡ ${last.skillName||"技能"} 发动！`;sf.className="animate-skill";sf.style.cssText="text-align:center;font-size:13px;font-weight:bold;padding:6px;border-radius:8px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:4px";show("skill-flash");}
     }
   }
 }
@@ -402,6 +415,17 @@ function respondCard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blo
 function doDiscard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"discard",card_ids:ids});ST.selectedCards.clear();}
 // deno-lint-ignore no-unused-vars
 function doConfirmSkill(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"confirm_skill",card_ids:ids});ST.selectedCards.clear();}
+// deno-lint-ignore no-unused-vars
+function stealWithAnim(pos){
+  if(ST.blocked)return;
+  // Get the clicked card element
+  const cards=document.querySelectorAll(".steal-card");
+  const el=[...cards].find(c=>parseInt(c.dataset.pos)===pos);
+  if(el){el.classList.add("steal-fly");setTimeout(()=>el.remove(),500);}
+  // Disable all steal cards
+  cards.forEach(c=>c.style.pointerEvents="none");
+  send({action:"steal_card",position:pos});
+}
 
 // ====== 游戏结束 ======
 function showGameOver(){

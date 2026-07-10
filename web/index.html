@@ -78,12 +78,35 @@
 
   /* 全屏游戏布局 */
   #screen-game:not(.hidden) { display: flex !important; flex-direction: row !important; }
-  #my-area, #opp-area { transition: background .4s; }
+  #my-area, #opp-area { transition: background .3s; }
+  #my-area { border-right: 1px solid #1e1e2e; }
+  #opp-area { border-left: 1px solid #2e1e1e; }
   .turn-active { text-shadow: 0 0 18px rgba(124,58,237,.6); color: #c4b5fd !important; animation: turn-pulse 2s ease-in-out infinite; }
   @keyframes turn-pulse {
     0%, 100% { text-shadow: 0 0 12px rgba(124,58,237,.4); }
     50% { text-shadow: 0 0 28px rgba(124,58,237,.8), 0 0 40px rgba(124,58,237,.3); }
   }
+  /* mini card for play/discard zones */
+  .mini-card {
+    width: 44px; height: 60px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-size: 10px; flex-shrink: 0; position: relative;
+  }
+  .mini-card .ms { font-size: 14px; }
+  .mini-card .mn { font-weight: bold; font-size: 9px; }
+  .mini-card.spade,.mini-card.club { color: #ccc; } .mini-card.heart,.mini-card.diamond { color: #ef4444; }
+  /* steal card fly animation */
+  @keyframes steal-fly {
+    0% { opacity: 0.6; transform: scale(1.2); }
+    50% { opacity: 0.9; transform: scale(1.5); }
+    100% { opacity: 0; transform: scale(0.6) translateY(-40px); }
+  }
+  @keyframes steal-fade {
+    0% { opacity: 1; }
+    100% { opacity: 0; transform: scale(0.8); }
+  }
+  .steal-fly { animation: steal-fly .5s ease-out forwards; }
+  .steal-fade { animation: steal-fade .6s ease-out forwards; }
 </style>
 </head>
 <body>
@@ -132,51 +155,60 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen hidden" style="max-width:100vw;padding:0;gap:0;height:100vh;overflow:hidden;display:none">
-  <!-- 左半屏：自己 -->
-  <div id="my-area" style="flex:1;display:flex;flex-direction:column;padding:12px 8px 8px;background:linear-gradient(135deg,#0a0a14 0%,#0f0f1f 100%);border-right:1px solid #1a1a2e;overflow:hidden">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <div id="my-name" style="font-size:22px;font-weight:bold;transition:color .3s"></div>
-      <span id="my-turn-badge" style="display:none;font-size:11px;background:var(--c-accent);color:white;padding:2px 8px;border-radius:10px">你的回合</span>
-      <div id="my-hp" style="font-family:monospace;font-size:15px;margin-left:auto"></div>
+  <!-- 左：自己面板 -->
+  <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);border-right:1px solid #1e1e2e;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+      <div id="my-name" style="font-size:17px;font-weight:bold;transition:color .3s;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <span id="my-turn-badge" style="display:none;font-size:10px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite;white-space:nowrap">你的回合</span>
+      <div id="my-hp" style="font-family:monospace;font-size:14px;margin-left:auto"></div>
     </div>
-    <div id="my-equip" style="font-size:12px;color:var(--c-gold);min-height:20px"></div>
-    <div id="my-skills" style="font-size:12px;color:var(--c-accent);min-height:20px;margin-bottom:4px"></div>
+    <div id="my-skills" style="font-size:11px;color:#a78bfa;min-height:16px;margin-bottom:6px;line-height:1.5"></div>
+    <div id="my-equip" style="font-size:11px;color:var(--c-gold);min-height:16px;line-height:1.5"></div>
     <div style="flex:1"></div>
-    <div id="action-bar" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;min-height:32px;align-items:center"></div>
-    <div id="my-hand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;min-height:50px;padding:4px 0"></div>
   </div>
 
-  <!-- 中间共享区 -->
-  <div id="center-strip" style="width:320px;flex-shrink:0;display:flex;flex-direction:column;padding:8px 12px;overflow-y:auto;background:var(--c-bg);border-left:1px solid #1a1a2e;border-right:1px solid #1a1a2e">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-      <span id="phase-label" style="font-size:12px;padding:3px 10px;border-radius:6px;font-weight:bold;background:var(--c-accent);color:white"></span>
+  <!-- 中间：共享区 + 手牌 + 按钮 -->
+  <div id="center-strip" style="flex:1;display:flex;flex-direction:column;padding:8px 12px 0;overflow:hidden;background:var(--c-bg);min-width:0">
+    <!-- 顶部 bar -->
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-shrink:0">
+      <span id="phase-label" style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:bold;background:var(--c-accent);color:white"></span>
       <span id="turn-timer" style="font-family:monospace;font-size:13px;color:var(--c-gold)"></span>
-      <span id="deck-count" style="font-size:11px;opacity:.5;margin-left:auto"></span>
+      <span id="deck-count" style="font-size:11px;opacity:.4;margin-left:auto"></span>
     </div>
-    <div id="pending-msg" class="hidden" style="background:#450a0a;color:#fca5a5;padding:8px 12px;border-radius:8px;text-align:center;font-size:12px;margin-bottom:6px"></div>
-    <div id="steal-zone" class="hidden" style="margin-bottom:6px"></div>
-    <div style="display:flex;gap:8px;justify-content:center;min-height:28px;align-items:center;margin-bottom:4px">
-      <span id="play-zone" class="hidden" style="font-size:14px;font-weight:bold"></span>
-      <span id="discard-zone" style="font-size:12px;opacity:.5"></span>
+    <!-- Pending -->
+    <div id="pending-msg" class="hidden" style="background:#2d0a0a;color:#fca5a5;padding:6px 10px;border-radius:6px;text-align:center;font-size:11px;margin-bottom:4px;flex-shrink:0"></div>
+    <!-- Steal -->
+    <div id="steal-zone" class="hidden" style="margin-bottom:4px;flex-shrink:0"></div>
+    <!-- 出牌/弃牌区 -->
+    <div style="display:flex;gap:12px;justify-content:center;min-height:32px;align-items:center;margin-bottom:3px;flex-shrink:0">
+      <div id="play-zone" class="hidden" style="display:flex;gap:4px;align-items:center"></div>
+      <div id="discard-zone" style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;justify-content:center"></div>
     </div>
-    <div id="skill-flash" class="hidden" style="text-align:center;font-size:13px;font-weight:bold;padding:6px;border-radius:8px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:4px"></div>
-    <div id="card-info" style="text-align:center;font-size:13px;color:var(--c-gold);min-height:22px;margin-bottom:4px"></div>
-    <div id="game-log" style="flex:1;overflow-y:auto;font-size:11px;opacity:.55;min-height:60px;line-height:1.5"></div>
+    <!-- 技能 flash -->
+    <div id="skill-flash" class="hidden" style="text-align:center;font-size:12px;font-weight:bold;padding:4px;border-radius:6px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:3px;flex-shrink:0"></div>
+    <!-- 卡牌说明 -->
+    <div id="card-info" style="text-align:center;font-size:12px;color:var(--c-gold);min-height:20px;flex-shrink:0"></div>
+    <!-- 日志 -->
+    <div id="game-log" style="flex:1;overflow-y:auto;font-size:10px;opacity:.45;min-height:40px;line-height:1.4;max-height:80px;flex-shrink:1"></div>
+    <!-- 手牌 -->
+    <div id="my-hand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;padding:4px 0;min-height:56px;flex-shrink:0"></div>
+    <!-- 操作按钮 -->
+    <div id="action-bar" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:4px 0 8px;min-height:32px;align-items:center;flex-shrink:0"></div>
   </div>
 
-  <!-- 右半屏：对手 -->
-  <div id="opp-area" style="flex:1;display:flex;flex-direction:column;padding:12px 8px 8px;background:linear-gradient(225deg,#140a0a 0%,#1f0f0f 100%);border-left:1px solid #1a1a2e;overflow:hidden">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-      <div id="opp-name" style="font-size:22px;font-weight:bold;transition:color .3s"></div>
-      <span id="opp-turn-badge" style="display:none;font-size:11px;background:var(--c-accent);color:white;padding:2px 8px;border-radius:10px">对手回合</span>
-      <div id="opp-hp" style="font-family:monospace;font-size:15px;margin-left:auto"></div>
+  <!-- 右：对手面板 -->
+  <div id="opp-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#1a0f0f 0%,#120a0a 100%);border-left:1px solid #2e1e1e;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+      <div id="opp-name" style="font-size:17px;font-weight:bold;transition:color .3s;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      <span id="opp-turn-badge" style="display:none;font-size:10px;background:#991b1b;color:#fca5a5;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite;white-space:nowrap">对手回合</span>
+      <div id="opp-hp" style="font-family:monospace;font-size:14px;margin-left:auto"></div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <span id="opp-cards" style="font-size:13px;opacity:.7"></span>
-      <div id="opp-disconnected" class="hidden" style="background:#991b1b;color:#fca5a5;font-size:11px;padding:2px 8px;border-radius:6px;margin-left:auto">已断线</div>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+      <span id="opp-cards" style="font-size:12px;opacity:.6"></span>
+      <div id="opp-disconnected" class="hidden" style="background:#991b1b;color:#fca5a5;font-size:10px;padding:1px 6px;border-radius:4px">已断线</div>
     </div>
-    <div id="opp-equip" style="font-size:12px;color:var(--c-gold);min-height:20px;margin-bottom:4px"></div>
-    <div id="opp-skills" style="font-size:12px;color:var(--c-accent);min-height:20px"></div>
+    <div id="opp-skills" style="font-size:11px;color:#a78bfa;min-height:16px;margin-bottom:6px;line-height:1.5"></div>
+    <div id="opp-equip" style="font-size:11px;color:var(--c-gold);min-height:16px;line-height:1.5"></div>
     <div style="flex:1"></div>
   </div>
 </div>

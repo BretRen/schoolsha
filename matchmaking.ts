@@ -154,6 +154,7 @@ class MatchmakingQueue {
     // 生成房间码并预创建房间
     const code = generateRoomCode();
     const room = roomManager.getOrCreateRoom(code);
+    room.isMatch = true; // 标记为匹配对战房间
 
     // 30秒后如果房间还是空的 → 清理
     const joinTimer = setTimeout(() => {

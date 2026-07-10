@@ -385,7 +385,7 @@ function renderActions(gs){
   if(ST.blocked){html("action-bar","");return;}
   if(p&&p.target===ST.myIndex){
     if(p.type==="skill_discard"){
-      const need=1; // skills.json 中技能代价弃牌数
+      const need=p.discardCount||1;
       if(ST.selectedCards.size>=need)btns+=`<button class="btn btn-primary btn-sm" onclick="doConfirmSkill()">确认发动 (${ST.selectedCards.size}/${need})</button>`;
       btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'pass'})">取消</button>`;
     }else{

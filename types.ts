@@ -64,6 +64,8 @@ export interface PendingResponse {
   stealAction?: "steal" | "discard";
   /** skill_discard 类型时，待确认的技能 ID */
   pendingSkillId?: string;
+  /** skill_discard 类型时，需要弃牌的数量 */
+  discardCount?: number;
 }
 
 export interface GameState {

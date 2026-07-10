@@ -48,6 +48,8 @@ export class Room {
   gameStarted = false;
   /** 防止同一局游戏重复记录 ELO */
   private _eloRecorded = false;
+  /** 是否为匹配对战的房间（否则为手动创建/加入的房间） */
+  isMatch = false;
 
   private selectTimer: ReturnType<typeof setTimeout> | null = null;
   private timeoutInterval: ReturnType<typeof setInterval> | null = null;
@@ -88,8 +90,8 @@ export class Room {
       this.send(client.socket, { type: "game_state", state: view, yourIndex: i });
     }
 
-    // 游戏结束 → 记录 ELO
-    if (this.game.gameOver && !this._eloRecorded) {
+    // 游戏结束 → 记录 ELO（仅匹配对战）
+    if (this.game.gameOver && !this._eloRecorded && this.isMatch) {
       this._eloRecorded = true;
       const wIdx = this.game.winner!;
       const lIdx = 1 - wIdx;
@@ -263,8 +265,8 @@ export class Room {
         type: "character_select",
         characters: chars,
         timeoutSec: CHAR_SELECT_TIMEOUT_SEC,
-        opponent: oppInfo ?? undefined,
-        elo: { my: myElo, prediction },
+        opponent: this.isMatch ? (oppInfo ?? undefined) : undefined,
+        elo: this.isMatch ? { my: myElo, prediction } : { my: 0, prediction: null },
       });
     }
     this.startSelectTimer();

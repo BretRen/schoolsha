@@ -154,6 +154,7 @@ export function tryUseSkill(
       target: playerIdx,
       timeout: Date.now() + 15_000,
       pendingSkillId: skillId,
+      discardCount: skill.cost.discard,
     };
     return null; // 等玩家选牌后确认
   }

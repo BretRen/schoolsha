@@ -408,6 +408,29 @@ export class RoomManager {
       console.log(`Cleaned up ${toRemove.length} rooms (remaining: ${this.rooms.size})`);
     }
   }
+
+  /** 查找某用户在所有房间中断线的对局 */
+  findDisconnectedGames(userId: string): Array<{ roomCode: string; opponent: string; disconnectedAt: number }> {
+    const results: Array<{ roomCode: string; opponent: string; disconnectedAt: number }> = [];
+    for (const [code, room] of this.rooms) {
+      if (!room.game || room.game.gameOver) continue;
+      for (let i = 0; i < 2; i++) {
+        const disconnectedAt = room.game.disconnectedAt[i];
+        if (disconnectedAt !== null && room.disconnectedUserId[i] === userId) {
+          const oppIdx = 1 - i;
+          const opponent = room.clients[oppIdx]?.displayName ||
+            room.disconnectedUserId[oppIdx] ||
+            "对手";
+          results.push({
+            roomCode: code,
+            opponent,
+            disconnectedAt,
+          });
+        }
+      }
+    }
+    return results;
+  }
 }
 
 // ---------- 单例 ----------

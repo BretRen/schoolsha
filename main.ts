@@ -178,6 +178,27 @@ Deno.serve({ port: PORT }, async (req) => {
       });
     }
 
+    // 断线对局查询（服务端权威，不靠客户端 sessionStorage）
+    if (url.pathname === "/api/disconnected-games") {
+      const token = url.searchParams.get("token");
+      if (!token || !AUTH_ENABLED) {
+        return new Response(JSON.stringify({ games: [] }), {
+          headers: { "content-type": "application/json" },
+        });
+      }
+      const user = await validateToken(token);
+      if (!user) {
+        return new Response(JSON.stringify({ error: "token 无效" }), {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      const games = roomManager.findDisconnectedGames(user.sub);
+      return new Response(JSON.stringify({ games }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+
     // 静态文件
     if (url.pathname === "/" || url.pathname === "/index.html") {
       return serveStatic("web/index.html", "text/html");

@@ -32,19 +32,36 @@ async function initAuth() {
     if (info.auth?.mode==="zitadel_oidc") { AUTH.enabled=true; AUTH.provider=info.auth.provider; AUTH.clientId=info.auth.clientId; }
   } catch { /* noop */ }
   const saved = sessionStorage.getItem("auth_token"); if (saved) AUTH.token = saved;
-  if (AUTH.enabled && location.search.includes("code=")) { if (await handleAuthCallback()) { checkReconnect(); return; } }
-  if (AUTH.token) checkReconnect();
+  if (AUTH.enabled && location.search.includes("code=")) { await handleAuthCallback(); }
+  if (AUTH.token) fetchDisconnectedGames();
 }
 
 // ====== 重连 ======
-function addActiveRoom(code) { const s = sessionStorage.getItem("active_room")||""; const rooms=s.split(",").filter(Boolean); if(!rooms.includes(code))rooms.push(code); sessionStorage.setItem("active_room",rooms.join(",")); }
-function clearActiveRooms() { sessionStorage.removeItem("active_room"); }
-function checkReconnect() {
+async function fetchDisconnectedGames() {
+  if (!AUTH.token) return;
+  try {
+    const r = await fetch(`${HTTP_URL}/api/disconnected-games?token=${encodeURIComponent(AUTH.token)}`);
+    const data = await r.json();
+    if (data.games?.length) {
+      const g = data.games[0];
+      const elapsed = Math.floor((Date.now() - g.disconnectedAt) / 1000);
+      const remain = Math.max(0, 30 - elapsed);
+      if (remain <= 0) { clearActiveRooms(); return; }
+      showReconnectOverlay(g.roomCode, g.opponent, remain);
+      return;
+    }
+  } catch { /* 网络错误，回退到 sessionStorage */ }
+  // 服务端没返回 → 回退到本地 sessionStorage
   const s = sessionStorage.getItem("active_room"); if(!s)return;
   const rooms=s.split(",").filter(Boolean); if(!rooms.length)return;
-  const code=rooms[rooms.length-1];
-  createOverlay("🔌 断线重连",`活跃房间 <b style="color:#c4b5fd">${code}</b>`,30,t=>`${t} 秒内可重连`,()=>{ST.roomCode=code;connect(buildWsUrl(`?room=${code}`));text("menu-status","");},()=>{clearActiveRooms();});
+  showReconnectOverlay(rooms[rooms.length-1], "对手", 30);
 }
+function showReconnectOverlay(code, opponent, seconds) {
+  const body = `房间 <b style="color:#c4b5fd">${code}</b> &nbsp; 对手: ${esc(opponent)}`;
+  createOverlay("🔌 断线重连", body, seconds, t=>`${t} 秒内可重连`, ()=>{ST.roomCode=code;connect(buildWsUrl(`?room=${code}`));text("menu-status","");}, ()=>{clearActiveRooms();});
+}
+function addActiveRoom(code) { const s = sessionStorage.getItem("active_room")||""; const rooms=s.split(",").filter(Boolean); if(!rooms.includes(code))rooms.push(code); sessionStorage.setItem("active_room",rooms.join(",")); }
+function clearActiveRooms() { sessionStorage.removeItem("active_room"); }
 function createOverlay(title,body,seconds,cfn,onAction,onCancel) {
   const el=document.createElement("div");el.id="block-overlay";
   el.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999";
@@ -106,7 +123,7 @@ function connect(wsUrl){
   ST.ws=new WebSocket(wsUrl);ST.selectedCards.clear();ST.selectTarget=null;stopTimer();ST.blocked=false;removeOverlay();
   ST.ws.onopen=()=>{$("menu-status").textContent="";};
   ST.ws.onmessage=ev=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handle(msg);};
-  ST.ws.onclose=()=>{stopTimer();if(ST.screen==="game"||ST.screen==="char"){if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)addActiveRoom(ST.roomCode);showScreen("menu");text("menu-status","连接断开");if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)checkReconnect();}};
+  ST.ws.onclose=()=>{stopTimer();if(ST.screen==="game"||ST.screen==="char"){if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)addActiveRoom(ST.roomCode);showScreen("menu");text("menu-status","连接断开");if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)fetchDisconnectedGames();}};
   ST.ws.onerror=()=>{if(AUTH.enabled&&AUTH.token){text("menu-status","令牌失效");AUTH.token=null;sessionStorage.removeItem("auth_token");startLogin();}else if(AUTH.enabled)startLogin();else text("menu-status","连接失败");};
 }
 function send(msg){if(ST.ws?.readyState===WebSocket.OPEN)ST.ws.send(JSON.stringify(msg));}

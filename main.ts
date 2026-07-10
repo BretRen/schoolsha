@@ -6,7 +6,7 @@ import { handleMessage, anyoneDisconnected, markReconnected } from "./game.ts";
 import { validateToken, extractToken, fetchUserInfo } from "./auth.ts";
 import { roomManager, type Client } from "./room.ts";
 import { matchmaking } from "./matchmaking.ts";
-import { getLeaderboard, getElo } from "./elo.ts";
+import { getLeaderboard, getElo, updateElo } from "./elo.ts";
 import { getAllCharacters } from "./skills.ts";
 import type { ClientMsg, RoomInfo } from "./types.ts";
 
@@ -393,7 +393,10 @@ Deno.serve({ port: PORT }, async (req) => {
 
     // ---- 角色选择阶段 ----
     if (!room.game && msg.action === "pick_character") {
-      // 校验角色 ID 有效性
+      if (room.locked[idx]) {
+        send(socket, { type: "error", message: "已锁定角色，无法更改" });
+        return;
+      }
       const validChars = getAllCharacters();
       const valid = validChars.find(c => c.id === msg.id);
       if (!valid) {
@@ -403,9 +406,29 @@ Deno.serve({ port: PORT }, async (req) => {
       room.picks[idx] = msg.id;
       const nameTag = room.clients[idx]?.displayName || "?";
       console.log(`[${room.code}] P${idx} (${nameTag}) picked: ${msg.id}`);
+      // 通知对手：对手已选择角色（但不透露具体角色）
+      const opp = room.clients[1 - idx];
+      if (opp) {
+        send(opp.socket, { type: "opponent_picked", picked: true } as ServerMsg);
+      }
+      return;
+    }
 
-      // 双方都选好了
-      if (room.picks[0] && room.picks[1]) {
+    if (!room.game && msg.action === "lock_character") {
+      if (!room.picks[idx]) {
+        send(socket, { type: "error", message: "请先选择一个角色" });
+        return;
+      }
+      room.locked[idx] = true;
+      const nameTag = room.clients[idx]?.displayName || "?";
+      console.log(`[${room.code}] P${idx} (${nameTag}) locked: ${room.picks[idx]}`);
+      // 通知对手：对手已锁定
+      const opp = room.clients[1 - idx];
+      if (opp) {
+        send(opp.socket, { type: "opponent_locked", locked: true } as ServerMsg);
+      }
+      // 双方都锁定了 → 开始游戏
+      if (room.locked[0] && room.locked[1]) {
         room.startGame();
       }
       return;
@@ -438,11 +461,23 @@ Deno.serve({ port: PORT }, async (req) => {
     if (room.game && !room.game.gameOver) {
       room.handleDisconnect(idx);
     } else if (!room.game) {
-      // 选角阶段有人离开 → 清除选角定时器防僵尸局，通知另一位
+      // 选角阶段有人离开
       if (room.selectTimer) { clearTimeout(room.selectTimer); room.selectTimer = null; }
-      room.picks = [null, null];
       const other = room.clients[1 - idx];
-      if (other) {
+      if (other && room.isMatch) {
+        // 匹配对战：对手退出 → 剩余玩家立即获胜
+        send(other.socket, { type: "opponent_left_win", message: "对手在选角阶段退出，你获胜！" } as ServerMsg);
+        console.log(`[${room.code}] P${1-idx} wins by opponent leave during character select`);
+        // 记录 ELO
+        const winner = other;
+        const loser = room.clients[idx];
+        if (winner && loser) {
+          updateElo(winner.userId, loser.userId, winner.displayName, loser.displayName);
+        }
+      } else if (other) {
+        // 手动房间：等待新玩家
+        room.picks = [null, null];
+        room.locked = [false, false];
         send(other.socket, { type: "error", message: "对手已离开，等待新玩家..." });
         send(other.socket, { type: "waiting", message: "等待另一位玩家..." });
       }

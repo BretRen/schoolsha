@@ -128,21 +128,22 @@ export class Room {
     this.selectTimer = setTimeout(() => {
       const chars = getAllCharacters();
 
-      // 未选的自动选第一个角色
-      if (this.picks[0] === null) {
-        this.picks[0] = chars[0].id;
-        console.log(`[${this.code}] P0 select timeout, auto-picked ${chars[0].name}`);
-      }
-      if (this.picks[1] === null) {
-        this.picks[1] = chars[0].id;
-        console.log(`[${this.code}] P1 select timeout, auto-picked ${chars[0].name}`);
+      // 未选的或未锁定的自动选第一个角色并锁定
+      for (let i = 0; i < 2; i++) {
+        if (this.picks[i] === null) {
+          this.picks[i] = chars[0].id;
+          console.log(`[${this.code}] P${i} select timeout, auto-picked ${chars[0].name}`);
+        }
+        if (!this.locked[i]) {
+          this.locked[i] = true;
+          console.log(`[${this.code}] P${i} auto-locked`);
+        }
       }
 
       this.startGame();
     }, CHAR_SELECT_TIMEOUT_SEC * 1000);
   }
 
-  /** 双方都选了角色 → 开始游戏 */
   clearSelectTimer(): void {
     if (this.selectTimer) { clearTimeout(this.selectTimer); this.selectTimer = null; }
   }

@@ -67,7 +67,8 @@
     transition: border-color .15s, transform .1s;
   }
   .chcard:hover { border-color: var(--c-accent); transform: translateY(-2px); }
-  .chcard.selected { border-color: var(--c-accent); background: #1e1040; }
+  .chcard.char-selected { border-color: var(--c-gold) !important; background: #1e1040; box-shadow: 0 0 12px rgba(245,158,11,.3); }
+  .chcard.char-disabled { opacity: .4; cursor: not-allowed; pointer-events: none; transform: none !important; }
   .chcard h3 { font-size: 18px; margin-bottom: 4px; }
   .chcard .hp { color: var(--c-red); font-size: 14px; }
   .chcard .sk { color: var(--c-gold); font-size: 12px; margin-top: 4px; }
@@ -134,18 +135,65 @@
 
 <!-- ═══════ 选角 ═══════ -->
 <div id="screen-char" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'char'">
-  <h2 class="text-xl font-bold text-center mb-2">选择你的角色</h2>
-  <div class="font-mono text-sm mb-2" style="color:var(--c-gold)" x-text="$store.g.charTimerText"></div>
-  <div class="grid gap-3 w-full" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
-    <template x-for="c in $store.g.characters" :key="c.id">
-      <div class="chcard" @click="$store.g.pickCharacter(c.id)">
-        <h3 x-text="c.name"></h3>
-        <div class="hp" x-text="'♥ × ' + c.maxHp"></div>
-        <div class="sk" x-text="c.skills.length ? c.skills.join(' · ') : '无技能'"></div>
+  <div style="display:flex;gap:16px;width:100%;max-width:800px;align-items:flex-start">
+    <!-- 左：对手信息 -->
+    <div style="width:160px;flex-shrink:0;background:var(--c-card);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--c-border)">
+      <div class="text-xs opacity-50 mb-1">对手</div>
+      <div class="font-bold text-sm mb-2" x-text="$store.g.charStatus?.replace(/对手: /,'') || '等待中'"></div>
+      <div x-show="$store.g.opponentPicked" class="text-xs" style="color:#f59e0b">✓ 已选择</div>
+      <div x-show="$store.g.opponentLocked" class="text-xs" style="color:#22c55e">🔒 已锁定</div>
+      <div x-show="!$store.g.opponentPicked" class="text-xs opacity-40">选择中...</div>
+    </div>
+
+    <!-- 中：角色选择 -->
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0">
+      <h2 class="text-xl font-bold text-center mb-1">选择你的角色</h2>
+      <div class="font-mono text-sm mb-2" style="color:var(--c-gold)" x-text="$store.g.charTimerText"></div>
+      <div class="grid gap-3 w-full mb-3" style="grid-template-columns:repeat(auto-fill,minmax(130px,1fr))">
+        <template x-for="c in $store.g.characters" :key="c.id">
+          <div class="chcard" :class="{'char-selected': $store.g.selectedChar === c.id, 'char-disabled': $store.g.charLocked}"
+               @click="$store.g.pickCharacter(c.id)"
+               style="transition:all .2s">
+            <h3 x-text="c.name" style="font-size:15px;margin:0 0 4px"></h3>
+            <div class="hp" x-text="'♥ × ' + c.maxHp" style="font-size:12px"></div>
+            <div class="sk" style="font-size:11px;margin-top:4px;line-height:1.3;opacity:.7" x-text="c.skills.length ? c.skills.join(' · ') : '无技能'"></div>
+          </div>
+        </template>
       </div>
-    </template>
+      <!-- 技能详情 -->
+      <div x-show="$store.g.selectedChar" style="background:var(--c-card);border:1px solid var(--c-border);border-radius:8px;padding:8px 12px;width:100%;font-size:12px;margin-bottom:8px">
+        <template x-for="c in $store.g.characters.filter(c=>c.id===$store.g.selectedChar)" :key="c.id">
+          <div>
+            <strong x-text="c.name" style="color:var(--c-accent)"></strong>
+            <span style="opacity:.5"> · ♥×<span x-text="c.maxHp"></span></span>
+            <div class="mt-1" style="opacity:.7;line-height:1.4">
+              <template x-for="s in c.skills" :key="s">
+                <div>• <span x-text="s"></span> — <span x-text="getSkillDesc({id:s,name:s})"></span></div>
+              </template>
+              <div x-show="!c.skills.length">无技能</div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <!-- 锁定按钮 -->
+      <button class="btn btn-primary w-full" :class="{'btn-disabled': !$store.g.selectedChar || $store.g.charLocked}"
+              @click="$store.g.lockCharacter()"
+              :disabled="!$store.g.selectedChar || $store.g.charLocked"
+              style="max-width:200px">
+        <span x-show="!$store.g.charLocked">🔒 锁定角色</span>
+        <span x-show="$store.g.charLocked" style="color:#22c55e">✓ 已锁定</span>
+      </button>
+    </div>
+
+    <!-- 右：我的信息 -->
+    <div style="width:160px;flex-shrink:0;background:var(--c-card);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--c-border)">
+      <div class="text-xs opacity-50 mb-1">我</div>
+      <div class="font-bold text-sm mb-2" x-text="$store.g.myNameDisplay()"></div>
+      <div x-show="$store.g.selectedChar" class="text-xs" style="color:#f59e0b">✓ 已选择</div>
+      <div x-show="$store.g.charLocked" class="text-xs" style="color:#22c55e">🔒 已锁定</div>
+      <div x-show="!$store.g.selectedChar" class="text-xs opacity-40">选择中...</div>
+    </div>
   </div>
-  <p class="text-sm opacity-80 mt-3 text-center" x-html="$store.g.charStatus"></p>
 </div>
 
 <!-- ═══════ 游戏 ═══════ -->

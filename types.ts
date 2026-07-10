@@ -119,7 +119,8 @@ export type ClientMsg =
   | { action: "pass" }
   | { action: "respond"; card_id: string }
   | { action: "reconnect"; seat: number }
-  | { action: "confirm_skill"; card_ids: string[] };
+  | { action: "confirm_skill"; card_ids: string[] }
+  | { action: "lock_character" };
 
 export interface CharacterInfo {
   id: string;
@@ -185,7 +186,10 @@ export type ServerMsg =
   | { type: "error"; message: string }
   | { type: "queue_status"; status: string; position: number; estimatedWait: string }
   | { type: "match_found"; room: string; opponent: { displayName: string; elo: number } }
-  | { type: "queue_timeout"; message: string };
+  | { type: "queue_timeout"; message: string }
+  | { type: "opponent_picked"; picked: boolean }
+  | { type: "opponent_locked"; locked: boolean }
+  | { type: "opponent_left_win"; message: string };
 
 /** /room/create 响应 */
 export interface RoomInfo {

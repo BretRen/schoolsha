@@ -205,11 +205,13 @@ function handleMsg(msg) {
     case "character_select":
       store.mode = "room"; store.screen = "char";
       store.characters = msg.characters; store.charTimeout = msg.timeoutSec;
+      store.selectedChar = null; store.charLocked = false;
+      store.opponentPicked = false; store.opponentLocked = false;
       if (store.charTimer) clearInterval(store.charTimer);
       let s = msg.timeoutSec; store.charTimerText = `${s}s`;
       store.charTimer = setInterval(() => { s--; if (s < 0) { clearInterval(store.charTimer); return; } store.charTimerText = `${s}s`; }, 1000);
-      if (msg.opponent && store.mode === "matching") {
-        store.charStatus = `对手: ${esc(msg.opponent.displayName)} (ELO ${msg.opponent.elo})`;
+      if (msg.opponent) {
+        store.charStatus = `对手: ${esc(msg.opponent.displayName)}${store.mode === "matching" ? ` (ELO ${msg.opponent.elo})` : ""}`;
         if (msg.elo?.prediction) {
           const p = msg.elo.prediction;
           store.charStatus += ` — ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>`;
@@ -249,6 +251,14 @@ function handleMsg(msg) {
     case "queue_timeout":
       if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
       store.screen = "menu"; break;
+    case "opponent_picked":
+      store.opponentPicked = msg.picked; break;
+    case "opponent_locked":
+      store.opponentLocked = msg.locked; break;
+    case "opponent_left_win":
+      store.screen = "menu";
+      createOverlay("🎉 对手退出", msg.message, 5, t => `${t} 秒后关闭`, () => { removeOverlay(); }, () => { removeOverlay(); }, true);
+      break;
     case "error":
       if (store.screen === "menu" || store.screen === "lobby") { store.screen = "menu"; }
       break;
@@ -306,6 +316,8 @@ function backToMenu() {
   store.ws = null; store.gs = null; store.roomCode = null; store.myIndex = -1;
   store.selectedCards = {}; store.blocked = false; store.matchStartTime = null;
   store.eloResult = null; store._lastLogLen = 0; store._lastPlayId = null; store._lastDiscardKeys = "";
+  store.selectedChar = null; store.charLocked = false;
+  store.opponentPicked = false; store.opponentLocked = false;
   removeOverlay(); store.screen = "menu";
 }
 function showLeaderboard() {
@@ -358,6 +370,8 @@ document.addEventListener("alpine:init", () => {
     eloResult: null,
     charTimer: null, charTimerText: "", charStatus: "",
     characters: [], charTimeout: 0,
+    selectedChar: null, charLocked: false,
+    opponentPicked: false, opponentLocked: false,
     lobbyCode: "", lobbyInvite: "", lobbyStatus: "等待另一位玩家...",
     lbData: null,
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
@@ -410,7 +424,16 @@ document.addEventListener("alpine:init", () => {
     },
     isCardSelected(id) { return !!this.selectedCards[id]; },
 
-    pickCharacter(id) { send({ action: "pick_character", id }); },
+    pickCharacter(id) {
+      if (this.charLocked) return;
+      this.selectedChar = id;
+      send({ action: "pick_character", id });
+    },
+    lockCharacter() {
+      if (!this.selectedChar || this.charLocked) return;
+      this.charLocked = true;
+      send({ action: "lock_character" });
+    },
     playSelected() {
       const ids = Object.keys(this.selectedCards);
       if (ids.length === 0 || this.blocked) return;

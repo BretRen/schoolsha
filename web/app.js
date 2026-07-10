@@ -114,18 +114,18 @@ function hpStr(hp,max){let s="";for(let i=0;i<max;i++)s+=i<hp?"♥":"♡";return
 
 // ====== 卡牌说明（学校主题） ======
 const CARD_DESC = {
-  "作业":"对对手造成 1 点伤害（每回合限 1 次）","豁免":"响应【作业】或【点名批评】",
+  "作业":"对手需出【豁免】抵消，否则受 1 点伤害","豁免":"响应【作业】或【最终测试】",
   "补给":"回复 1 点体力，或濒死时自救","辩论":"双方轮流出【作业】，先不出者受 1 点伤害",
-  "突击测验":"对手需出【作业】，否则受 1 点伤害","点名批评":"对手需出【豁免】，否则受 1 点伤害",
-  "告密":"弃置对手一张武器牌","小抄":"本回合下一张【作业】伤害 +1；或濒死时自救",
-  "神偷":"获得对手一张手牌","陷害":"弃置对手两张手牌",
-  "嫁祸":"将一张手牌交给对手","午饭":"回复 1 点体力",
-  "午饭留堂":"全体回复 1 点体力","感冒":"造成 1 点伤害并回复 1 点体力",
-  "免罚券":"抵消一张锦囊牌的效果","最终测试":"全体各抽 2 张牌",
-  "钢笔":"武器：可出任意张【作业】","圆规":"武器：【作业】无视出牌次数限制",
-  "尺子":"武器：可将两张手牌当【作业】","橡皮":"武器：【作业】被豁免后仍造成1点伤害",
-  "校服":"防具：黑色【作业】无效","黑名单":"防具：受到【陷害】【点名批评】伤害+1",
-  "涂改液":"防具：需出【豁免】时可判定，红色判定牌则自动闪避",
+  "突击测验":"对手需出【作业】，否则受 1 点伤害","点名批评":"造成 1 点伤害",
+  "告密":"盲选弃置对手一张手牌或装备","小抄":"本回合下一张【作业】伤害 +1；或濒死时自救",
+  "神偷":"盲选获取对手一张手牌或装备","陷害":"造成 3 点伤害",
+  "嫁祸":"对手需弃一张牌，否则受 1 点伤害","午饭":"摸 2 张牌",
+  "午饭留堂":"对手随机弃一张手牌或装备","感冒":"造成 1 点伤害",
+  "免罚券":"抵消一张锦囊牌（辩论/突击测验/最终测试/嫁祸）","最终测试":"对手需出【豁免】，否则受 1 点伤害",
+  "钢笔":"武器：攻击未闪避时伤害 +1","圆规":"武器：【作业】无视出牌次数限制",
+  "尺子":"武器：对手出【豁免】后，可再出一张【作业】","橡皮":"武器：【作业】被豁免后仍造成1点伤害",
+  "校服":"防具：黑色【作业】无效","黑名单":"防具：【作业】无效；受到【陷害】【点名批评】伤害+1",
+  "涂改液":"防具：被【作业】时翻牌判定，翻出红色则自动闪避",
 };
 function getCardDesc(c){return CARD_DESC[c.name]||`${c.name}（${suitSym(c.suit)}${c.number}）`;}
 
@@ -135,7 +135,7 @@ const WEAPON_NAMES = new Set(["钢笔","圆规","尺子","橡皮"]);
 function isWeapon(n){return WEAPON_NAMES.has(n);}
 
 // 出牌阶段不能主动使用的牌（仅响应）
-const DEFENSIVE_ONLY = ["豁免"];
+const DEFENSIVE_ONLY = ["豁免", "免罚券"];
 
 // ====== WebSocket ======
 function buildWsUrl(path){let url=`${WS_URL}${path}`;if(AUTH.token)url+=(path.includes("?")?"&":"?")+`token=${encodeURIComponent(AUTH.token)}`;return url;}
@@ -206,20 +206,26 @@ function handSig(h){return h.map(c=>c.id).join(",");}
 function renderGame(){
   const gs=ST.gs;if(!gs||!gs.you||!gs.opponent)return;
   const opp=gs.opponent;
-  text("opp-name",gs.opponentName||"对手");$("opp-hp").textContent=hpStr(opp.hp,opp.maxHp);
+  const oppName=gs.opponentName||"对手";
+  const isOppTurn=gs.turnPlayer===1-ST.myIndex;
+  html("opp-name",`${esc(oppName)}${isOppTurn?' <span style="font-size:11px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite">◀ 回合</span>':''}`);
+  if(isOppTurn)$("opp-name").classList.add("turn-active");else $("opp-name").classList.remove("turn-active");
+  $("opp-hp").textContent=hpStr(opp.hp,opp.maxHp);
   text("opp-cards",`手牌: ${opp.handCount}`);
-  let oe="";if(opp.weapon)oe+=`🗡 ${cn(opp.weapon)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(opp.weapon)}</span><br>`;if(opp.armor)oe+=`🛡 ${cn(opp.armor)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(opp.armor)}</span>`;html("opp-equip",oe||"无装备");
+  let oe="";if(opp.weapon)oe+=`<div>🗡 ${cn(opp.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.weapon)}</div>`;if(opp.armor)oe+=`<div style="margin-top:4px">🛡 ${cn(opp.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.armor)}</div>`;html("opp-equip",oe||'<span style="opacity:.3">无装备</span>');
   if(gs.opponentDisconnected)show("opp-disconnected");else hide("opp-disconnected");
-  // 对手技能
   const oppSkills=gs.opponent.skills||[];
-  text("opp-skills",oppSkills.length?oppSkills.map(s=>`• ${s.name}`).join("<br>"):"");
+  html("opp-skills",oppSkills.length?oppSkills.map(s=>`<div style="margin-top:2px">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
 
   const me=gs.you;
-  text("my-name",gs.playerName||"你");$("my-hp").textContent=hpStr(me.hp,me.maxHp);
-  let meq="";if(me.weapon)meq+=`🗡 ${cn(me.weapon)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(me.weapon)}</span><br>`;if(me.armor)meq+=`🛡 ${cn(me.armor)}<br><span style="font-size:10px;opacity:.7">${getCardDesc(me.armor)}</span>`;html("my-equip",meq||"无装备");
-  // 自己技能
+  const myName=gs.playerName||"你";
+  const isMyTurn=gs.turnPlayer===ST.myIndex;
+  html("my-name",`${esc(myName)}${isMyTurn?' <span style="font-size:11px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite">你的回合</span>':''}`);
+  if(isMyTurn)$("my-name").classList.add("turn-active");else $("my-name").classList.remove("turn-active");
+  $("my-hp").textContent=hpStr(me.hp,me.maxHp);
+  let meq="";if(me.weapon)meq+=`<div>🗡 ${cn(me.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.weapon)}</div>`;if(me.armor)meq+=`<div style="margin-top:4px">🛡 ${cn(me.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.armor)}</div>`;html("my-equip",meq||'<span style="opacity:.3">无装备</span>');
   const mySkills=me.skills||[];
-  text("my-skills",mySkills.length?mySkills.map(s=>`• ${s.name}`).join("<br>"):"");
+  html("my-skills",mySkills.length?mySkills.map(s=>`<div style="margin-top:2px">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
 
   const pn={judge:"判定",draw:"摸牌",play:"出牌",discard:"弃牌",end:"结束"};
   text("phase-label",pn[gs.phase]||gs.phase);text("deck-count",`牌堆: ${gs.deckCount}`);
@@ -269,7 +275,7 @@ function renderHand(hand){
     const sel=ST.selectedCards.has(c.id);
     let disabled=false,reason="";
     if(isMyResp&&selectable&&!isDiscard){
-      const ok=selectable.includes(c.name)||(pending?.type==="borrow_knife"&&isWeapon(c.name));
+      const ok=selectable.includes(c.name)||(pending?.type==="borrow_knife"&&isWeapon(c.name))||(c.name==="免罚券"&&["barbarian","volley","duel","borrow_knife"].includes(pending.type));
       if(!ok){disabled=true;reason=`需要${selectable.join("或")}`;}
     }
     // 出牌阶段：防御牌不能主动使用
@@ -291,7 +297,7 @@ const RESP_NAMES = {
   near_death:"你处于濒死状态，请出【补给】或【小抄】自救",
   duel:"对手发起【辩论】，请出【作业】",
   barbarian:"【突击测验】！请出【作业】",
-  volley:"【点名批评】！请出【豁免】",
+  volley:"【最终测试】！请出【豁免】",
   borrow_knife:"【嫁祸】！请弃一张牌",
   steal: function(p) { return p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）"; },
 };
@@ -300,9 +306,9 @@ const RESP_NAMES_OPP = {
   near_death:"对手濒死，等待使用【补给】",
   duel:"等待对手出【作业】响应【辩论】",
   barbarian:"等待对手出【作业】响应【突击测验】",
-  volley:"等待对手出【豁免】响应【点名批评】",
+  volley:"等待对手出【豁免】响应【最终测试】",
   borrow_knife:"等待对手弃牌响应【嫁祸】",
-  steal:"对手正在选择要弃的牌...",
+  steal:"对手正在盲选你的牌...",
 };
 
 function renderPending(gs){

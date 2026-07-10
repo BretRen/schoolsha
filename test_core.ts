@@ -101,8 +101,8 @@ Deno.test("effects: 作业 canUse 需要目标", () => {
   assertEquals(e.needsTarget, true);
 });
 
-Deno.test("effects: 赦免不能主动使用", () => {
-  const e = getCardEffect("赦免");
+Deno.test("effects: 豁免不能主动使用", () => {
+  const e = getCardEffect("豁免");
   assert(e);
   assertEquals(e.canUse({ phase: "play", turnPlayer: 0, pendingResponse: null } as any, 0, {} as any), false);
   assert(e.canRespond);
@@ -121,8 +121,8 @@ Deno.test("effects: 神偷对手空手不能出", () => {
   assertFalse(s!.canUse(state, 0, {} as any));
 });
 
-Deno.test("effects: 打小报告对手空手不能出", () => {
-  const d = getCardEffect("打小报告");
+Deno.test("effects: 告密对手空手不能出", () => {
+  const d = getCardEffect("告密");
   const state = { players: [{ hp: 3 }, { hp: 3, hand: [], weapon: null, armor: null }], phase: "play", turnPlayer: 0, pendingResponse: null } as any;
   assertFalse(d!.canUse(state, 0, {} as any));
 });

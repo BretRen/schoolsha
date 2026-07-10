@@ -125,6 +125,13 @@ export function tryUseSkill(
 
   if (skill.type !== "active") return `${skill.name} 是${skill.type === "locked" ? "锁定" : "被动"}技，不能主动使用`;
 
+  // 必须是自己回合且出牌阶段
+  if (playerIdx !== state.turnPlayer) return "不是你的回合";
+  if (state.phase !== "play") return "只能在出牌阶段使用";
+
+  // 不能有进行中的 pending（除非是 skill_discard）
+  if (state.pendingResponse && state.pendingResponse.type !== "skill_discard") return "有进行中的响应";
+
   // 检查阶段
   if (skill.trigger?.phase && state.phase !== skill.trigger.phase) {
     return "不在正确的阶段";

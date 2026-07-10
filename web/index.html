@@ -75,6 +75,15 @@
   .lb-header { color: var(--c-dim); font-size: 11px; display: flex; font-weight: bold; padding: 4px 12px; }
 
   #go-title.win { color: var(--c-green); } #go-title.lose { color: var(--c-red); }
+
+  /* 全屏游戏布局 */
+  #screen-game:not(.hidden) { display: flex !important; flex-direction: row !important; }
+  #my-area, #opp-area { transition: background .4s; }
+  .turn-active { text-shadow: 0 0 18px rgba(124,58,237,.6); color: #c4b5fd !important; animation: turn-pulse 2s ease-in-out infinite; }
+  @keyframes turn-pulse {
+    0%, 100% { text-shadow: 0 0 12px rgba(124,58,237,.4); }
+    50% { text-shadow: 0 0 28px rgba(124,58,237,.8), 0 0 40px rgba(124,58,237,.3); }
+  }
 </style>
 </head>
 <body>
@@ -122,59 +131,54 @@
 </div>
 
 <!-- ═══════ 游戏 ═══════ -->
-<div id="screen-game" class="screen hidden">
-  <!-- 顶部信息栏 -->
-  <div class="w-full flex items-center gap-3 py-2 flex-wrap">
-    <span id="phase-label" class="text-sm px-3 py-1 rounded-md font-semibold" style="background:var(--c-accent);color:white"></span>
-    <span id="turn-timer" class="font-mono text-sm" style="color:var(--c-gold)"></span>
-    <span id="deck-count" class="text-sm opacity-60 ml-auto"></span>
-  </div>
-  <div id="pending-msg" class="hidden bg-red-950 text-red-300 px-4 py-3 rounded-lg text-center text-sm my-2 w-full"></div>
-  <div id="steal-zone" class="hidden w-full"></div>
-
-  <!-- 三栏布局 -->
-  <div class="w-full flex gap-3" style="min-height:200px">
-    <!-- 左：对手 -->
-    <div class="flex flex-col gap-2 p-3 rounded-lg" style="width:140px;flex-shrink:0;background:var(--c-card);border:1px solid var(--c-border)">
-      <div id="opp-name" class="font-bold text-lg text-center truncate"></div>
-      <div id="opp-hp" class="font-mono text-center"></div>
-      <div id="opp-cards" class="text-xs opacity-60 text-center"></div>
-      <div id="opp-equip" class="text-xs mt-1" style="color:var(--c-gold)"></div>
-      <div id="opp-disconnected" class="hidden bg-red-900 text-red-300 text-xs px-2 py-1 rounded mt-1 text-center">已断线</div>
-      <div id="opp-elos" class="text-xs opacity-50 mt-1 text-center"></div>
-      <div id="opp-skills" class="text-xs mt-2" style="color:var(--c-accent)"></div>
+<div id="screen-game" class="screen hidden" style="max-width:100vw;padding:0;gap:0;height:100vh;overflow:hidden;display:none">
+  <!-- 左半屏：自己 -->
+  <div id="my-area" style="flex:1;display:flex;flex-direction:column;padding:12px 8px 8px;background:linear-gradient(135deg,#0a0a14 0%,#0f0f1f 100%);border-right:1px solid #1a1a2e;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div id="my-name" style="font-size:22px;font-weight:bold;transition:color .3s"></div>
+      <span id="my-turn-badge" style="display:none;font-size:11px;background:var(--c-accent);color:white;padding:2px 8px;border-radius:10px">你的回合</span>
+      <div id="my-hp" style="font-family:monospace;font-size:15px;margin-left:auto"></div>
     </div>
-
-    <!-- 中：共享内容 -->
-    <div class="flex flex-col flex-1 min-w-0">
-      <!-- 出牌/弃牌区 -->
-      <div id="center-zone" class="text-xs opacity-40 text-center py-2 min-h-[24px] flex gap-3 justify-center items-center">
-        <span id="play-zone" class="hidden"></span>
-        <span id="discard-zone"></span>
-      </div>
-      <!-- 技能提示 flash -->
-      <div id="skill-flash" class="hidden text-center text-sm font-bold py-2 rounded-lg" style="color:var(--c-gold);background:rgba(245,158,11,0.08)"></div>
-      <!-- 日志 -->
-      <div id="game-log" class="flex-1 overflow-y-auto text-xs opacity-50 py-1" style="min-height:60px;max-height:120px"></div>
-      <!-- 选中牌说明 -->
-      <div id="card-info" class="text-center text-sm py-2 min-h-[24px]" style="color:var(--c-gold)"></div>
-    </div>
-
-    <!-- 右：自己 -->
-    <div class="flex flex-col gap-2 p-3 rounded-lg" style="width:140px;flex-shrink:0;background:var(--c-card);border:1px solid var(--c-border)">
-      <div id="my-name" class="font-bold text-lg text-center truncate"></div>
-      <div id="my-hp" class="font-mono text-center"></div>
-      <div id="my-equip" class="text-xs mt-1" style="color:var(--c-gold)"></div>
-      <div id="my-elos" class="text-xs opacity-50 mt-1 text-center"></div>
-      <div id="my-skills" class="text-xs mt-2" style="color:var(--c-accent)"></div>
-    </div>
+    <div id="my-equip" style="font-size:12px;color:var(--c-gold);min-height:20px"></div>
+    <div id="my-skills" style="font-size:12px;color:var(--c-accent);min-height:20px;margin-bottom:4px"></div>
+    <div style="flex:1"></div>
+    <div id="action-bar" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:8px;min-height:32px;align-items:center"></div>
+    <div id="my-hand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;min-height:50px;padding:4px 0"></div>
   </div>
 
-  <!-- 手牌区 -->
-  <div id="my-hand" class="flex gap-2 flex-wrap justify-center py-3 min-h-[50px]"></div>
+  <!-- 中间共享区 -->
+  <div id="center-strip" style="width:320px;flex-shrink:0;display:flex;flex-direction:column;padding:8px 12px;overflow-y:auto;background:var(--c-bg);border-left:1px solid #1a1a2e;border-right:1px solid #1a1a2e">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
+      <span id="phase-label" style="font-size:12px;padding:3px 10px;border-radius:6px;font-weight:bold;background:var(--c-accent);color:white"></span>
+      <span id="turn-timer" style="font-family:monospace;font-size:13px;color:var(--c-gold)"></span>
+      <span id="deck-count" style="font-size:11px;opacity:.5;margin-left:auto"></span>
+    </div>
+    <div id="pending-msg" class="hidden" style="background:#450a0a;color:#fca5a5;padding:8px 12px;border-radius:8px;text-align:center;font-size:12px;margin-bottom:6px"></div>
+    <div id="steal-zone" class="hidden" style="margin-bottom:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:center;min-height:28px;align-items:center;margin-bottom:4px">
+      <span id="play-zone" class="hidden" style="font-size:14px;font-weight:bold"></span>
+      <span id="discard-zone" style="font-size:12px;opacity:.5"></span>
+    </div>
+    <div id="skill-flash" class="hidden" style="text-align:center;font-size:13px;font-weight:bold;padding:6px;border-radius:8px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:4px"></div>
+    <div id="card-info" style="text-align:center;font-size:13px;color:var(--c-gold);min-height:22px;margin-bottom:4px"></div>
+    <div id="game-log" style="flex:1;overflow-y:auto;font-size:11px;opacity:.55;min-height:60px;line-height:1.5"></div>
+  </div>
 
-  <!-- 操作按钮 -->
-  <div id="action-bar" class="flex gap-2 flex-wrap justify-center min-h-[40px] items-center"></div>
+  <!-- 右半屏：对手 -->
+  <div id="opp-area" style="flex:1;display:flex;flex-direction:column;padding:12px 8px 8px;background:linear-gradient(225deg,#140a0a 0%,#1f0f0f 100%);border-left:1px solid #1a1a2e;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div id="opp-name" style="font-size:22px;font-weight:bold;transition:color .3s"></div>
+      <span id="opp-turn-badge" style="display:none;font-size:11px;background:var(--c-accent);color:white;padding:2px 8px;border-radius:10px">对手回合</span>
+      <div id="opp-hp" style="font-family:monospace;font-size:15px;margin-left:auto"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span id="opp-cards" style="font-size:13px;opacity:.7"></span>
+      <div id="opp-disconnected" class="hidden" style="background:#991b1b;color:#fca5a5;font-size:11px;padding:2px 8px;border-radius:6px;margin-left:auto">已断线</div>
+    </div>
+    <div id="opp-equip" style="font-size:12px;color:var(--c-gold);min-height:20px;margin-bottom:4px"></div>
+    <div id="opp-skills" style="font-size:12px;color:var(--c-accent);min-height:20px"></div>
+    <div style="flex:1"></div>
+  </div>
 </div>
 
 <!-- ═══════ 排行榜 ═══════ -->

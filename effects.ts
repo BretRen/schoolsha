@@ -323,7 +323,7 @@ registerCardEffect("最终测试", {
       type: "volley", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "点名批评", target: opponent });
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "最终测试", target: opponent });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("volley"),
@@ -397,15 +397,6 @@ registerCardEffect("陷害", {
   onUse: (s, playerIdx, card) => {
     dealDamage(s, playerIdx, 1 - playerIdx, 3);
     addLog(s, { id: "card_played", player: playerIdx, cardName: "陷害", target: 1 - playerIdx });
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-  },
-});
-
-registerCardEffect("团队项目", {
-  canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
-  onUse: (s, playerIdx, card) => {
-    dealDamage(s, playerIdx, 1 - playerIdx, 2);
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });

@@ -134,6 +134,7 @@ function enterPhase(state: GameState, phase: Phase) {
     }
 
     case "discard": {
+      state.turnStartTime = Date.now();
       const player = state.players[state.turnPlayer];
       const limit = getHandLimit(state, state.turnPlayer, player.characterId ?? "");
       if (player.hand.length <= limit) {
@@ -333,14 +334,29 @@ export function checkTimeout(state: GameState): boolean {
     changed = true;
   }
 
-  // 回合超时（仅在 play 阶段）
+  // 回合超时（play + discard 阶段）
   if (
     !state.gameOver &&
-    state.phase === "play" &&
     !state.pendingResponse &&
+    (state.phase === "play" || state.phase === "discard") &&
     Date.now() - state.turnStartTime > TURN_TIMEOUT_MS
   ) {
-    console.log(`P${state.turnPlayer} turn timeout (${TURN_TIMEOUT_SEC}s)`);
+    console.log(`P${state.turnPlayer} turn timeout (${TURN_TIMEOUT_SEC}s) in ${state.phase}`);
+    if (state.phase === "discard") {
+      // discard 超时：随机弃牌后推进
+      const player = state.players[state.turnPlayer];
+      const limit = getHandLimit(state, state.turnPlayer, player.characterId ?? "");
+      const needDiscard = player.hand.length - limit;
+      if (needDiscard > 0) {
+        for (let i = 0; i < needDiscard; i++) {
+          const idx = Math.floor(Math.random() * player.hand.length);
+          const [card] = player.hand.splice(idx, 1);
+          state.discard.push(card);
+          addLog(state, { id: "card_discarded", player: state.turnPlayer, cardName: card.name });
+        }
+        emit({ type: "card_discarded", player: state.turnPlayer, cards: [] }, state);
+      }
+    }
     advancePhase(state);
     changed = true;
   }

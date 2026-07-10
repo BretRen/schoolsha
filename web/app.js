@@ -266,7 +266,10 @@ function handleMsg(msg) {
       store.opponentLocked = msg.locked; break;
     case "opponent_left_win":
       store.screen = "menu";
-      createOverlay("🎉 对手退出", msg.message, 5, t => `${t} 秒后关闭`, () => { removeOverlay(); }, () => { removeOverlay(); }, true);
+      if (msg.eloResult) store.eloResult = msg.eloResult;
+      createOverlay(msg.title || "🎉 对手退出",
+        msg.message + (msg.eloResult ? `\nELO ${msg.eloResult.change > 0 ? '+' : ''}${msg.eloResult.change} → ${msg.eloResult.newElo}` : ""),
+        5, t => `${t} 秒后关闭`, () => { removeOverlay(); }, () => { removeOverlay(); }, true);
       break;
     case "reconnected":
       store.blocked = false; removeOverlay(); break;

@@ -466,14 +466,16 @@ Deno.serve({ port: PORT }, async (req) => {
       const other = room.clients[1 - idx];
       if (other && room.isMatch) {
         // 匹配对战：对手退出 → 剩余玩家立即获胜
-        send(other.socket, { type: "opponent_left_win", message: "对手在选角阶段退出，你获胜！" } as ServerMsg);
-        console.log(`[${room.code}] P${1-idx} wins by opponent leave during character select`);
         // 记录 ELO
         const winner = other;
         const loser = room.clients[idx];
+        let eloResult = null;
         if (winner && loser) {
-          updateElo(winner.userId, loser.userId, winner.displayName, loser.displayName);
+          const result = updateElo(winner.userId, loser.userId, winner.displayName, loser.displayName);
+          eloResult = { change: result.winnerChange, newElo: result.winnerNewElo };
         }
+        send(other.socket, { type: "opponent_left_win", message: "对手在选角阶段退出，你获胜！", eloResult } as ServerMsg);
+        console.log(`[${room.code}] P${1-idx} wins by opponent leave during character select`);
       } else if (other) {
         // 手动房间：等待新玩家
         room.picks = [null, null];

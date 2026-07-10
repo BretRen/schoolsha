@@ -135,9 +135,11 @@ export class Room {
         for (let i = 0; i < 2; i++) {
           const c = this.clients[i];
           if (c) {
-            this.send(c.socket, { type: "opponent_left_win", message: "对方未锁定角色，本局作废（平局）" } as ServerMsg);
+            this.send(c.socket, { type: "opponent_left_win", message: "双方均未锁定角色，对局作废（平局，不计ELO）", title: "🤝 平局" } as ServerMsg);
           }
         }
+        // 标记为已开始防止重复触发，稍后由清理器回收
+        this.gameStarted = true;
         return;
       }
 

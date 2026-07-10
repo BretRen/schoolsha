@@ -132,7 +132,7 @@ async function fetchDisconnectedGames() {
 
 // ====== Overlay ======
 let _overlayTimer = null;
-function createOverlay(title, body, seconds, cfn, onAction, onCancel, noIgnore) {
+function createOverlay(title, body, seconds, cfn, onAction, onCancel, noIgnore, buttonText) {
   removeOverlay();
   const el = document.createElement("div"); el.id = "block-overlay";
   el.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999";
@@ -143,7 +143,7 @@ function createOverlay(title, body, seconds, cfn, onAction, onCancel, noIgnore) 
     <h2 style="font-size:28px">${title}</h2><div>${body}</div>
     <p id="bl-countdown" style="color:#f59e0b;font-family:monospace;font-size:16px">${cfn(seconds)}</p>
     <div style="display:flex;gap:12px;justify-content:center;margin-top:8px">
-      <button class="btn btn-primary btn-sm" id="bl-action">${onAction ? '重新连接' : ''}</button>
+      <button class="btn btn-primary btn-sm" id="bl-action">${onAction ? (buttonText || '重新连接') : ''}</button>
       ${ignoreHtml}</div></div>`;
   document.body.appendChild(el);
   _overlayTimer = setInterval(() => { r--; if (r <= 0) { clearInterval(_overlayTimer); _overlayTimer = null; removeOverlay(); if (onCancel) onCancel(); } upd(); }, 1000);
@@ -274,7 +274,7 @@ function handleMsg(msg) {
       if (msg.eloResult) store.eloResult = msg.eloResult;
       createOverlay(msg.title || "🎉 对手退出",
         msg.message + (msg.eloResult ? `\nELO ${msg.eloResult.change > 0 ? '+' : ''}${msg.eloResult.change} → ${msg.eloResult.newElo}` : ""),
-        5, t => `${t} 秒后关闭`, () => { removeOverlay(); }, () => { removeOverlay(); }, true);
+        5, t => `${t} 秒后关闭`, () => { removeOverlay(); }, () => { removeOverlay(); }, true, "确认");
       break;
     case "reconnected":
       store.blocked = false; removeOverlay(); break;

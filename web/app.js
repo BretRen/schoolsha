@@ -220,12 +220,13 @@ function handleMsg(msg) {
       let s = msg.timeoutSec; store.charTimerText = `${s}s`;
       store.charTimer = setInterval(() => { s--; if (s < 0) { clearInterval(store.charTimer); return; } store.charTimerText = `${s}s`; }, 1000);
       if (msg.opponent) {
-        store.charStatus = `对手: ${esc(msg.opponent.displayName)}${store.mode === "matching" ? ` (ELO ${msg.opponent.elo})` : ""}`;
+        store.charOpponent = `对手: ${esc(msg.opponent.displayName)}${store.mode === "matching" ? ` (ELO ${msg.opponent.elo})` : ""}`;
+        store.charEloPrediction = "";
         if (msg.elo?.prediction) {
           const p = msg.elo.prediction;
-          store.charStatus += ` — ELO ${msg.elo.my} → <span style="color:#22c55e">胜 +${p.win}</span> · <span style="color:#ef4444">负 ${p.lose}</span>`;
+          store.charEloPrediction = `<span style="color:#22c55e">胜 +${p.win}</span> · <span style="color:#ef4444">负 ${p.lose}</span>（你的 ELO ${msg.elo.my}）`;
         }
-      } else { store.charStatus = ""; }
+      } else { store.charOpponent = ""; store.charEloPrediction = ""; }
       break;
     case "game_state":
       store.gs = msg.state; store.myIndex = msg.yourIndex;
@@ -384,6 +385,7 @@ document.addEventListener("alpine:init", () => {
     matchStartTime: null, matchInterval: null,
     eloResult: null,
     charTimer: null, charTimerText: "", charStatus: "",
+    charOpponent: "", charEloPrediction: "",
     characters: [], charTimeout: 0,
     selectedChar: null, charLocked: false,
     opponentPicked: false, opponentLocked: false,

@@ -460,7 +460,7 @@ Deno.serve({ port: PORT }, async (req) => {
     // 游戏进行中 → 断线处理
     if (room.game && !room.game.gameOver) {
       room.handleDisconnect(idx);
-    } else if (!room.game) {
+    } else if (!room.game && !room.gameStarted) {
       // 选角阶段有人离开
       if (room.selectTimer) { clearTimeout(room.selectTimer); room.selectTimer = null; }
       const other = room.clients[1 - idx];

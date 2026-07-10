@@ -312,21 +312,20 @@ registerCardEffect("突击测验", {
 
 registerCardEffect("最终测试", {
   canUse: all(playPhase, isTurn, noPending),
-  needsTarget: true,
+  needsTarget: false,
   onUse: (s, playerIdx, card) => {
-    const opponent = 1 - playerIdx;
-    if (s.players[opponent].armor?.name === "黑名单") {
-      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-      return;
+    // 双方各抽 2 张
+    for (const p of [playerIdx, 1 - playerIdx]) {
+      const { drawn, deck, discard } = drawCards(s.deck, s.discard, 2);
+      s.deck = deck;
+      s.discard = discard;
+      s.players[p].hand.push(...drawn);
+      addLog(s, { id: "draw", player: p, count: drawn.length });
+      emit({ type: "draw_card", player: p, cards: drawn }, s);
     }
-    s.pendingResponse = {
-      type: "volley", source: playerIdx, target: opponent, card,
-      timeout: Date.now() + 15_000,
-    };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "最终测试", target: opponent });
-    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "最终测试" });
+    emit({ type: "card_played", player: playerIdx, card }, s);
   },
-  canRespond: pendingIs("volley"),
 });
 
 registerCardEffect("嫁祸", {
@@ -392,10 +391,32 @@ registerCardEffect("告密", {
 });
 
 registerCardEffect("陷害", {
-  canUse: all(playPhase, isTurn, noPending),
+  canUse: all(playPhase, isTurn, noPending, (s, p) => {
+    const opp = s.players[1 - p];
+    let count = opp.hand.length + (opp.weapon ? 1 : 0) + (opp.armor ? 1 : 0);
+    return count >= 2;
+  }),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    dealDamage(s, playerIdx, 1 - playerIdx, 3);
+    const opp = s.players[1 - playerIdx];
+    // 构建池：手牌 + 武器 + 防具
+    const pool: Card[] = [...opp.hand];
+    if (opp.weapon) pool.push(opp.weapon);
+    if (opp.armor) pool.push(opp.armor);
+    // 随机弃 2 张
+    for (let i = 0; i < 2 && pool.length > 0; i++) {
+      const idx = Math.floor(Math.random() * pool.length);
+      const c = pool.splice(idx, 1)[0];
+      if (opp.hand.some(h => h.id === c.id)) {
+        removeCard(opp.hand, c.id);
+      } else if (opp.weapon?.id === c.id) {
+        opp.weapon = null;
+      } else if (opp.armor?.id === c.id) {
+        opp.armor = null;
+      }
+      s.discard.push(c);
+      addLog(s, { id: "card_discarded", player: 1 - playerIdx, cardName: c.name });
+    }
     addLog(s, { id: "card_played", player: playerIdx, cardName: "陷害", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
@@ -405,9 +426,20 @@ registerCardEffect("点名批评", {
   canUse: all(playPhase, isTurn, noPending),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    dealDamage(s, playerIdx, 1 - playerIdx, 1);
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+    const opponent = 1 - playerIdx;
+    // 大衣：免疫
+    if (s.players[opponent].armor?.name === "黑名单") {
+      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
+      return;
+    }
+    s.pendingResponse = {
+      type: "volley", source: playerIdx, target: opponent, card,
+      timeout: Date.now() + 15_000,
+    };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "点名批评", target: opponent });
+    emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
+  canRespond: pendingIs("volley"),
 });
 
 registerCardEffect("午饭留堂", {

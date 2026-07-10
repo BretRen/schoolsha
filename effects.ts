@@ -176,25 +176,21 @@ registerCardEffect("作业", {
       return;
     }
 
-    // 涂改液：判定 — 抽一张牌，红色=自动闪避
+    // 涂改液：主动技 — 需玩家确认是否发动
     if (opponent.armor?.name === "涂改液") {
       if (s.deck.length === 0 && s.discard.length === 0) {
-        // 无牌可判定，作业正常生效
+        // 无牌可判定，作业正常生效（不询问）
       } else {
-        const { drawn, deck, discard } = drawCards(s.deck, s.discard, 1);
-        s.deck = deck;
-        s.discard = discard;
-        if (drawn.length > 0) {
-          const judge = drawn[0];
-          s.discard.push(judge);
-          const isRed = judge.suit === "heart" || judge.suit === "diamond";
-          addLog(s, { id: "judge_result", player: 1 - playerIdx, cardName: judge.name, suit: judge.suit, result: isRed ? "success" : "fail" });
-          if (isRed) {
-            // 红色=自动闪避，作业无效
-            emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-            return;
-          }
-        }
+        s.pendingResponse = {
+          type: "judge_armor",
+          source: playerIdx,
+          target: 1 - playerIdx,
+          card,
+          timeout: Date.now() + 8000,
+        };
+        addLog(s, { id: "card_played", player: playerIdx, cardName: "作业", target: 1 - playerIdx });
+        emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+        return;
       }
     }
 
@@ -705,7 +701,45 @@ export function handleTimeout(state: GameState) {
     return;
   }
 
+  // judge_armor 超时 → 玩家选择不发动涂改液 → 作业正常生效
+  if (pending.type === "judge_armor") {
+    state.pendingResponse = null;
+    setDodgePending(state, pending.source, pending.card!);
+    return;
+  }
+
   state.pendingResponse = null;
+}
+
+// 涂改液主动技 — 玩家确认发动后翻牌判定
+export function handleActivateArmor(state: GameState, playerIdx: number): string | null {
+  const pending = state.pendingResponse;
+  if (!pending || pending.type !== "judge_armor") return "没有需要响应的判定";
+  if (playerIdx !== pending.target) return "不是你需要响应";
+
+  const { drawn, deck, discard } = drawCards(state.deck, state.discard, 1);
+  state.deck = deck;
+  state.discard = discard;
+  state.pendingResponse = null;
+
+  if (drawn.length > 0) {
+    const judge = drawn[0];
+    state.discard.push(judge);
+    const isRed = judge.suit === "heart" || judge.suit === "diamond";
+    addLog(state, { id: "judge_result", player: playerIdx, cardName: judge.name, suit: judge.suit, result: isRed ? "success" : "fail" });
+    if (isRed) {
+      // 红色 → 闪避成功，作业无效
+      emit({ type: "card_played", player: pending.source, card: pending.card!, target: playerIdx }, state);
+      return null;
+    }
+    // 黑色 → 判定失败，作业正常生效
+    setDodgePending(state, pending.source, pending.card!);
+    return null;
+  }
+
+  // 无牌可判（理论上不会走到这里）
+  setDodgePending(state, pending.source, pending.card!);
+  return null;
 }
 
 function handleSkillDiscardTimeout(state: GameState, playerIdx: number) {

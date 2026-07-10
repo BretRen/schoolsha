@@ -315,6 +315,11 @@
       </template>
     </div>
 
+    <!-- 详细一次性记录 -->
+    <div style="text-align:center;font-size:11px;opacity:.7;min-height:18px;flex-shrink:0;padding:2px 0"
+         x-effect="$store.g._judgeVersion"
+         x-text="$store.g.detailLog()"></div>
+
     <!-- Action bar -->
     <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:4px 0 8px;min-height:32px;align-items:center;flex-shrink:0">
       <!-- 响应中：skill_discard -->
@@ -330,8 +335,13 @@
           确认弃牌 (<span x-text="$store.g.cardCount"></span>/<span x-text="$store.g.pending?.discardCount||1"></span>)
         </button>
       </div>
+      <!-- 响应中：涂改液判定 -->
+      <div x-show="$store.g.pending?.type==='judge_armor' && $store.g.isMyResp" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">
+        <button class="btn btn-accent btn-sm" @click="$store.g.doActivateArmor()">⚖ 发动涂改液</button>
+        <button class="btn btn-outline btn-sm" @click="$store.g.doPass()">不发动</button>
+      </div>
       <!-- 响应中：普通响应 -->
-      <div x-show="$store.g.pending && $store.g.isMyResp && $store.g.pending?.type!=='skill_discard' && $store.g.pending?.type!=='opponent_discard'" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">
+      <div x-show="$store.g.pending && $store.g.isMyResp && $store.g.pending?.type!=='skill_discard' && $store.g.pending?.type!=='opponent_discard' && $store.g.pending?.type!=='judge_armor'" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center">
         <button class="btn btn-outline btn-sm" @click="$store.g.doPass()">不响应</button>
         <button class="btn btn-primary btn-sm" @click="$store.g.respondCard()" :disabled="$store.g.cardCount <= 0">
           出牌响应<span x-show="$store.g.cardCount <= 0" style="font-size:10px;opacity:.6">（先点击手牌选择）</span>

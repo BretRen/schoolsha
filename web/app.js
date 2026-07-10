@@ -93,6 +93,7 @@ const RESP_NAMES = {
   steal: p => p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）",
   skill_discard: "请弃一张手牌以发动技能",
   opponent_discard: "对手技能生效！请选择要弃的牌",
+  judge_armor: "是否发动【涂改液】翻牌判定？（8秒）",
 };
 const RESP_NAMES_OPP = {
   dodge: "等待对手出【豁免】响应你的【作业】",
@@ -104,6 +105,7 @@ const RESP_NAMES_OPP = {
   steal: "对手正在盲选你的牌...",
   skill_discard: "对手正在弃牌发动技能...",
   opponent_discard: "等待对手弃牌响应你的技能...",
+  judge_armor: "等待对手决定是否发动【涂改液】...",
 };
 const PN = { judge: "判定", draw: "摸牌", play: "出牌", discard: "弃牌", end: "结束" };
 
@@ -497,6 +499,7 @@ document.addEventListener("alpine:init", () => {
     },
     doPass() { send({ action: "pass" }); },
     doEndPhase() { send({ action: "end_phase" }); },
+    doActivateArmor() { send({ action: "activate_armor" }); },
     doUseSkill(skillId) { send({ action: "use_skill", skill_id: skillId }); },
     stealWithAnim(pos) {
       if (this.blocked) return;
@@ -559,6 +562,28 @@ document.addEventListener("alpine:init", () => {
       if (!this.gs?.log) return null;
       const last = this.gs.log[this.gs.log.length - 1];
       return last?.id === "judge_result" ? last : null;
+    },
+    detailLog() {
+      // 返回最新一条日志的详细描述（一次性显示）
+      if (!this.gs?.log) return "";
+      const last = this.gs.log[this.gs.log.length - 1];
+      if (!last) return "";
+      const who = last.player === this.myIndex ? "你" : "对手";
+      switch (last.id) {
+        case "card_played":
+          return last.target !== undefined
+            ? `${who} 对 ${last.target === this.myIndex ? "你" : "对手"} 使用了【${last.cardName}】`
+            : `${who} 使用了【${last.cardName}】`;
+        case "damage": return `${who} 受到 ${last.amount} 点伤害`;
+        case "heal": return `${who} 回复了 ${last.amount} 点体力`;
+        case "skill_used": return `${who} 发动了技能【${last.skillName}】`;
+        case "draw": return `${who} 摸了 ${last.count} 张牌`;
+        case "card_discarded": case "discard": return `${who} 弃置了【${last.cardName}】`;
+        case "judge_result":
+          return `涂改液判定：${who} 翻出 ${suitSym(last.suit)}【${last.cardName}】→ ${last.result === "success" ? "红色·闪避成功 ✅" : "黑色·判定失败 ❌"}`;
+        case "death": return `${who} 阵亡`;
+        default: return "";
+      }
     },
     formatLogEntry(e) {
       const p = `P${e.player}`;

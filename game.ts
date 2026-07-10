@@ -4,7 +4,7 @@
 
 import type { GameState, Player, Phase, ServerStateView, PlayerView, ClientMsg } from "./types.ts";
 import { createDeck, shuffle, drawCards } from "./cards.ts";
-import { tryUseCard, handleTimeout, handleStealCard, addLog } from "./effects.ts";
+import { tryUseCard, handleTimeout, handleStealCard, addLog, handleActivateArmor } from "./effects.ts";
 import { cardLabel } from "./cards.ts";
 import { emit } from "./events.ts";
 import {
@@ -214,6 +214,9 @@ export function handleMessage(
 
     case "confirm_skill":
       return handleConfirmSkill(state, playerIdx, msg.card_ids);
+
+    case "activate_armor":
+      return handleActivateArmor(state, playerIdx);
 
     default:
       return `未知操作: ${action}`;

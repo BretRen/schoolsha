@@ -28,6 +28,8 @@ export type LogEntry = {
   id: "card_discarded"; player: number; cardName: string;
 } | {
   id: "death"; player: number;
+} | {
+  id: "judge_result"; player: number; cardName: string; suit: string; result: "success" | "fail";
 };
 
 export interface Card {

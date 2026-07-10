@@ -176,7 +176,7 @@ registerCardEffect("作业", {
       return;
     }
 
-    // 抽奖：判定 — 抽一张牌，红色=自动闪避
+    // 涂改液：判定 — 抽一张牌，红色=自动闪避
     if (opponent.armor?.name === "涂改液") {
       if (s.deck.length === 0 && s.discard.length === 0) {
         // 无牌可判定，作业正常生效
@@ -187,7 +187,9 @@ registerCardEffect("作业", {
         if (drawn.length > 0) {
           const judge = drawn[0];
           s.discard.push(judge);
-          if (judge.suit === "heart" || judge.suit === "diamond") {
+          const isRed = judge.suit === "heart" || judge.suit === "diamond";
+          addLog(s, { id: "judge_result", player: 1 - playerIdx, cardName: judge.name, suit: judge.suit, result: isRed ? "success" : "fail" });
+          if (isRed) {
             // 红色=自动闪避，作业无效
             emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
             return;

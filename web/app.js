@@ -235,6 +235,7 @@ function handleMsg(msg) {
     case "game_state":
       store.gs = msg.state; store.myIndex = msg.yourIndex;
       store._playVersion++;
+      store._judgeVersion++;
       if (store.screen !== "game") { store.screen = "game"; clearInterval(store.charTimer); }
       if (msg.eloResult) store.eloResult = msg.eloResult;
       if (store.gs.gameOver) { stopTimers(); }
@@ -398,7 +399,7 @@ document.addEventListener("alpine:init", () => {
     lbData: null,
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
     _hadPending: false,
-    _playVersion: 0,
+    _playVersion: 0, _judgeVersion: 0,
 
     // Computed helpers
     get isMyTurn() { return this.gs?.turnPlayer === this.myIndex; },
@@ -554,6 +555,11 @@ document.addEventListener("alpine:init", () => {
       const last = this.gs.log[this.gs.log.length - 1];
       return last?.id === "skill_used" ? last : null;
     },
+    recentJudge() {
+      if (!this.gs?.log) return null;
+      const last = this.gs.log[this.gs.log.length - 1];
+      return last?.id === "judge_result" ? last : null;
+    },
     formatLogEntry(e) {
       const p = `P${e.player}`;
       switch (e.id) {
@@ -565,6 +571,7 @@ document.addEventListener("alpine:init", () => {
         case "draw": return `${p} 摸了 ${e.count} 张牌`;
         case "card_discarded": case "discard": return `${p} 弃置了【${e.cardName}】`;
         case "death": return `${p} 阵亡`;
+        case "judge_result": return `⚖ 判定：${p} 翻出【${e.cardName}】${e.suit} → ${e.result === "success" ? "红色·闪避✅" : "黑色·生效❌"}`;
         default: return "";
       }
     },

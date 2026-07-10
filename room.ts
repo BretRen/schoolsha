@@ -208,6 +208,11 @@ export class Room {
     const overLimit = markDisconnected(this.game, idx);
     const opponent = this.clients[1 - idx];
 
+    if (overLimit) {
+      this.broadcast();
+      return overLimit;
+    }
+
     if (opponent) {
       const left = MAX_DISCONNECTS - this.game.disconnectCount[idx];
       this.send(opponent.socket, {

@@ -68,6 +68,15 @@ class MatchmakingQueue {
     const p = this.queue[idx];
     this.queue.splice(idx, 1);
     console.log(`[matchmaking] ${p.displayName || userId} left queue`);
+    // 通知队列中剩余玩家
+    for (const other of this.queue) {
+      this.send(other.socket, {
+        type: "queue_status",
+        status: "waiting",
+        position: this.queue.indexOf(other) + 1,
+        estimatedWait: `${this.queue.length * 5}s`,
+      });
+    }
     if (this.queue.length === 0) this.stopRetry();
   }
 

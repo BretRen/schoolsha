@@ -697,6 +697,12 @@ export function handleTimeout(state: GameState) {
     return;
   }
 
+  // opponent_discard 超时 → 随机弃对手牌
+  if (pending.type === "opponent_discard") {
+    handleOpponentDiscardTimeout(state, pending.target!);
+    return;
+  }
+
   state.pendingResponse = null;
 }
 
@@ -721,4 +727,18 @@ function handleSkillDiscardTimeout(state: GameState, playerIdx: number) {
   }
   executeSkillEffect(state, playerIdx, skill);
   addLog(state, { id: "skill_used", player: playerIdx, skillName: skill.name });
+}
+
+function handleOpponentDiscardTimeout(state: GameState, targetIdx: number) {
+  const pending = state.pendingResponse;
+  if (!pending) return;
+  const player = state.players[targetIdx];
+  const count = pending.discardCount ?? 1;
+  for (let i = 0; i < count && player.hand.length > 0; i++) {
+    const idx = Math.floor(Math.random() * player.hand.length);
+    const [card] = player.hand.splice(idx, 1);
+    state.discard.push(card);
+    addLog(state, { id: "card_discarded", player: targetIdx, cardName: card.name });
+  }
+  state.pendingResponse = null;
 }

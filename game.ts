@@ -192,6 +192,10 @@ export function handleMessage(
     }
 
     case "discard": {
+      // 技能弃牌：对手选择弃牌
+      if (state.pendingResponse?.type === "opponent_discard" && playerIdx === state.pendingResponse.target) {
+        return handleOpponentDiscard(state, playerIdx, msg.card_ids);
+      }
       if (playerIdx !== state.turnPlayer) return "不是你的回合";
       if (state.phase !== "discard") return "不在弃牌阶段";
       return handleDiscard(state, playerIdx, msg.card_ids);
@@ -320,12 +324,36 @@ function handleDiscard(
   return null;
 }
 
+function handleOpponentDiscard(
+  state: GameState,
+  playerIdx: number,
+  cardIds: string[],
+): string | null {
+  const pending = state.pendingResponse;
+  if (!pending || pending.type !== "opponent_discard") return "没有待处理的弃牌";
+  const count = pending.discardCount ?? 1;
+  if (cardIds.length !== count) return `需要弃 ${count} 张牌`;
+  const player = state.players[playerIdx];
+  for (const id of cardIds) {
+    const idx = player.hand.findIndex(c => c.id === id);
+    if (idx === -1) return `你没有牌 ${id}`;
+    const [card] = player.hand.splice(idx, 1);
+    state.discard.push(card);
+    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
+  }
+  state.pendingResponse = null;
+  return null;
+}
+
 // ---------- 超时检查 ----------
 
 const TURN_TIMEOUT_MS = TURN_TIMEOUT_SEC * 1000;
 
 export function checkTimeout(state: GameState): boolean {
   let changed = false;
+
+  // 有人断线时暂停所有超时
+  if (anyoneDisconnected(state)) return changed;
 
   // Pending 超时
   if (state.pendingResponse && Date.now() >= state.pendingResponse.timeout) {
@@ -456,5 +484,6 @@ export function getPlayerView(
     opponentName: "",
     opponentId: "",
     handLimit: getHandLimit(state, playerIdx, me.characterId ?? ""),
+    skillUseCount: state.skillUseCount,
   };
 }

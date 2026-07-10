@@ -92,6 +92,7 @@ const RESP_NAMES = {
   borrow_knife: "【嫁祸】！请弃一张牌",
   steal: p => p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）",
   skill_discard: "请弃一张手牌以发动技能",
+  opponent_discard: "对手技能生效！请选择要弃的牌",
 };
 const RESP_NAMES_OPP = {
   dodge: "等待对手出【豁免】响应你的【作业】",
@@ -102,6 +103,7 @@ const RESP_NAMES_OPP = {
   borrow_knife: "等待对手弃牌响应【嫁祸】",
   steal: "对手正在盲选你的牌...",
   skill_discard: "对手正在弃牌发动技能...",
+  opponent_discard: "等待对手弃牌响应你的技能...",
 };
 const PN = { judge: "判定", draw: "摸牌", play: "出牌", discard: "弃牌", end: "结束" };
 
@@ -153,6 +155,13 @@ function createOverlay(title, body, seconds, cfn, onAction, onCancel, noIgnore) 
 function removeOverlay() {
   if (_overlayTimer) { clearInterval(_overlayTimer); _overlayTimer = null; }
   const el = document.getElementById("block-overlay"); if (el) el.remove();
+}
+function showToast(msg) {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(220,38,38,.9);color:white;padding:8px 20px;border-radius:8px;font-size:14px;z-index:999;pointer-events:none;animation:fadeOut 3s forwards";
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3100);
 }
 function showLoginOverlay() {
   removeOverlay();
@@ -259,9 +268,12 @@ function handleMsg(msg) {
       store.screen = "menu";
       createOverlay("🎉 对手退出", msg.message, 5, t => `${t} 秒后关闭`, () => { removeOverlay(); }, () => { removeOverlay(); }, true);
       break;
+    case "reconnected":
+      store.blocked = false; removeOverlay(); break;
+    case "opponent_reconnected":
+      removeOverlay(); break;
     case "error":
-      if (store.screen === "menu" || store.screen === "lobby") { store.screen = "menu"; }
-      break;
+      showToast(msg.message); break;
   }
 }
 
@@ -388,6 +400,7 @@ document.addEventListener("alpine:init", () => {
     // Actions
     toggleCard(id) {
       if (this.blocked) return;
+      if (this.isCardDisabled(this.me?.hand?.find(c => c.id === id))) return;
       const isDiscard = this.gs?.phase === "discard" && this.gs?.turnPlayer === this.myIndex;
       const isSkillDiscard = this.pending?.type === "skill_discard" && this.isMyResp;
       const sel = this.selectedCards;
@@ -410,6 +423,8 @@ document.addEventListener("alpine:init", () => {
     },
     isCardDisabled(c) {
       const isDiscard = this.gs?.phase === "discard" && this.gs?.turnPlayer === this.myIndex;
+      // 对手技能强制弃牌：所有手牌可选
+      if (this.pending?.type === "opponent_discard") return false;
       // 防御牌在自己出牌阶段（非响应中）不能主动出
       if (!isDiscard && this.gs?.phase === "play" && this.isMyTurn && !this.pending && DEFENSIVE_ONLY.includes(c.name)) return true;
       // 非响应阶段所有牌可用

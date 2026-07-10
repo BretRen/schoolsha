@@ -128,17 +128,25 @@ export class Room {
   private startSelectTimer(): void {
     if (this.selectTimer) clearTimeout(this.selectTimer);
     this.selectTimer = setTimeout(() => {
-      const chars = getAllCharacters();
+      // 检查是否有玩家未锁定 — 未锁定=弃权，平局
+      const anyUnlocked = !this.locked[0] || !this.locked[1];
+      if (anyUnlocked && !this.gameStarted) {
+        console.log(`[${this.code}] Select timeout with unlocked players — tie`);
+        for (let i = 0; i < 2; i++) {
+          const c = this.clients[i];
+          if (c) {
+            this.send(c.socket, { type: "opponent_left_win", message: "对方未锁定角色，本局作废（平局）" } as ServerMsg);
+          }
+        }
+        return;
+      }
 
-      // 未选的或未锁定的自动选第一个角色并锁定
+      const chars = getAllCharacters();
+      // 双方都锁定但未选 → 自动补选
       for (let i = 0; i < 2; i++) {
         if (this.picks[i] === null) {
           this.picks[i] = chars[0].id;
           console.log(`[${this.code}] P${i} select timeout, auto-picked ${chars[0].name}`);
-        }
-        if (!this.locked[i]) {
-          this.locked[i] = true;
-          console.log(`[${this.code}] P${i} auto-locked`);
         }
       }
 
@@ -232,6 +240,11 @@ export class Room {
         this.disconnectedUserId[i] = null;
         markReconnected(this.game, i);
         this.send(socket, { type: "reconnected", message: "已重新连接" });
+        // 通知对手关闭断线弹窗
+        const opp = this.clients[1 - i];
+        if (opp) {
+          this.send(opp.socket, { type: "opponent_reconnected" } as ServerMsg);
+        }
         this.broadcast();
         this.lastActiveAt = Date.now();
         console.log(`[${this.code}] P${i} reconnected`);

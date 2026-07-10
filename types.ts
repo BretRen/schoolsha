@@ -48,7 +48,7 @@ export interface Player {
   armor: Card | null;
 }
 
-export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal" | "skill_discard";
+export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal" | "skill_discard" | "opponent_discard";
 
 export interface PendingResponse {
   type: PendingType;
@@ -172,6 +172,8 @@ export interface ServerStateView {
   opponentId: string;
   /** 当前手牌上限（含技能加成） */
   handLimit: number;
+  /** 技能每回合使用次数 */
+  skillUseCount: Record<string, number>;
   /** 对局日志 */
   log: LogEntry[];
 }
@@ -183,6 +185,7 @@ export type ServerMsg =
   | { type: "disconnected"; message: string; attemptsLeft: number }
   | { type: "room_created"; code: string; inviteUrl: string; wsUrl: string }
   | { type: "reconnected"; message: string }
+  | { type: "opponent_reconnected" }
   | { type: "error"; message: string }
   | { type: "queue_status"; status: string; position: number; estimatedWait: string }
   | { type: "match_found"; room: string; opponent: { displayName: string; elo: number } }

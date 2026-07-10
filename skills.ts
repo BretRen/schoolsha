@@ -179,9 +179,14 @@ export function executeSkillEffect(state: GameState, playerIdx: number, skill: S
       const target = 1 - playerIdx;
       const hand = state.players[target].hand;
       if (hand.length === 0) break;
-      const idx = Math.floor(Math.random() * hand.length);
-      const card = hand.splice(idx, 1)[0];
-      state.discard.push(card);
+      // 让对手自己选择弃牌
+      state.pendingResponse = {
+        type: "opponent_discard",
+        source: playerIdx,
+        target,
+        timeout: Date.now() + 15_000,
+        discardCount: effect.count,
+      };
       break;
     }
     case "draw_cards": {

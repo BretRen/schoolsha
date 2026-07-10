@@ -2,7 +2,7 @@
 // effects.ts — 卡牌效果 + 装备系统
 // ============================================================
 
-import type { GameState, Card, PendingType } from "./types.ts";
+import type { GameState, Card, PendingType, LogEntry } from "./types.ts";
 import { hasCard, removeCard, drawCards } from "./cards.ts";
 import { emit } from "./events.ts";
 
@@ -30,9 +30,8 @@ export function getCardEffect(name: string): CardEffect | undefined {
 
 // ---------- 日志 ----------
 
-function addLog(s: GameState, player: number, msg: string) {
-  const name = `P${player}`;
-  s.log.push(`[${name}] ${msg}`);
+function addLog(s: GameState, entry: LogEntry) {
+  s.log.push(entry);
   if (s.log.length > 50) s.log.shift();
 }
 
@@ -80,7 +79,7 @@ function dealDamage(s: GameState, source: number, target: number, amount: number
   }
   s.players[target].hp -= amount;
   if (s.players[target].hp < 0) s.players[target].hp = 0;
-  addLog(s, target, `受到 ${amount} 点伤害`);
+  addLog(s, { id: "damage", player: target, amount });
   emit({ type: "damage", source, target, amount }, s);
   // 直接伤害可能致死，触发濒死流程
   if (s.players[target].hp <= 0 && !s.gameOver) {
@@ -90,7 +89,7 @@ function dealDamage(s: GameState, source: number, target: number, amount: number
 
 function healTo(s: GameState, player: number, amount: number) {
   s.players[player].hp = Math.min(s.players[player].hp + amount, s.players[player].maxHp);
-  addLog(s, player, `回复了 ${amount} 点体力`);
+  addLog(s, { id: "heal", player: player, amount });
   emit({ type: "heal", player, amount }, s);
 }
 
@@ -176,7 +175,7 @@ function equipCard(s: GameState, playerIdx: number, card: Card): string | null {
   } else {
     return "不是装备牌";
   }
-  addLog(s, playerIdx, `装备了【${card.name}】`);
+  addLog(s, { id: "card_equipped", player: playerIdx, cardName: card.name });
   emit({ type: "card_played", player: playerIdx, card }, s);
   return null;
 }
@@ -228,7 +227,7 @@ registerCardEffect("作业", {
 
     s.attackUsed = true;
     setDodgePending(s, playerIdx, card);
-    addLog(s, playerIdx, `使用了【作业】`);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "作业", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });
@@ -283,6 +282,7 @@ registerCardEffect("辩论", {
       type: "duel", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
     };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "辩论", target: opponent });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("duel"),
@@ -301,6 +301,7 @@ registerCardEffect("突击测验", {
       type: "barbarian", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
     };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "突击测验", target: opponent });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("barbarian"),
@@ -319,6 +320,7 @@ registerCardEffect("最终测试", {
       type: "volley", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
     };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "点名批评", target: opponent });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("volley"),
@@ -348,6 +350,7 @@ registerCardEffect("神偷", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     stealRandomCard(s, 1 - playerIdx, playerIdx);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "神偷", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });
@@ -360,6 +363,7 @@ registerCardEffect("告密", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     discardFromPool(s, 1 - playerIdx);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "告密", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });
@@ -369,6 +373,7 @@ registerCardEffect("陷害", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     dealDamage(s, playerIdx, 1 - playerIdx, 3);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "陷害", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });

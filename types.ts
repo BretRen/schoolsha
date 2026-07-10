@@ -6,6 +6,28 @@ export type Suit = "spade" | "heart" | "club" | "diamond";
 export type Phase = "judge" | "draw" | "play" | "discard" | "end";
 export type CardType = "basic" | "trick" | "weapon" | "armor";
 
+// ---------- 结构化日志（便于 i18n）----------
+
+export type LogEntry = {
+  id: "card_played"; player: number; cardName: string; target?: number;
+} | {
+  id: "card_equipped"; player: number; cardName: string;
+} | {
+  id: "damage"; player: number; amount: number;
+} | {
+  id: "heal"; player: number; amount: number;
+} | {
+  id: "skill_used"; player: number; skillName: string;
+} | {
+  id: "phase"; player: number; phase: string;
+} | {
+  id: "draw"; player: number; count: number;
+} | {
+  id: "discard"; player: number; cardName: string;
+} | {
+  id: "death"; player: number;
+};
+
 export interface Card {
   id: string;
   name: string;
@@ -55,7 +77,7 @@ export interface GameState {
   /** 技能每回合使用次数（多房间隔离） */
   skillUseCount: Record<string, number>;
   /** 对局日志 */
-  log: string[];
+  log: LogEntry[];
 }
 
 // ---------- JSON 配置类型 ----------
@@ -128,7 +150,7 @@ export interface ServerStateView {
   /** 当前手牌上限（含技能加成） */
   handLimit: number;
   /** 对局日志 */
-  log: string[];
+  log: LogEntry[];
 }
 
 export type ServerMsg =

@@ -136,15 +136,19 @@ export function tryUseSkill(
     if (used >= skill.perTurn) return "本回合已使用过";
   }
 
-  // 支付代价：弃牌
+  // 支付代价：弃牌（改为玩家自选）
   if (skill.cost?.discard) {
     const hand = state.players[playerIdx].hand;
     if (hand.length < skill.cost.discard) return "手牌不足";
-    // 从手牌随机弃（后续可改为玩家自选）
-    for (let i = 0; i < skill.cost.discard; i++) {
-      const card = hand.pop()!;
-      state.discard.push(card);
-    }
+    // 设置 pending，让玩家选牌
+    state.pendingResponse = {
+      type: "skill_discard",
+      source: playerIdx,
+      target: playerIdx,
+      timeout: Date.now() + 15_000,
+      pendingSkillId: skillId,
+    };
+    return null; // 等玩家选牌后确认
   }
 
   // 标记使用
@@ -159,7 +163,7 @@ export function tryUseSkill(
   return null;
 }
 
-function executeSkillEffect(state: GameState, playerIdx: number, skill: SkillDef) {
+export function executeSkillEffect(state: GameState, playerIdx: number, skill: SkillDef) {
   const effect = skill.effect;
 
   switch (effect.type) {

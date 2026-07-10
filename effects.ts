@@ -5,6 +5,8 @@
 import type { GameState, Card, PendingType, LogEntry } from "./types.ts";
 import { hasCard, removeCard, drawCards } from "./cards.ts";
 import { emit } from "./events.ts";
+import { getSkill, executeSkillEffect } from "./skills.ts";
+import { cardLabel } from "./cards.ts";
 
 // ---------- 效果类型 ----------
 
@@ -639,6 +641,7 @@ export function tryRespond(
   if (pending.type === "duel" || pending.type === "barbarian") return "需要出【作业】";
   if (pending.type === "volley") return "需要出【豁免】";
   if (pending.type === "steal") return "请选择要偷的牌";
+  if (pending.type === "skill_discard") return "需要选择要弃置的牌";
   if (pending.type === "borrow_knife") return "需要弃一张牌";
 
   return "无效响应";
@@ -741,5 +744,34 @@ export function handleTimeout(state: GameState) {
     return;
   }
 
+  // skill_discard 超时 → 随机弃牌，执行技能
+  if (pending.type === "skill_discard") {
+    handleSkillDiscardTimeout(state, pending.target!);
+    return;
+  }
+
   state.pendingResponse = null;
+}
+
+function handleSkillDiscardTimeout(state: GameState, playerIdx: number) {
+  const pending = state.pendingResponse;
+  if (!pending) return;
+  const skill = getSkill(pending.pendingSkillId!);
+  if (!skill) { state.pendingResponse = null; return; }
+  const player = state.players[playerIdx];
+  const count = skill.cost?.discard ?? 0;
+  // 随机弃牌
+  for (let i = 0; i < count; i++) {
+    if (player.hand.length === 0) break;
+    const idx = Math.floor(Math.random() * player.hand.length);
+    const [card] = player.hand.splice(idx, 1);
+    state.discard.push(card);
+    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
+  }
+  state.pendingResponse = null;
+  if (skill.perTurn) {
+    state.skillUseCount[pending.pendingSkillId!] = (state.skillUseCount[pending.pendingSkillId!] ?? 0) + 1;
+  }
+  executeSkillEffect(state, playerIdx, skill);
+  addLog(state, { id: "skill_used", player: playerIdx, skillName: skill.name });
 }

@@ -48,7 +48,7 @@ export interface Player {
   armor: Card | null;
 }
 
-export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal";
+export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal" | "skill_discard";
 
 export interface PendingResponse {
   type: PendingType;
@@ -62,6 +62,8 @@ export interface PendingResponse {
   poolSize?: number;
   /** 选牌后的动作：偷(默认) 或 弃 */
   stealAction?: "steal" | "discard";
+  /** skill_discard 类型时，待确认的技能 ID */
+  pendingSkillId?: string;
 }
 
 export interface GameState {
@@ -114,7 +116,8 @@ export type ClientMsg =
   | { action: "steal_card"; card_id?: string; position?: number }
   | { action: "pass" }
   | { action: "respond"; card_id: string }
-  | { action: "reconnect"; seat: number };
+  | { action: "reconnect"; seat: number }
+  | { action: "confirm_skill"; card_ids: string[] };
 
 export interface CharacterInfo {
   id: string;

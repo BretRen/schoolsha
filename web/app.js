@@ -355,8 +355,14 @@ function renderActions(gs){
   let btns="";const isMyTurn=gs.turnPlayer===ST.myIndex;const p=gs.pendingResponse;
   if(ST.blocked){html("action-bar","");return;}
   if(p&&p.target===ST.myIndex){
-    btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'pass'})">不响应</button>`;
-    if(ST.selectedCards.size>0)btns+=`<button class="btn btn-primary btn-sm" onclick="respondCard()">出牌响应</button>`;
+    if(p.type==="skill_discard"){
+      const need=1; // skills.json 中技能代价弃牌数
+      if(ST.selectedCards.size>=need)btns+=`<button class="btn btn-primary btn-sm" onclick="doConfirmSkill()">确认发动 (${ST.selectedCards.size}/${need})</button>`;
+      btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'pass'})">取消</button>`;
+    }else{
+      btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'pass'})">不响应</button>`;
+      if(ST.selectedCards.size>0)btns+=`<button class="btn btn-primary btn-sm" onclick="respondCard()">出牌响应</button>`;
+    }
   }else if(isMyTurn&&gs.phase==="play"&&!p){
     if(ST.selectedCards.size>0)btns+=`<button class="btn btn-primary btn-sm" onclick="playSelected()">出牌</button>`;
     if(gs.you.skills?.length)for(const s of gs.you.skills)if(s.type==="active")btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'use_skill',skill_id:'${s.id}'})">技能: ${s.name}</button>`;
@@ -371,13 +377,15 @@ function renderActions(gs){
 
 // ====== 卡牌操作 ======
 // deno-lint-ignore no-unused-vars
-function toggleCard(id){if(ST.blocked)return;const gs=ST.gs;if(!gs)return;const isDiscard=gs.phase==="discard"&&gs.turnPlayer===ST.myIndex;if(ST.selectedCards.has(id))ST.selectedCards.delete(id);else{if(isDiscard)ST.selectedCards.add(id);else{ST.selectedCards.clear();ST.selectedCards.add(id);}}renderHand(gs.you.hand);renderActions(gs);renderCardInfo();}
+function toggleCard(id){if(ST.blocked)return;const gs=ST.gs;if(!gs)return;const isDiscard=gs.phase==="discard"&&gs.turnPlayer===ST.myIndex;const isSkillDiscard=gs.pendingResponse?.type==="skill_discard"&&gs.pendingResponse?.target===ST.myIndex;if(ST.selectedCards.has(id))ST.selectedCards.delete(id);else{if(isDiscard||isSkillDiscard)ST.selectedCards.add(id);else{ST.selectedCards.clear();ST.selectedCards.add(id);}}renderHand(gs.you.hand);renderActions(gs);renderCardInfo();}
 // deno-lint-ignore no-unused-vars
 function playSelected(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"play_card",card_id:ids[0],target:ST.myIndex===0?1:0});ST.selectedCards.clear();}
 // deno-lint-ignore no-unused-vars
 function respondCard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"play_card",card_id:ids[0]});ST.selectedCards.clear();}
 // deno-lint-ignore no-unused-vars
 function doDiscard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"discard",card_ids:ids});ST.selectedCards.clear();}
+// deno-lint-ignore no-unused-vars
+function doConfirmSkill(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"confirm_skill",card_ids:ids});ST.selectedCards.clear();}
 
 // ====== 游戏结束 ======
 function showGameOver(){

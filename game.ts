@@ -14,6 +14,7 @@ import {
   tryUseSkill,
   resetSkillCounts,
   getSkill,
+  executeSkillEffect,
 } from "./skills.ts";
 
 export { cardLabel };
@@ -205,6 +206,9 @@ export function handleMessage(
     case "steal_card":
       return handleStealCard(state, playerIdx, msg.position);
 
+    case "confirm_skill":
+      return handleConfirmSkill(state, playerIdx, msg.card_ids);
+
     default:
       return `未知操作: ${action}`;
   }
@@ -236,6 +240,44 @@ function handleUseSkill(
 
   const err = tryUseSkill(state, playerIdx, charId, skillId);
   if (err) return err;
+  return null;
+}
+
+function handleConfirmSkill(
+  state: GameState,
+  playerIdx: number,
+  cardIds: string[],
+): string | null {
+  const pending = state.pendingResponse;
+  if (!pending || pending.type !== "skill_discard") return "没有待确认的技能";
+  if (playerIdx !== pending.target) return "不是你需要确认";
+
+  const skill = getSkill(pending.pendingSkillId!);
+  if (!skill) return "未知技能";
+
+  const player = state.players[playerIdx];
+  const count = skill.cost?.discard ?? 0;
+  if (cardIds.length !== count) return `需要选 ${count} 张牌`;
+
+  for (const id of cardIds) {
+    const idx = player.hand.findIndex(c => c.id === id);
+    if (idx === -1) return `你没有牌 ${id}`;
+    const card = player.hand.splice(idx, 1)[0];
+    state.discard.push(card);
+    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
+  }
+
+  state.pendingResponse = null;
+
+  // 标记使用
+  if (skill.perTurn) {
+    state.skillUseCount[pending.pendingSkillId!] = (state.skillUseCount[pending.pendingSkillId!] ?? 0) + 1;
+  }
+
+  // 执行效果
+  executeSkillEffect(state, playerIdx, skill);
+  addLog(state, { id: "skill_used", player: playerIdx, skillName: skill.name });
+
   return null;
 }
 

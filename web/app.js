@@ -82,7 +82,7 @@ const SKILL_DESC = {
 };
 const WEAPON_NAMES = new Set(["钢笔", "圆规", "尺子", "橡皮"]);
 const DEFENSIVE_ONLY = ["豁免", "免罚券"];
-const RESP_CARDS = { dodge: ["豁免"], near_death: ["补给", "小抄"], duel: ["作业"], barbarian: ["作业"], volley: ["豁免"], borrow_knife: [] };
+const RESP_CARDS = { dodge: ["豁免"], near_death: ["补给", "小抄"], duel: ["作业"], barbarian: ["作业"], volley: ["豁免"], borrow_knife: null };
 const RESP_NAMES = {
   dodge: "对手对你使用了【作业】，请出【豁免】",
   near_death: "你处于濒死状态，请出【补给】或【小抄】自救",
@@ -193,6 +193,10 @@ function connect(wsUrl) {
   store.ws.onmessage = ev => { let msg; try { msg = JSON.parse(ev.data); } catch { return; } handleMsg(msg); };
   store.ws.onclose = () => {
     stopTimers();
+    if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
+    if (store.screen === "lobby" && store.mode === "matching") {
+      store.screen = "menu"; store.lobbyStatus = "";
+    }
     if (store.screen === "game" || store.screen === "char") {
       if (store.roomCode && store.gs && !store.gs.gameOver) fetchDisconnectedGames();
     }

@@ -4,7 +4,7 @@
 
 import type { GameState, Player, Phase, ServerStateView, PlayerView, ClientMsg } from "./types.ts";
 import { createDeck, shuffle, drawCards } from "./cards.ts";
-import { tryUseCard, handleTimeout, handleStealCard } from "./effects.ts";
+import { tryUseCard, handleTimeout, handleStealCard, addLog } from "./effects.ts";
 import { cardLabel } from "./cards.ts";
 import { emit } from "./events.ts";
 import {
@@ -265,6 +265,9 @@ function handleDiscard(
   }
 
   state.discard.push(...discarded);
+  for (const c of discarded) {
+    addLog(state, { id: "card_discarded", player: playerIdx, cardName: c.name });
+  }
   emit(
     { type: "card_discarded", player: playerIdx, cards: discarded },
     state,

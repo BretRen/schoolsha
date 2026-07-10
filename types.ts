@@ -25,6 +25,8 @@ export type LogEntry = {
 } | {
   id: "discard"; player: number; cardName: string;
 } | {
+  id: "card_discarded"; player: number; cardName: string;
+} | {
   id: "death"; player: number;
 };
 

@@ -322,17 +322,31 @@ function renderPending(gs){
 
 
 function renderCenterZone(gs){
-  const el=$("center-zone");if(!el)return;
-  const p=gs.pendingResponse;
-  if(p){
-    const card=p.card;
-    if(card)el.textContent=`出牌: ${card.name}`;
-    return;
+  const playZone=$("play-zone");const discardZone=$("discard-zone");
+  if(!playZone||!discardZone)return;
+  // 从日志中找到最近一次出牌和弃牌
+  let lastPlay=null,lastDiscard=null;
+  if(gs.log){
+    for(let i=gs.log.length-1;i>=0;i--){
+      const e=gs.log[i];
+      if(!lastPlay&&e.id==="card_played")lastPlay=e;
+      if(!lastDiscard&&(e.id==="card_discarded"||e.id==="discard"))lastDiscard=e;
+      if(lastPlay&&lastDiscard)break;
+    }
   }
-  if(gs.phase==="discard"){el.textContent="弃牌阶段";return;}
-  const lastLog=gs.log?.[gs.log.length-1];
-  if(lastLog&&lastLog.id==="card_played")el.textContent=`${lastLog.cardName}`;
-  else el.textContent="";
+  if(lastPlay){playZone.textContent=`🃏 ${lastPlay.cardName}`;playZone.className="animate-card-in";show("play-zone");}
+  else hide("play-zone");
+  if(lastDiscard){discardZone.textContent=`弃: ${lastDiscard.cardName}`;discardZone.className="animate-discard";}
+  else{discardZone.textContent=gs.phase==="discard"?"弃牌阶段":"";}
+
+  // 技能 flash（上一条日志是 skill_used 且最近才出现）
+  if(gs.log){
+    const last=gs.log[gs.log.length-1];
+    if(last&&last.id==="skill_used"){
+      const sf=$("skill-flash");
+      if(sf){sf.textContent=`⚡ ${last.skillName || "技能"} 发动！`;sf.className="animate-skill text-center text-sm font-bold py-2 rounded-lg";show("skill-flash");}
+    }
+  }
 }
 
 function renderActions(gs){

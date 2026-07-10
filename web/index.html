@@ -46,6 +46,16 @@
     font-size:11px; white-space:nowrap; z-index:10; border:1px solid #ef4444; pointer-events:none;
   }
 
+  /* 动画 */
+  @keyframes flash-in { 0% { opacity: 0; transform: scale(1.3); } 50% { opacity: 1; transform: scale(1); } }
+  @keyframes skill-flash { 0% { opacity: 0; transform: translateY(-8px); } 20% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+  @keyframes card-fade-in { 0% { opacity: 0; transform: translateY(-10px); } 100% { opacity: 1; transform: translateY(0); } }
+  @keyframes discard-pop { 0% { opacity: 0; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
+  .animate-flash { animation: flash-in .3s ease-out; }
+  .animate-skill { animation: skill-flash 3s ease-out forwards; }
+  .animate-card-in { animation: card-fade-in .25s ease-out; }
+  .animate-discard { animation: discard-pop .4s ease-out; }
+
   .chcard {
     background: var(--c-card); border: 2px solid var(--c-border);
     border-radius: 10px; padding: 16px; text-align: center; cursor: pointer;
@@ -137,8 +147,13 @@
 
     <!-- 中：共享内容 -->
     <div class="flex flex-col flex-1 min-w-0">
-      <!-- 弃牌/出牌区 -->
-      <div id="center-zone" class="text-xs opacity-40 text-center py-2 min-h-[24px]"></div>
+      <!-- 出牌/弃牌区 -->
+      <div id="center-zone" class="text-xs opacity-40 text-center py-2 min-h-[24px] flex gap-3 justify-center items-center">
+        <span id="play-zone" class="hidden"></span>
+        <span id="discard-zone"></span>
+      </div>
+      <!-- 技能提示 flash -->
+      <div id="skill-flash" class="hidden text-center text-sm font-bold py-2 rounded-lg" style="color:var(--c-gold);background:rgba(245,158,11,0.08)"></div>
       <!-- 日志 -->
       <div id="game-log" class="flex-1 overflow-y-auto text-xs opacity-50 py-1" style="min-height:60px;max-height:120px"></div>
       <!-- 选中牌说明 -->

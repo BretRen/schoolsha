@@ -30,7 +30,7 @@ export function getCardEffect(name: string): CardEffect | undefined {
 
 // ---------- 日志 ----------
 
-function addLog(s: GameState, entry: LogEntry) {
+export function addLog(s: GameState, entry: LogEntry) {
   s.log.push(entry);
   if (s.log.length > 50) s.log.shift();
 }
@@ -159,6 +159,7 @@ function discardFromPool(s: GameState, player: number): boolean {
   }
 
   s.discard.push(card);
+  addLog(s, { id: "card_discarded", player, cardName: card.name });
   emit({ type: "card_discarded", player, cards: [card] }, s);
   return true;
 }
@@ -678,12 +679,15 @@ export function handleStealCard(state: GameState, playerIdx: number, position?: 
   // 偷或弃
   if (pending.stealAction === "discard") {
     state.discard.push(card);
+    state.pendingResponse = null;
+    state.discard.push(pending.card!);
+    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
   } else {
     state.players[playerIdx].hand.push(card);
+    state.pendingResponse = null;
+    state.discard.push(pending.card!);
+    addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
   }
-  state.pendingResponse = null;
-  state.discard.push(pending.card!);
-  addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
   emit({ type: "card_played", player: playerIdx, card }, state);
   return null;
 }

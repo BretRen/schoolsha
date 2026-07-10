@@ -5,6 +5,7 @@
 import type { GameState } from "./types.ts";
 import { onEvent, emit } from "./events.ts";
 import { drawCards } from "./cards.ts";
+import { addLog } from "./effects.ts";
 import charactersConfig from "./characters.json" with { type: "json" };
 import skillsConfig from "./skills.json" with { type: "json" };
 
@@ -153,6 +154,7 @@ export function tryUseSkill(
 
   // 执行效果
   executeSkillEffect(state, playerIdx, skill);
+  addLog(state, { id: "skill_used", player: playerIdx, skillName: skill.name });
 
   return null;
 }

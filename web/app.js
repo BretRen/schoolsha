@@ -33,16 +33,23 @@ async function initAuth() {
   } catch { /* noop */ }
   const saved = sessionStorage.getItem("auth_token"); if (saved) AUTH.token = saved;
   if (AUTH.enabled && location.search.includes("code=")) { await handleAuthCallback(); }
-  if (AUTH.token) {
-    // 邀请链接：OAuth 前存了房间码，现在自动加入
-    const inviteRoom = sessionStorage.getItem("invite_room");
-    if (inviteRoom) {
+
+  // 邀请链接优先：有 token 直接加入，没 token 触发登录
+  const inviteRoom = sessionStorage.getItem("invite_room");
+  if (inviteRoom) {
+    if (AUTH.token) {
       sessionStorage.removeItem("invite_room");
       joinRoomByCode(inviteRoom);
       return;
     }
-    fetchDisconnectedGames();
+    if (AUTH.enabled) {
+      text("menu-status", `正在登录以加入房间 ${inviteRoom}...`);
+      startLogin();
+      return;
+    }
   }
+
+  if (AUTH.token) fetchDisconnectedGames();
 }
 
 // ====== 重连 ======

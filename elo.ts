@@ -76,10 +76,9 @@ export function updateElo(
     const oldW = w.elo, oldL = l.elo;
 
     const eWinner = 1 / (1 + Math.pow(10, (l.elo - w.elo) / 400));
-    const eLoser = 1 / (1 + Math.pow(10, (w.elo - l.elo) / 400));
 
     w.elo = Math.round(w.elo + K_FACTOR * (1 - eWinner));
-    l.elo = Math.round(l.elo + K_FACTOR * (0 - eLoser));
+    l.elo = Math.round(l.elo + K_FACTOR * (0 - eWinner));
     if (w.elo < 0) w.elo = 0;
     if (l.elo < 0) l.elo = 0;
 
@@ -95,10 +94,9 @@ export function updateElo(
  */
 export function predictEloChange(myElo: number, oppElo: number): { win: number; lose: number } {
   const eWin = 1 / (1 + Math.pow(10, (oppElo - myElo) / 400));
-  const eLose = 1 / (1 + Math.pow(10, (myElo - oppElo) / 400));
   return {
     win: Math.round(K_FACTOR * (1 - eWin)),
-    lose: Math.round(K_FACTOR * (0 - eLose)),
+    lose: Math.round(K_FACTOR * (0 - eWin)),
   };
 }
 

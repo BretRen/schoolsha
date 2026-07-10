@@ -150,8 +150,7 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen hidden" x-show="$store.g.screen === 'game'"
-     x-effect="if($store.g.screen==='game' && $store.g.gs && !$store.g.pending && $store.g.gs.turnTimeLeft !== $store.g._lastTurnTime) { $store.g._lastTurnTime = $store.g.gs.turnTimeLeft; startTurnTimer($store.g.gs.turnTimeLeft); }"
-     x-init="/* Alpine managed */">
+     x-effect="(function(){ if($store.g.screen==='game' && $store.g.gs && !$store.g.pending && $store.g.gs.turnTimeLeft !== $store.g._lastTurnTime) { $store.g._lastTurnTime = $store.g.gs.turnTimeLeft; startTurnTimer($store.g.gs.turnTimeLeft); } })()">
 
   <!-- 左：自己面板 -->
   <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">

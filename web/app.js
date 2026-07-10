@@ -1,58 +1,115 @@
 // ============================================================
-// app.js — 学校杀网页版客户端
+// app.js — 学校杀网页版 (Alpine.js)
+// 仅 WS/Auth/工具函数，所有渲染由 Alpine 模板处理
 // ============================================================
 
-const WS_URL = `ws://${location.host}/ws`;
-const HTTP_URL = `http://${location.host}`;
-
 // ====== 认证 (PKCE) ======
+const HTTP_URL = `http://${location.host}`;
+const WS_URL = `ws://${location.host}/ws`;
 const AUTH = { enabled: false, provider: "", clientId: "", token: null };
 
-function b64(buf) { const s = String.fromCharCode(...new Uint8Array(buf)); return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function b64(buf) { const s = String.fromCharCode(...new Uint8Array(buf)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
 
 async function startLogin() {
   const vb = new Uint8Array(32); crypto.getRandomValues(vb); const verifier = b64(vb);
   sessionStorage.setItem("pkce_verifier", verifier);
   const challenge = b64(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
-  location.href = `${AUTH.provider}/oauth/v2/authorize?${new URLSearchParams({client_id:AUTH.clientId,redirect_uri:location.origin+"/",response_type:"code",code_challenge:challenge,code_challenge_method:"S256",scope:"openid profile email"})}`;
+  location.href = `${AUTH.provider}/oauth/v2/authorize?${new URLSearchParams({ client_id: AUTH.clientId, redirect_uri: location.origin + "/", response_type: "code", code_challenge: challenge, code_challenge_method: "S256", scope: "openid profile email" })}`;
 }
 
 async function handleAuthCallback() {
   const code = new URLSearchParams(location.search).get("code"); if (!code) return false;
   const verifier = sessionStorage.getItem("pkce_verifier"); if (!verifier) return false;
   history.replaceState(null, "", location.pathname);
-  const r = await fetch(`${AUTH.provider}/oauth/v2/token`, {method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"authorization_code",client_id:AUTH.clientId,code,redirect_uri:location.origin+"/",code_verifier:verifier})});
-  if (!r.ok) { text("menu-status","登录失败"); sessionStorage.removeItem("pkce_verifier"); return false; }
+  const r = await fetch(`${AUTH.provider}/oauth/v2/token`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: AUTH.clientId, code, redirect_uri: location.origin + "/", code_verifier: verifier }) });
+  if (!r.ok) { sessionStorage.removeItem("pkce_verifier"); return false; }
   const d = await r.json(); AUTH.token = d.access_token;
-  sessionStorage.setItem("auth_token", d.access_token); sessionStorage.removeItem("pkce_verifier");
-  text("menu-status","已登录"); return true;
+  sessionStorage.setItem("auth_token", d.access_token); sessionStorage.removeItem("pkce_verifier"); return true;
 }
+
 async function initAuth() {
   try { const r = await fetch(`${HTTP_URL}/info`); const info = await r.json();
-    if (info.auth?.mode==="zitadel_oidc") { AUTH.enabled=true; AUTH.provider=info.auth.provider; AUTH.clientId=info.auth.clientId; }
+    if (info.auth?.mode === "zitadel_oidc") { AUTH.enabled = true; AUTH.provider = info.auth.provider; AUTH.clientId = info.auth.clientId; }
   } catch { /* noop */ }
   const saved = sessionStorage.getItem("auth_token"); if (saved) AUTH.token = saved;
   if (AUTH.enabled && location.search.includes("code=")) { await handleAuthCallback(); }
 
-  // 邀请链接优先：有 token 直接加入，没 token 触发登录
   const inviteRoom = sessionStorage.getItem("invite_room");
   if (inviteRoom) {
-    if (AUTH.token) {
-      sessionStorage.removeItem("invite_room");
-      joinRoomByCode(inviteRoom);
-      return;
-    }
-    if (AUTH.enabled) {
-      text("menu-status", `正在登录以加入房间 ${inviteRoom}...`);
-      startLogin();
-      return;
-    }
+    if (AUTH.token) { sessionStorage.removeItem("invite_room"); joinRoomByCode(inviteRoom); return; }
+    if (AUTH.enabled) { startLogin(); return; }
   }
-
   if (AUTH.token) fetchDisconnectedGames();
 }
 
+// ====== 工具函数 ======
+const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
+const suitSym = s => ({ spade: "♠", heart: "♥", club: "♣", diamond: "♦" }[s] || "?");
+const cn = c => c?.name || "?";
+const hpStr = (hp, max) => { let s = ""; for (let i = 0; i < max; i++) s += i < hp ? "♥" : "♡"; return s; };
+const isWeapon = n => WEAPON_NAMES.has(n);
+
+// ====== 常量 ======
+const CARD_DESC = {
+  "作业": "对手需出【豁免】抵消，否则受 1 点伤害",
+  "豁免": "响应【作业】或【点名批评】",
+  "补给": "回复 1 点体力，或濒死时自救",
+  "辩论": "双方轮流出【作业】，先不出者受 1 点伤害",
+  "突击测验": "对手需出【作业】，否则受 1 点伤害",
+  "点名批评": "对手需出【豁免】，否则受 1 点伤害",
+  "告密": "盲选弃置对手一张手牌或装备",
+  "小抄": "本回合下一张【作业】伤害 +1；或濒死时自救",
+  "神偷": "盲选获取对手一张手牌或装备",
+  "陷害": "随机弃置对手两张手牌或装备",
+  "嫁祸": "对手需弃一张牌，否则受 1 点伤害",
+  "午饭": "摸 2 张牌",
+  "午饭留堂": "对手随机弃一张手牌或装备",
+  "感冒": "造成 1 点伤害",
+  "免罚券": "抵消一张锦囊牌（辩论/突击测验/最终测试/嫁祸）",
+  "最终测试": "全体各抽 2 张牌",
+  "钢笔": "武器：攻击未闪避时伤害 +1",
+  "圆规": "武器：【作业】无视出牌次数限制",
+  "尺子": "武器：对手出【豁免】后，可再出一张【作业】",
+  "橡皮": "武器：【作业】被豁免后仍造成 1 点伤害",
+  "校服": "防具：黑色【作业】无效",
+  "黑名单": "防具：【作业】无效；受到【陷害】【点名批评】伤害+1",
+  "涂改液": "防具：被【作业】时翻牌判定，翻出红色则自动闪避",
+};
+const SKILL_DESC = {
+  class_president: "出牌阶段弃一张手牌，令对手也弃一张手牌。每回合限一次。",
+  athletic: "锁定技。手牌上限+1。",
+  tutoring: "锁定技。摸牌阶段多摸一张牌。",
+};
+const WEAPON_NAMES = new Set(["钢笔", "圆规", "尺子", "橡皮"]);
+const DEFENSIVE_ONLY = ["豁免", "免罚券"];
+const RESP_CARDS = { dodge: ["豁免"], near_death: ["补给", "小抄"], duel: ["作业"], barbarian: ["作业"], volley: ["豁免"], borrow_knife: [] };
+const RESP_NAMES = {
+  dodge: "对手对你使用了【作业】，请出【豁免】",
+  near_death: "你处于濒死状态，请出【补给】或【小抄】自救",
+  duel: "对手发起【辩论】，请出【作业】",
+  barbarian: "【突击测验】！请出【作业】",
+  volley: "【点名批评】！请出【豁免】",
+  borrow_knife: "【嫁祸】！请弃一张牌",
+  steal: p => p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）",
+  skill_discard: "请弃一张手牌以发动技能",
+};
+const RESP_NAMES_OPP = {
+  dodge: "等待对手出【豁免】响应你的【作业】",
+  near_death: "对手濒死，等待使用【补给】",
+  duel: "等待对手出【作业】响应【辩论】",
+  barbarian: "等待对手出【作业】响应【突击测验】",
+  volley: "等待对手出【豁免】响应【点名批评】",
+  borrow_knife: "等待对手弃牌响应【嫁祸】",
+  steal: "对手正在盲选你的牌...",
+  skill_discard: "对手正在弃牌发动技能...",
+};
+const PN = { judge: "判定", draw: "摸牌", play: "出牌", discard: "弃牌", end: "结束" };
+
+function getCardDesc(c) { return CARD_DESC[c.name] || `${c.name}（${suitSym(c.suit)}${c.number}）`; }
+function getSkillDesc(s) { return SKILL_DESC[s.id] || s.name; }
+
 // ====== 重连 ======
+let _reconnectOverlayActive = false;
 async function fetchDisconnectedGames() {
   if (!AUTH.token) return;
   try {
@@ -63,389 +120,407 @@ async function fetchDisconnectedGames() {
       const elapsed = Math.floor((Date.now() - g.disconnectedAt) / 1000);
       const remain = Math.max(0, 30 - elapsed);
       if (remain <= 0) { clearActiveRooms(); return; }
-      showReconnectOverlay(g.roomCode, g.opponent, remain);
+      _reconnectOverlayActive = true;
+      createOverlay("🔌 断线重连", `房间 <b style="color:#c4b5fd">${g.roomCode}</b> &nbsp; 对手: ${esc(g.opponent)}`, remain, t => `${t} 秒内可重连`, () => { _reconnectOverlayActive = false; Alpine.store("g").roomCode = g.roomCode; connect(buildWsUrl(`?room=${g.roomCode}`)); }, () => { _reconnectOverlayActive = false; clearActiveRooms(); }, false);
       return;
     }
-  } catch { /* 网络错误，回退到 sessionStorage */ }
-  // 服务端没返回 → 回退到本地 sessionStorage
-  const s = sessionStorage.getItem("active_room"); if(!s)return;
-  const rooms=s.split(",").filter(Boolean); if(!rooms.length)return;
-  showReconnectOverlay(rooms[rooms.length-1], "对手", 30);
+  } catch { /* fallback */ }
+  const s = sessionStorage.getItem("active_room"); if (!s) return;
+  const rooms = s.split(",").filter(Boolean); if (!rooms.length) return;
+  _reconnectOverlayActive = true;
+  createOverlay("🔌 断线重连", `房间 <b style="color:#c4b5fd">${rooms[rooms.length - 1]}</b>`, 30, t => `${t} 秒内可重连`, () => { _reconnectOverlayActive = false; Alpine.store("g").roomCode = rooms[rooms.length - 1]; connect(buildWsUrl(`?room=${rooms[rooms.length - 1]}`)); }, () => { _reconnectOverlayActive = false; clearActiveRooms(); }, false);
 }
-function showReconnectOverlay(code, opponent, seconds) {
-  const body = `房间 <b style="color:#c4b5fd">${code}</b> &nbsp; 对手: ${esc(opponent)}`;
-  createOverlay("🔌 断线重连", body, seconds, t=>`${t} 秒内可重连`, ()=>{ST.roomCode=code;connect(buildWsUrl(`?room=${code}`));text("menu-status","");}, ()=>{clearActiveRooms();});
-}
-function addActiveRoom(code) { const s = sessionStorage.getItem("active_room")||""; const rooms=s.split(",").filter(Boolean); if(!rooms.includes(code))rooms.push(code); sessionStorage.setItem("active_room",rooms.join(",")); }
+
+function addActiveRoom(code) { const s = sessionStorage.getItem("active_room") || ""; const rooms = s.split(",").filter(Boolean); if (!rooms.includes(code)) rooms.push(code); sessionStorage.setItem("active_room", rooms.join(",")); }
 function clearActiveRooms() { sessionStorage.removeItem("active_room"); }
-function createOverlay(title,body,seconds,cfn,onAction,onCancel,noIgnore) {
-  const el=document.createElement("div");el.id="block-overlay";
-  el.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999";
-  let r=seconds; const upd=()=>{el.querySelector("#bl-countdown").textContent=cfn(r);};
-  const ignoreHtml=noIgnore?'':'<button class="btn btn-outline btn-sm" id="bl-ignore">忽略</button>';
-  el.innerHTML=`<div style="background:#1a1a1a;border:2px solid #7c3aed;border-radius:16px;padding:40px;text-align:center;max-width:360px;display:flex;flex-direction:column;gap:12px">
+
+// ====== Overlay ======
+let _overlayTimer = null;
+function createOverlay(title, body, seconds, cfn, onAction, onCancel, noIgnore) {
+  removeOverlay();
+  const el = document.createElement("div"); el.id = "block-overlay";
+  el.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999";
+  let r = seconds;
+  const upd = () => { const cd = el.querySelector("#bl-countdown"); if (cd) cd.textContent = cfn(r); };
+  const ignoreHtml = noIgnore ? "" : '<button class="btn btn-outline btn-sm" id="bl-ignore">忽略</button>';
+  el.innerHTML = `<div style="background:#1a1a1a;border:2px solid #7c3aed;border-radius:16px;padding:40px;text-align:center;max-width:360px;display:flex;flex-direction:column;gap:12px">
     <h2 style="font-size:28px">${title}</h2><div>${body}</div>
     <p id="bl-countdown" style="color:#f59e0b;font-family:monospace;font-size:16px">${cfn(seconds)}</p>
     <div style="display:flex;gap:12px;justify-content:center;margin-top:8px">
-      <button class="btn btn-primary btn-sm" id="bl-action">${onAction?'重新连接':''}</button>
+      <button class="btn btn-primary btn-sm" id="bl-action">${onAction ? '重新连接' : ''}</button>
       ${ignoreHtml}</div></div>`;
   document.body.appendChild(el);
-  const t=setInterval(()=>{r--;if(r<=0){clearInterval(t);el._timer=null;removeOverlay();if(onCancel)onCancel();}upd();},1000);el._timer=t;
-  if(onAction)el.querySelector("#bl-action").onclick=()=>{clearInterval(t);removeOverlay();onAction();};
-  else el.querySelector("#bl-action").style.display="none";
-  if(!noIgnore)el.querySelector("#bl-ignore").onclick=()=>{clearInterval(t);removeOverlay();if(onCancel)onCancel();};
+  _overlayTimer = setInterval(() => { r--; if (r <= 0) { clearInterval(_overlayTimer); _overlayTimer = null; removeOverlay(); if (onCancel) onCancel(); } upd(); }, 1000);
+  if (onAction) el.querySelector("#bl-action").onclick = () => { clearInterval(_overlayTimer); _overlayTimer = null; removeOverlay(); onAction(); };
+  else el.querySelector("#bl-action").style.display = "none";
+  if (!noIgnore) el.querySelector("#bl-ignore").onclick = () => { clearInterval(_overlayTimer); _overlayTimer = null; removeOverlay(); if (onCancel) onCancel(); };
 }
-function removeOverlay(){const el=document.getElementById("block-overlay");if(el){if(el._timer){clearInterval(el._timer);el._timer=null;}el.remove();}}
 
-// ====== 状态 ======
-const ST = { screen:"menu",ws:null,roomCode:null,mode:null,myIndex:-1,gs:null,selectedCards:new Set,selectTarget:null,timerInterval:null,serverTimer:60,lastHandSig:"",blocked:false,eloResult:null };
-
-// ====== 工具 ======
-const $=id=>document.getElementById(id);
-const esc=s=>{const d=document.createElement("div");d.textContent=s;return d.innerHTML;};
-const show=id=>{const e=$(id);if(e)e.classList.remove("hidden");};
-const hide=id=>{const e=$(id);if(e)e.classList.add("hidden");};
-const text=(id,s)=>{const e=$(id);if(e)e.textContent=s;};
-const html=(id,s)=>{const e=$(id);if(e)e.innerHTML=s;};
-function showScreen(n){document.querySelectorAll(".screen").forEach(e=>e.classList.add("hidden"));const el=$(`screen-${n}`);if(el)el.classList.remove("hidden");ST.screen=n;}
-function log(msg){const el=$("game-log");if(!el)return;const d=document.createElement("div");d.textContent=`[${new Date().toLocaleTimeString()}] ${msg}`;el.appendChild(d);el.scrollTop=el.scrollHeight;}
-function suitSym(s){return{spade:"♠",heart:"♥",club:"♣",diamond:"♦"}[s]||"?";}
-function cn(c){return c?.name||"?";}
-function hpStr(hp,max){let s="";for(let i=0;i<max;i++)s+=i<hp?"♥":"♡";return`${s} (${hp}/${max})`;}
-
-// ====== 卡牌说明（学校主题） ======
-const CARD_DESC = {
-  "作业":"对手需出【豁免】抵消，否则受 1 点伤害","豁免":"响应【作业】或【点名批评】",
-  "补给":"回复 1 点体力，或濒死时自救","辩论":"双方轮流出【作业】，先不出者受 1 点伤害",
-  "突击测验":"对手需出【作业】，否则受 1 点伤害","点名批评":"对手需出【豁免】，否则受 1 点伤害",
-  "告密":"盲选弃置对手一张手牌或装备","小抄":"本回合下一张【作业】伤害 +1；或濒死时自救",
-  "神偷":"盲选获取对手一张手牌或装备","陷害":"随机弃置对手两张手牌或装备",
-  "嫁祸":"对手需弃一张牌，否则受 1 点伤害","午饭":"摸 2 张牌",
-  "午饭留堂":"对手随机弃一张手牌或装备","感冒":"造成 1 点伤害",
-  "免罚券":"抵消一张锦囊牌（辩论/突击测验/最终测试/嫁祸）","最终测试":"全体各抽 2 张牌",
-  "钢笔":"武器：攻击未闪避时伤害 +1","圆规":"武器：【作业】无视出牌次数限制",
-  "尺子":"武器：对手出【豁免】后，可再出一张【作业】","橡皮":"武器：【作业】被豁免后仍造成1点伤害",
-  "校服":"防具：黑色【作业】无效","黑名单":"防具：【作业】无效；受到【陷害】【点名批评】伤害+1",
-  "涂改液":"防具：被【作业】时翻牌判定，翻出红色则自动闪避",
-};
-function getCardDesc(c){return CARD_DESC[c.name]||`${c.name}（${suitSym(c.suit)}${c.number}）`;}
-const SKILL_DESC={class_president:"出牌阶段弃一张手牌，令对手也弃一张手牌。每回合限一次。",athletic:"锁定技。手牌上限+1。",tutoring:"锁定技。摸牌阶段多摸一张牌。"};
-function getSkillDesc(s){return SKILL_DESC[s.id]||s.name;}
-
-// 响应类型→需要的牌名
-const RESP_CARDS = { dodge:["豁免"],near_death:["补给","小抄"],duel:["作业"],barbarian:["作业"],volley:["豁免"],borrow_knife:[] };
-const WEAPON_NAMES = new Set(["钢笔","圆规","尺子","橡皮"]);
-function isWeapon(n){return WEAPON_NAMES.has(n);}
-
-// 出牌阶段不能主动使用的牌（仅响应）
-const DEFENSIVE_ONLY = ["豁免", "免罚券"];
+function removeOverlay() {
+  if (_overlayTimer) { clearInterval(_overlayTimer); _overlayTimer = null; }
+  const el = document.getElementById("block-overlay"); if (el) el.remove();
+}
 
 // ====== WebSocket ======
-function buildWsUrl(path){let url=`${WS_URL}${path}`;if(AUTH.token)url+=(path.includes("?")?"&":"?")+`token=${encodeURIComponent(AUTH.token)}`;return url;}
-function connect(wsUrl){
-  if(ST.ws)ST.ws.close();
-  ST.ws=new WebSocket(wsUrl);ST.selectedCards.clear();ST.selectTarget=null;stopTimer();ST.blocked=false;removeOverlay();
-  ST.ws.onopen=()=>{$("menu-status").textContent="";};
-  ST.ws.onmessage=ev=>{let msg;try{msg=JSON.parse(ev.data);}catch{return;}handle(msg);};
-  ST.ws.onclose=()=>{stopTimer();if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}if(ST.screen==="game"||ST.screen==="char"){if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)addActiveRoom(ST.roomCode);showScreen("menu");text("menu-status","连接断开");if(ST.roomCode&&ST.gs&&!ST.gs.gameOver)fetchDisconnectedGames();}};
-  ST.ws.onerror=()=>{if(AUTH.enabled&&AUTH.token){text("menu-status","令牌失效");AUTH.token=null;sessionStorage.removeItem("auth_token");startLogin();}else if(AUTH.enabled)startLogin();else text("menu-status","连接失败");};
+function buildWsUrl(path) { let url = `${WS_URL}${path}`; if (AUTH.token) url += (path.includes("?") ? "&" : "?") + `token=${encodeURIComponent(AUTH.token)}`; return url; }
+
+function connect(wsUrl) {
+  const store = Alpine.store("g");
+  if (store.ws) store.ws.close();
+  store.ws = new WebSocket(wsUrl);
+  store.selectedCards = {};
+  store.blocked = false;
+  removeOverlay();
+  store.ws.onopen = () => {};
+  store.ws.onmessage = ev => { let msg; try { msg = JSON.parse(ev.data); } catch { return; } handleMsg(msg); };
+  store.ws.onclose = () => {
+    stopTimers();
+    if (store.screen === "game" || store.screen === "char") {
+      if (store.roomCode && store.gs && !store.gs.gameOver) addActiveRoom(store.roomCode);
+      store.screen = "menu";
+      if (store.roomCode && store.gs && !store.gs.gameOver) fetchDisconnectedGames();
+    }
+  };
+  store.ws.onerror = () => {
+    if (AUTH.enabled && AUTH.token) { AUTH.token = null; sessionStorage.removeItem("auth_token"); startLogin(); }
+    else if (AUTH.enabled) startLogin();
+  };
 }
-function send(msg){if(ST.blocked)return;if(ST.ws?.readyState===WebSocket.OPEN)ST.ws.send(JSON.stringify(msg));}
 
-// ====== 倒计时 ======
-function startTimer(s){stopTimer();ST.serverTimer=s;ST.pendingTimer=null;const el=$("turn-timer");if(!el)return;el.textContent=`${s}s`;ST.timerInterval=setInterval(()=>{ST.serverTimer--;if(ST.serverTimer<0)ST.serverTimer=0;el.textContent=`${ST.serverTimer}s`;},1000);}
-function startPendingTimer(timeout){stopPendingTimer();ST.pendingTimer=setInterval(()=>{const r=Math.max(0,Math.floor((timeout-Date.now())/1000));const el=$("pending-timer");if(el)el.textContent=`${r}s`;if(r<=0)stopPendingTimer();},200);}
-function stopPendingTimer(){if(ST.pendingTimer){clearInterval(ST.pendingTimer);ST.pendingTimer=null;}}
-function stopTimer(){if(ST.timerInterval){clearInterval(ST.timerInterval);ST.timerInterval=null;}stopPendingTimer();}
-
-// ====== 消息处理 ======
-function handle(msg){
-  switch(msg.type){
-    case "room_created":ST.roomCode=msg.code;ST.mode="room";addActiveRoom(msg.code);showScreen("lobby");text("lobby-code",msg.code);text("lobby-invite",msg.inviteUrl);break;
-    case "waiting":text("lobby-status",msg.message);break;
+function handleMsg(msg) {
+  const store = Alpine.store("g");
+  switch (msg.type) {
+    case "room_created":
+      store.roomCode = msg.code; store.mode = "room"; addActiveRoom(msg.code);
+      store.screen = "lobby"; store.lobbyCode = msg.code; store.lobbyInvite = msg.inviteUrl; break;
+    case "waiting":
+      store.lobbyStatus = msg.message; break;
     case "character_select":
-      showScreen("char");renderCharSelect(msg.characters,msg.timeoutSec);
-      if(msg.opponent&&ST.mode==="matching"){const op=msg.opponent;const p=msg.elo?.prediction;const line=p?` (ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>)`:'';html("char-status",`对手: ${esc(op.displayName)} (ELO ${op.elo})${line}`);}
+      store.mode = "room"; store.screen = "char";
+      store.characters = msg.characters; store.charTimeout = msg.timeoutSec;
+      if (store.charTimer) clearInterval(store.charTimer);
+      let s = msg.timeoutSec; store.charTimerText = `${s}s`;
+      store.charTimer = setInterval(() => { s--; if (s < 0) { clearInterval(store.charTimer); return; } store.charTimerText = `${s}s`; }, 1000);
+      if (msg.opponent && store.mode === "matching") {
+        store.charStatus = `对手: ${esc(msg.opponent.displayName)} (ELO ${msg.opponent.elo})`;
+        if (msg.elo?.prediction) {
+          const p = msg.elo.prediction;
+          store.charStatus += ` — ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>`;
+        }
+      } else { store.charStatus = ""; }
       break;
     case "game_state":
-      ST.gs=msg.state;ST.myIndex=msg.yourIndex;if(ST.screen!=="game")showScreen("game");renderGame();
-      if(ST.gs.gameOver){if(msg.eloResult)ST.eloResult=msg.eloResult;sessionStorage.removeItem("active_room");stopTimer();showGameOver();}break;
-    case "disconnected":show("opp-disconnected");blockGame(msg.message,msg.attemptsLeft);log(`⚠ ${msg.message}`);break;
-    case "reconnected":hide("opp-disconnected");removeOverlay();ST.blocked=false;log("✓ 对手已重连");break;
-    case "queue_status":ST.mode="matching";showScreen("lobby");text("lobby-code","");text("lobby-invite","");ST.matchStartTime=Date.now();ST.matchInterval=setInterval(()=>{const el=$("lobby-status");if(el&&ST.mode==="matching"){const s=Math.floor((Date.now()-ST.matchStartTime)/1000);el.textContent=`匹配中... 排队: ${msg.position} (已匹配 ${s}s)`;}},1000);text("lobby-status",`匹配中... 排队: ${msg.position} (已匹配 0s)`);break;
-    case "match_found":if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}ST.mode="matching";ST.roomCode=msg.room;addActiveRoom(msg.room);text("lobby-status",`匹配成功！${msg.opponent.displayName} (ELO ${msg.opponent.elo})`);connect(buildWsUrl(`?room=${msg.room}`));break;
-    case "queue_timeout":if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}showScreen("menu");text("menu-status","匹配超时");break;
-    case "error":log(`错误: ${msg.message}`);if(ST.screen==="menu"||ST.screen==="lobby"){showScreen("menu");text("menu-status",msg.message);}break;
-  }
-}
-function blockGame(msg,att){ST.blocked=true;stopTimer();stopPendingTimer();if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}createOverlay("⚠ 对手已断线",msg,30,t=>`${t} 秒后自动判胜（剩余重连: ${att} 次）`,null,null,true);}
-
-// ====== 菜单 ======
-function ensureAuth(){if(AUTH.enabled&&!AUTH.token){text("menu-status","请先登录");startLogin();return false;}return true;}
-let _creating=false;
-// deno-lint-ignore no-unused-vars
-function createRoom(){if(!ensureAuth()||_creating)return;_creating=true;fetch(`${HTTP_URL}/room/create`).then(r=>r.json()).then(info=>{ST.roomCode=info.code;ST.mode="room";addActiveRoom(info.code);showScreen("lobby");text("lobby-code",info.code);text("lobby-invite",info.inviteUrl);connect(buildWsUrl(`?room=${info.code}`));text("menu-status","");}).catch(()=>text("menu-status","无法连接服务器")).finally(()=>{_creating=false;});}
-function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim().toUpperCase();if(!code)return;joinRoomByCode(code);}
-function joinRoomByCode(code){ST.roomCode=code;ST.mode="room";addActiveRoom(code);showScreen("lobby");connect(buildWsUrl(`?room=${code}`));text("menu-status","");}
-// deno-lint-ignore no-unused-vars
-function quickMatch(){if(!ensureAuth())return;connect(buildWsUrl("?mode=matching"));ST.mode="matching";text("menu-status","");}
-// deno-lint-ignore no-unused-vars
-function leaveLobby(){if(ST.ws)ST.ws.close();clearActiveRooms();showScreen("menu");}
-function backToMenu(){stopTimer();if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}if(ST.ws)ST.ws.close();ST.ws=null;ST.gs=null;ST.roomCode=null;ST.myIndex=-1;ST.selectedCards.clear();ST.blocked=false;ST.matchStartTime=null;_lastLogLen=0;_lastPlayId=null;_lastDiscardIds=[];removeOverlay();hide("game-over-overlay");clearActiveRooms();showScreen("menu");}
-// deno-lint-ignore no-unused-vars
-function showLeaderboard(){fetch(`${HTTP_URL}/leaderboard`+(ST.gs?.playerId?`?userId=${ST.gs.playerId}`:"")).then(r=>r.json()).then(renderLeaderboard).then(()=>showScreen("leaderboard")).catch(()=>text("menu-status","无法获取排行榜"));}
-function renderLeaderboard(data){
-  let h=`<div class="lb-header"><span class="lb-rank">#</span><span class="lb-name">玩家</span><span class="lb-elo">ELO</span><span class="lb-stats">胜/负</span></div>`;
-  for(const p of data.top10)h+=`<div class="lb-row"><span class="lb-rank">${p.rank}</span><span class="lb-name">${esc(p.displayName||p.userId.slice(0,8))}</span><span class="lb-elo">${p.elo}</span><span class="lb-stats">${p.wins}W ${p.losses}L</span></div>`;
-  html("lb-table",h||'<p style="color:#888;padding:16px">暂无数据</p>');
-  if(data.you){show("lb-you");html("lb-you",`<div class="lb-row"><span class="lb-rank">${data.you.rank}</span><span class="lb-name">← 你</span><span class="lb-elo">${data.you.elo}</span><span class="lb-stats">${data.you.wins}W ${data.you.losses}L</span></div>`);}else hide("lb-you");
-}
-
-// ====== 选角 ======
-function renderCharSelect(chars,timeout){let h="";for(const c of chars)h+=`<div class="chcard" onclick="pickCharacter('${c.id}')"><h3>${c.name}</h3><div class="hp">♥ × ${c.maxHp}</div><div class="sk">${c.skills.length?c.skills.join(" · "):"无技能"}</div></div>`;html("char-list",h);let s=timeout;text("char-timer",`${s}s`);stopTimer();ST.timerInterval=setInterval(()=>{s--;if(s<0){stopTimer();return;}text("char-timer",`${s}s`);},1000);}
-// deno-lint-ignore no-unused-vars
-function pickCharacter(id){document.querySelectorAll(".chcard").forEach(e=>e.classList.remove("selected"));const c=[...document.querySelectorAll(".chcard")].find(e=>e.innerHTML.includes(id));if(c)c.classList.add("selected");send({action:"pick_character",id});text("char-status","已选择");}
-
-// ====== 游戏渲染 ======
-function handSig(h){return h.map(c=>c.id).join(",");}
-function renderGame(){
-  const gs=ST.gs;if(!gs||!gs.you||!gs.opponent)return;
-  const opp=gs.opponent;
-  const oppName=gs.opponentName||"对手";
-  const isOppTurn=gs.turnPlayer===1-ST.myIndex;
-  html("opp-name",`${esc(oppName)}${isOppTurn?' <span style="font-size:11px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite">◀ 回合</span>':''}`);
-  if(isOppTurn)$("opp-name").classList.add("turn-active");else $("opp-name").classList.remove("turn-active");
-  $("opp-hp").textContent=hpStr(opp.hp,opp.maxHp);
-  text("opp-cards",`手牌: ${opp.handCount}`);
-  let oe="";if(opp.weapon)oe+=`<div style="cursor:help" title="${esc(getCardDesc(opp.weapon))}">🗡 ${cn(opp.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.weapon)}</div>`;if(opp.armor)oe+=`<div style="margin-top:4px;cursor:help" title="${esc(getCardDesc(opp.armor))}">🛡 ${cn(opp.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.armor)}</div>`;html("opp-equip",oe||'<span style="opacity:.3">无装备</span>');
-  if(gs.opponentDisconnected)show("opp-disconnected");else hide("opp-disconnected");
-  const oppSkills=gs.opponent.skills||[];
-  html("opp-skills",oppSkills.length?oppSkills.map(s=>`<div style="margin-top:2px;cursor:help" title="${esc(getSkillDesc(s))}">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
-
-  const me=gs.you;
-  const myName=gs.playerName||"你";
-  const isMyTurn=gs.turnPlayer===ST.myIndex;
-  html("my-name",`${esc(myName)}${isMyTurn?' <span style="font-size:11px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite">你的回合</span>':''}`);
-  if(isMyTurn)$("my-name").classList.add("turn-active");else $("my-name").classList.remove("turn-active");
-  $("my-hp").textContent=hpStr(me.hp,me.maxHp);
-  let meq="";if(me.weapon)meq+=`<div style="cursor:help" title="${esc(getCardDesc(me.weapon))}">🗡 ${cn(me.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.weapon)}</div>`;if(me.armor)meq+=`<div style="margin-top:4px;cursor:help" title="${esc(getCardDesc(me.armor))}">🛡 ${cn(me.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.armor)}</div>`;html("my-equip",meq||'<span style="opacity:.3">无装备</span>');
-  const mySkills=me.skills||[];
-  html("my-skills",mySkills.length?mySkills.map(s=>`<div style="margin-top:2px;cursor:help" title="${esc(getSkillDesc(s))}">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
-
-  const pn={judge:"判定",draw:"摸牌",play:"出牌",discard:"弃牌",end:"结束"};
-  text("phase-label",pn[gs.phase]||gs.phase);text("deck-count",`牌堆: ${gs.deckCount}`);
-  if(!gs.pendingResponse)startTimer(gs.turnTimeLeft);
-  else{stopTimer();text("turn-timer","");}
-
-  const sig=handSig(me.hand);if(sig!==ST.lastHandSig){ST.lastHandSig=sig;ST.selectedCards.clear();}
-  renderHand(me.hand);renderPending(gs);renderActions(gs);renderCardInfo();renderLog(gs);renderCenterZone(gs);
-}
-
-let _lastLogLen=0;
-function formatLogEntry(e){
-  const p=`P${e.player}`;
-  switch(e.id){
-    case "card_played": return `${p} 使用了【${e.cardName}】${e.target!==undefined?` → P${e.target}`:""}`;
-    case "card_equipped": return `${p} 装备了【${e.cardName}】`;
-    case "damage": return `${p} 受到 ${e.amount} 点伤害`;
-    case "heal": return `${p} 回复了 ${e.amount} 点体力`;
-    case "skill_used": return `${p} 发动了【${e.skillName}】`;
-    case "phase": return `${p} 进入【${e.phase}】阶段`;
-    case "draw": return `${p} 摸了 ${e.count} 张牌`;
-    case "discard": return `${p} 弃置了【${e.cardName}】`;
-    case "death": return `${p} 阵亡`;
-    default: return "";
-  }
-}
-function renderLog(gs){
-  const el=$("game-log");if(!el||!gs.log)return;
-  if(gs.log.length < _lastLogLen){el.innerHTML="";_lastLogLen=0;}
-  for(let i=_lastLogLen;i<gs.log.length;i++){
-    const d=document.createElement("div");d.textContent=formatLogEntry(gs.log[i]);el.appendChild(d);
-  }
-  _lastLogLen=gs.log.length;
-  if(_lastLogLen>50){while(el.children.length>30)el.firstChild.remove();_lastLogLen=el.children.length;}
-  el.scrollTop=el.scrollHeight;
-}
-
-function renderHand(hand){
-  const gs=ST.gs;const pending=gs?.pendingResponse;
-  const isMyResp=pending&&pending.target===ST.myIndex;
-  const isDiscard=gs?.phase==="discard"&&gs?.turnPlayer===ST.myIndex;
-
-  let selectable=null;
-  if(isMyResp)selectable=RESP_CARDS[pending.type]||[];
-
-  let h="";
-  for(const c of hand){
-    const sel=ST.selectedCards.has(c.id);
-    let disabled=false,reason="";
-    if(isMyResp&&selectable&&!isDiscard){
-      const ok=selectable.includes(c.name)||(pending?.type==="borrow_knife"&&isWeapon(c.name))||(c.name==="免罚券"&&["barbarian","volley","duel","borrow_knife"].includes(pending.type));
-      if(!ok){disabled=true;reason=`需要${selectable.join("或")}`;}
-    }
-    // 出牌阶段：防御牌不能主动使用
-    if(!isMyResp&&!isDiscard&&gs?.phase==="play"&&DEFENSIVE_ONLY.includes(c.name)&&gs?.turnPlayer===ST.myIndex){
-      disabled=true;reason="出牌阶段不能主动使用（响应牌）";
-    }
-    const cls=`gcard ${c.suit} ${sel?"selected":""} ${disabled?"disabled":""}`;
-    h+=`<div class="${cls}" onclick="${disabled?'':`toggleCard('${c.id}')`}" ${reason?`title="${reason}"`:''}>
-      <span class="gsuit">${suitSym(c.suit)}</span><span class="gname">${c.name}</span><span class="gnum">${c.number}</span></div>`;
-  }
-  html("my-hand",h);
-}
-
-function renderCardInfo(){const el=$("card-info");if(!el)return;if(ST.selectedCards.size===0){el.textContent="";return;}const id=[...ST.selectedCards][0];const hand=ST.gs?.you?.hand||[];const c=hand.find(c=>c.id===id);el.textContent=c?getCardDesc(c):"";}
-
-// 学校主题响应文案
-const RESP_NAMES = {
-  dodge:"对手对你使用了【作业】，请出【豁免】",
-  near_death:"你处于濒死状态，请出【补给】或【小抄】自救",
-  duel:"对手发起【辩论】，请出【作业】",
-  barbarian:"【突击测验】！请出【作业】",
-  volley:"【点名批评】！请出【豁免】",
-  borrow_knife:"【嫁祸】！请弃一张牌",
-  steal: function(p) { return p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）"; },
-  skill_discard: "请弃一张手牌以发动技能",
-};
-const RESP_NAMES_OPP = {
-  dodge:"等待对手出【豁免】响应你的【作业】",
-  near_death:"对手濒死，等待使用【补给】",
-  duel:"等待对手出【作业】响应【辩论】",
-  barbarian:"等待对手出【作业】响应【突击测验】",
-  volley:"等待对手出【豁免】响应【点名批评】",
-  borrow_knife:"等待对手弃牌响应【嫁祸】",
-  steal:"对手正在盲选你的牌...",
-  skill_discard:"对手正在弃牌发动技能...",
-};
-
-function renderPending(gs){
-  const p=gs.pendingResponse;if(!p){hide("pending-msg");hide("steal-zone");stopPendingTimer();return;}
-  const isMe=p.target===ST.myIndex;
-  const label=isMe?(RESP_NAMES[p.type]||p.type):(RESP_NAMES_OPP[p.type]||p.type);
-  const txt=typeof label==="function"?label(p):label;
-  const rem=Math.max(0,Math.floor((p.timeout-Date.now())/1000));
-  html("pending-msg",`<strong>⚠ ${isMe?"你":"对手"}需要响应</strong>：${txt} <span id="pending-timer" style="color:#f59e0b;font-weight:bold">${rem}s</span>`);
-  show("pending-msg");
-  if(isMe&&p.timeout)startPendingTimer(p.timeout);
-  if(isMe && p.type==="steal" && p.poolSize){
-    let h='<div class="flex gap-2 flex-wrap justify-center py-2" id="steal-cards">';
-    for(let i=1;i<=p.poolSize;i++){
-      h+=`<div class="gcard facedown steal-card" onclick="stealWithAnim(${i})" data-pos="${i}"><span class="gsuit">?</span><span class="gname">第${i}张</span></div>`;
-    }
-    h+='</div>';
-    html("steal-zone",h);show("steal-zone");
-  }else{
-    // Opponent perspective: animate steal cards fading
-    const sz=$("steal-zone");
-    if(sz&&!sz.classList.contains("hidden")&&sz.querySelectorAll(".steal-card").length>0){
-      sz.querySelectorAll(".steal-card").forEach(c=>c.classList.add("steal-fade"));
-      setTimeout(()=>hide("steal-zone"),600);
-    }else{hide("steal-zone");}
+      store.gs = msg.state; store.myIndex = msg.yourIndex;
+      if (store.screen !== "game") { store.screen = "game"; clearInterval(store.charTimer); }
+      if (msg.eloResult) store.eloResult = msg.eloResult;
+      if (store.gs.gameOver) { sessionStorage.removeItem("active_room"); stopTimers(); }
+      break;
+    case "disconnected":
+      store.blocked = true; stopTimers();
+      if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
+      createOverlay("⚠ 对手已断线", msg.message, 30, t => `${t} 秒后自动判胜（剩余重连: ${msg.attemptsLeft} 次）`, null, null, true);
+      break;
+    case "reconnected":
+      store.blocked = false; removeOverlay(); break;
+    case "queue_status":
+      store.mode = "matching"; store.screen = "lobby";
+      store.lobbyCode = ""; store.lobbyInvite = "";
+      store.matchStartTime = Date.now();
+      if (store.matchInterval) clearInterval(store.matchInterval);
+      store.lobbyStatus = `匹配中... 排队: ${msg.position} (已匹配 0s)`;
+      store.matchInterval = setInterval(() => {
+        if (store.mode !== "matching") { clearInterval(store.matchInterval); return; }
+        const sec = Math.floor((Date.now() - store.matchStartTime) / 1000);
+        store.lobbyStatus = `匹配中... 排队: ${msg.position} (已匹配 ${sec}s)`;
+      }, 1000);
+      break;
+    case "match_found":
+      if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
+      store.mode = "matching"; store.roomCode = msg.room; addActiveRoom(msg.room);
+      store.lobbyStatus = `匹配成功！${msg.opponent.displayName} (ELO ${msg.opponent.elo})`;
+      connect(buildWsUrl(`?room=${msg.room}`)); break;
+    case "queue_timeout":
+      if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
+      store.screen = "menu"; break;
+    case "error":
+      if (store.screen === "menu" || store.screen === "lobby") { store.screen = "menu"; }
+      break;
   }
 }
 
-
-let _lastPlayId=null,_lastDiscardIds=[];
-function renderCenterZone(gs){
-  const playZone=$("play-zone");const discardZone=$("discard-zone");
-  if(!playZone||!discardZone)return;
-  // 最近一次出牌
-  let lastPlay=null;
-  if(gs.log){for(let i=gs.log.length-1;i>=0;i--){const e=gs.log[i];if(e.id==="card_played"){lastPlay=e;break;}}}
-  if(lastPlay&&lastPlay.cardName&&lastPlay.id!==_lastPlayId){
-    _lastPlayId=lastPlay.id;
-    playZone.innerHTML=`<div class="mini-card animate-card-in"><span class="ms">🃏</span><span class="mn">${lastPlay.cardName}</span></div>`;
-    show("play-zone");
-    setTimeout(()=>{if(_lastPlayId===lastPlay.id)_lastPlayId=null;},3000);
-  }
-
-  // 弃牌区：显示最近3张
-  let discards=[];
-  if(gs.log){for(let i=gs.log.length-1;i>=0&&discards.length<3;i--){const e=gs.log[i];if(e.id==="card_discarded"||e.id==="discard")discards.unshift(e);}}
-  const dk=discards.map(d=>d.cardName||"").join(",");
-  if(dk!==_lastDiscardIds.join(",")){
-    _lastDiscardIds=discards.map(d=>d.cardName||"");
-    discardZone.innerHTML=discards.length?discards.map((d,i)=>`<div class="mini-card animate-discard" style="animation-delay:${i*0.1}s"><span class="mn">${d.cardName||"?"}</span></div>`).join(""):(gs.phase==="discard"?'<span style="font-size:11px;opacity:.4">弃牌阶段</span>':'');
-  }
-
-  // 技能 flash
-  if(gs.log){
-    const last=gs.log[gs.log.length-1];
-    if(last&&last.id==="skill_used"){
-      const sf=$("skill-flash");
-      if(sf){sf.textContent=`⚡ ${last.skillName||"技能"} 发动！`;sf.className="animate-skill";sf.style.cssText="text-align:center;font-size:13px;font-weight:bold;padding:6px;border-radius:8px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:4px";show("skill-flash");}
-    }
-  }
+// ====== Game actions (called from Alpine) ======
+function send(msg) {
+  const store = Alpine.store("g");
+  if (store.blocked) return;
+  if (store.ws?.readyState === WebSocket.OPEN) store.ws.send(JSON.stringify(msg));
 }
 
-function renderActions(gs){
-  let btns="";const isMyTurn=gs.turnPlayer===ST.myIndex;const p=gs.pendingResponse;
-  if(ST.blocked){html("action-bar","");return;}
-  if(p&&p.target===ST.myIndex){
-    if(p.type==="skill_discard"){
-      const need=p.discardCount||1;
-      if(ST.selectedCards.size>=need)btns+=`<button class="btn btn-primary btn-sm" onclick="doConfirmSkill()">确认发动 (${ST.selectedCards.size}/${need})</button>`;
-      btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'pass'})">取消</button>`;
-    }else{
-      btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'pass'})">不响应</button>`;
-      if(ST.selectedCards.size>0)btns+=`<button class="btn btn-primary btn-sm" onclick="respondCard()">出牌响应</button>`;
-    }
-  }else if(isMyTurn&&gs.phase==="play"&&!p){
-    if(ST.selectedCards.size>0)btns+=`<button class="btn btn-primary btn-sm" onclick="playSelected()">出牌</button>`;
-    if(gs.you.skills?.length)for(const s of gs.you.skills)if(s.type==="active")btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'use_skill',skill_id:'${s.id}'})">技能: ${s.name}</button>`;
-    btns+=`<button class="btn btn-outline btn-sm" onclick="send({action:'end_phase'})">结束出牌</button>`;
-  }else if(isMyTurn&&gs.phase==="discard"&&!p){
-    const need=gs.you.hand.length-(gs.handLimit||gs.you.hp);
-    if(need>0&&ST.selectedCards.size>0)btns+=`<button class="btn btn-error btn-sm" onclick="doDiscard()">弃牌 (${ST.selectedCards.size}/${need})</button>`;
-    if(need<=0)btns+=`<span class="text-sm opacity-60">无需弃牌</span>`;
-  }
-  html("action-bar",btns);
+function ensureAuth() { if (AUTH.enabled && !AUTH.token) { startLogin(); return false; } return true; }
+
+let _creating = false;
+function createRoom() {
+  if (!ensureAuth() || _creating) return;
+  _creating = true;
+  fetch(`${HTTP_URL}/room/create`).then(r => r.json()).then(info => {
+    const store = Alpine.store("g");
+    store.roomCode = info.code; store.mode = "room"; addActiveRoom(info.code);
+    store.screen = "lobby"; store.lobbyCode = info.code; store.lobbyInvite = info.inviteUrl;
+    connect(buildWsUrl(`?room=${info.code}`));
+  }).finally(() => { _creating = false; });
 }
 
-// ====== 卡牌操作 ======
-// deno-lint-ignore no-unused-vars
-function toggleCard(id){if(ST.blocked)return;const gs=ST.gs;if(!gs)return;const isDiscard=gs.phase==="discard"&&gs.turnPlayer===ST.myIndex;const isSkillDiscard=gs.pendingResponse?.type==="skill_discard"&&gs.pendingResponse?.target===ST.myIndex;if(ST.selectedCards.has(id))ST.selectedCards.delete(id);else{if(isDiscard||isSkillDiscard)ST.selectedCards.add(id);else{ST.selectedCards.clear();ST.selectedCards.add(id);}}renderHand(gs.you.hand);renderActions(gs);renderCardInfo();}
-// deno-lint-ignore no-unused-vars
-function playSelected(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"play_card",card_id:ids[0],target:ST.myIndex===0?1:0});ST.selectedCards.clear();}
-// deno-lint-ignore no-unused-vars
-function respondCard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"play_card",card_id:ids[0]});ST.selectedCards.clear();}
-// deno-lint-ignore no-unused-vars
-function doDiscard(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"discard",card_ids:ids});ST.selectedCards.clear();}
-// deno-lint-ignore no-unused-vars
-function doConfirmSkill(){const ids=[...ST.selectedCards];if(ids.length===0||ST.blocked)return;send({action:"confirm_skill",card_ids:ids});ST.selectedCards.clear();}
-// deno-lint-ignore no-unused-vars
-function stealWithAnim(pos){
-  if(ST.blocked)return;
-  // Get the clicked card element
-  const cards=document.querySelectorAll(".steal-card");
-  const el=[...cards].find(c=>parseInt(c.dataset.pos)===pos);
-  if(el){el.classList.add("steal-fly");setTimeout(()=>el.remove(),500);}
-  // Disable all steal cards
-  cards.forEach(c=>c.style.pointerEvents="none");
-  send({action:"steal_card",position:pos});
+function joinRoom() {
+  if (!ensureAuth()) return;
+  const code = document.getElementById("join-code")?.value?.trim()?.toUpperCase();
+  if (!code) return;
+  joinRoomByCode(code);
+}
+function joinRoomByCode(code) {
+  const store = Alpine.store("g");
+  store.roomCode = code; store.mode = "room"; addActiveRoom(code);
+  store.screen = "lobby"; connect(buildWsUrl(`?room=${code}`));
+}
+function quickMatch() {
+  if (!ensureAuth()) return;
+  const store = Alpine.store("g");
+  store.mode = "matching"; connect(buildWsUrl("?mode=matching"));
+}
+function leaveLobby() {
+  const store = Alpine.store("g");
+  if (store.ws) store.ws.close();
+  clearActiveRooms(); store.screen = "menu";
+}
+function backToMenu() {
+  stopTimers();
+  const store = Alpine.store("g");
+  if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
+  if (store.charTimer) { clearInterval(store.charTimer); store.charTimer = null; }
+  if (store.ws) store.ws.close();
+  store.ws = null; store.gs = null; store.roomCode = null; store.myIndex = -1;
+  store.selectedCards = {}; store.blocked = false; store.matchStartTime = null;
+  store.eloResult = null; store._lastLogLen = 0; store._lastPlayId = null; store._lastDiscardKeys = "";
+  removeOverlay(); clearActiveRooms(); store.screen = "menu";
+}
+function showLeaderboard() {
+  const store = Alpine.store("g");
+  fetch(`${HTTP_URL}/leaderboard` + (store.gs?.playerId ? `?userId=${store.gs.playerId}` : ""))
+    .then(r => r.json()).then(data => {
+      store.lbData = data; store.screen = "leaderboard";
+    });
 }
 
-// ====== 游戏结束 ======
-function showGameOver(){
-  const gs=ST.gs;if(!gs?.gameOver)return;show("game-over-overlay");
-  const won=gs.winner===ST.myIndex;
-  const el=$("go-title");el.textContent=won?"🎉 胜利！":"💀 失败";el.className=won?"win":"lose";
-  let sub=`${esc(gs.playerName||"你")} vs ${esc(gs.opponentName||"对手")}\n你: ♥${gs.you.hp}/${gs.you.maxHp}  对手: ♥${gs.opponent.hp}/${gs.opponent.maxHp}`;
-  if(ST.eloResult){
-    const er=ST.eloResult;
-    const sign=er.change>0?"+":"";
-    const color=er.change>0?"#22c55e":"#ef4444";
-    sub+=`\n\nELO <span style="color:${color};font-weight:bold">${sign}${er.change}</span> → ${er.newElo}`;
-    const osign=er.opponentChange>0?"+":"";
-    text("go-elo",`对手 ELO ${osign}${er.opponentChange}`);
-  }
-  html("go-subtitle",sub);ST.eloResult=null;
+// ====== Timers ======
+let _timerInterval = null;
+let _pendingTimer = null;
+
+function stopTimers() {
+  if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+  if (_pendingTimer) { clearInterval(_pendingTimer); _pendingTimer = null; }
 }
 
-// ====== 初始化 ======
-(async()=>{
+function startPendingTimer(timeout) {
+  if (_pendingTimer) clearInterval(_pendingTimer);
+  const store = Alpine.store("g");
+  _pendingTimer = setInterval(() => {
+    const r = Math.max(0, Math.floor((timeout - Date.now()) / 1000));
+    store.pendingTimerText = r + "s";
+    if (r <= 0) { clearInterval(_pendingTimer); _pendingTimer = null; }
+  }, 200);
+}
+
+function stopPendingTimer() {
+  if (_pendingTimer) { clearInterval(_pendingTimer); _pendingTimer = null; }
+  Alpine.store("g").pendingTimerText = "";
+}
+
+// ====== Init ======
+document.addEventListener("alpine:init", () => {
+  Alpine.store("g", {
+    screen: "menu",
+    ws: null, gs: null, myIndex: -1,
+    selectedCards: {},  // {cardId: true} for Alpine reactivity
+    blocked: false,
+    serverTimer: 60, pendingTimerText: "",
+    turnTimerText: "",
+    roomCode: null, mode: null,
+    matchStartTime: null, matchInterval: null,
+    eloResult: null,
+    charTimer: null, charTimerText: "", charStatus: "",
+    characters: [], charTimeout: 0,
+    lobbyCode: "", lobbyInvite: "", lobbyStatus: "等待另一位玩家...",
+    lbData: null,
+    _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
+
+    // Computed helpers
+    get isMyTurn() { return this.gs?.turnPlayer === this.myIndex; },
+    get opp() { return this.gs?.opponent; },
+    get me() { return this.gs?.you; },
+    get pending() { return this.gs?.pendingResponse; },
+    get isMyResp() { return this.pending && this.pending.target === this.myIndex; },
+    get phaseLabel() { return PN[this.gs?.phase] || this.gs?.phase; },
+    get cardCount() { return this.selectedCards ? Object.keys(this.selectedCards).length : 0; },
+
+    // Actions
+    toggleCard(id) {
+      if (this.blocked) return;
+      const isDiscard = this.gs?.phase === "discard" && this.gs?.turnPlayer === this.myIndex;
+      const isSkillDiscard = this.pending?.type === "skill_discard" && this.isMyResp;
+      const sel = this.selectedCards;
+      if (sel[id]) { delete sel[id]; }
+      else {
+        if (!isDiscard && !isSkillDiscard) { for (const k in sel) delete sel[k]; }
+        sel[id] = true;
+      }
+      this.selectedCards = Object.assign({}, sel); // trigger reactivity
+    },
+    isCardDisabled(c) {
+      if (!this.isMyResp || !this.gs) return false;
+      const isDiscard = this.gs.phase === "discard" && this.gs.turnPlayer === this.myIndex;
+      if (isDiscard) return false;
+      const p = this.pending;
+      if (!p) return false;
+      // 防御牌在出牌阶段不能主动出
+      if (!this.isMyResp && !isDiscard && this.gs.phase === "play" && DEFENSIVE_ONLY.includes(c.name) && this.isMyTurn) return true;
+      // 响应阶段检查
+      const selectable = RESP_CARDS[p.type];
+      if (!selectable) return false; // skill_discard etc — all cards allowed
+      if (selectable.includes(c.name)) return false;
+      if (p.type === "borrow_knife" && isWeapon(c.name)) return false;
+      if (c.name === "免罚券" && ["barbarian", "volley", "duel", "borrow_knife"].includes(p.type)) return false;
+      return true;
+    },
+    disabledReason(c) {
+      if (!this.isMyResp || !this.gs) return "";
+      const p = this.pending;
+      if (!p) return "";
+      const selectable = RESP_CARDS[p.type];
+      if (!selectable) return "";
+      return `需要${selectable.join("或")}`;
+    },
+    isCardSelected(id) { return !!this.selectedCards[id]; },
+
+    pickCharacter(id) { send({ action: "pick_character", id }); },
+    playSelected() {
+      const ids = Object.keys(this.selectedCards);
+      if (ids.length === 0 || this.blocked) return;
+      send({ action: "play_card", card_id: ids[0], target: this.myIndex === 0 ? 1 : 0 });
+      this.selectedCards = {};
+    },
+    respondCard() {
+      const ids = Object.keys(this.selectedCards);
+      if (ids.length === 0 || this.blocked) return;
+      send({ action: "play_card", card_id: ids[0] });
+      this.selectedCards = {};
+    },
+    doDiscard() {
+      const ids = Object.keys(this.selectedCards);
+      if (ids.length === 0 || this.blocked) return;
+      send({ action: "discard", card_ids: ids });
+      this.selectedCards = {};
+    },
+    doConfirmSkill() {
+      const ids = Object.keys(this.selectedCards);
+      if (ids.length === 0 || this.blocked) return;
+      send({ action: "confirm_skill", card_ids: ids });
+      this.selectedCards = {};
+    },
+    doPass() { send({ action: "pass" }); },
+    doEndPhase() { send({ action: "end_phase" }); },
+    doUseSkill(skillId) { send({ action: "use_skill", skill_id: skillId }); },
+    stealWithAnim(pos) {
+      if (this.blocked) return;
+      // Animate the clicked card
+      const cards = document.querySelectorAll(".steal-card");
+      const el = [...cards].find(c => parseInt(c.dataset.pos) === pos);
+      if (el) { el.classList.add("steal-fly"); setTimeout(() => el.remove(), 500); }
+      cards.forEach(c => c.style.pointerEvents = "none");
+      send({ action: "steal_card", position: pos });
+    },
+    stealPositions() {
+      if (!this.pending || this.pending.type !== "steal") return [];
+      return Array.from({ length: this.pending.poolSize || 0 }, (_, i) => i + 1);
+    },
+
+    // Pending helpers
+    pendingLabel() {
+      const p = this.pending; if (!p) return "";
+      const label = this.isMyResp ? (RESP_NAMES[p.type] || p.type) : (RESP_NAMES_OPP[p.type] || p.type);
+      return typeof label === "function" ? label(p) : label;
+    },
+    pendingPrefix() { return this.isMyResp ? "你" : "对手"; },
+    pendingRemaining() {
+      const p = this.pending; if (!p || !p.timeout) return 0;
+      return Math.max(0, Math.floor((p.timeout - Date.now()) / 1000));
+    },
+
+    // Game helpers
+    oppNameDisplay() { return this.gs?.opponentName || "对手"; },
+    myNameDisplay() { return this.gs?.playerName || "你"; },
+    isOppTurn() { return this.gs?.turnPlayer !== this.myIndex; },
+    needDiscard() {
+      if (!this.me || !this.gs) return 0;
+      return Math.max(0, this.me.hand.length - (this.gs.handLimit || this.me.hp));
+    },
+
+    // Recent play/discard for center zone
+    recentPlayCard() {
+      if (!this.gs?.log) return null;
+      for (let i = this.gs.log.length - 1; i >= 0; i--) {
+        if (this.gs.log[i].id === "card_played") return this.gs.log[i];
+      }
+      return null;
+    },
+    recentDiscards() {
+      if (!this.gs?.log) return [];
+      const d = [];
+      for (let i = this.gs.log.length - 1; i >= 0 && d.length < 3; i--) {
+        const e = this.gs.log[i];
+        if (e.id === "card_discarded" || e.id === "discard") d.unshift(e);
+      }
+      return d;
+    },
+    recentSkillUsed() {
+      if (!this.gs?.log) return null;
+      const last = this.gs.log[this.gs.log.length - 1];
+      return last?.id === "skill_used" ? last : null;
+    },
+    formatLogEntry(e) {
+      const p = `P${e.player}`;
+      switch (e.id) {
+        case "card_played": return `${p} 使用了【${e.cardName}】${e.target !== undefined ? ` → P${e.target}` : ""}`;
+        case "card_equipped": return `${p} 装备了【${e.cardName}】`;
+        case "damage": return `${p} 受到 ${e.amount} 点伤害`;
+        case "heal": return `${p} 回复了 ${e.amount} 点体力`;
+        case "skill_used": return `${p} 发动了【${e.skillName}】`;
+        case "draw": return `${p} 摸了 ${e.count} 张牌`;
+        case "card_discarded": case "discard": return `${p} 弃置了【${e.cardName}】`;
+        case "death": return `${p} 阵亡`;
+        default: return "";
+      }
+    },
+    gameOverMsg() {
+      if (!this.gs?.gameOver) return "";
+      const won = this.gs.winner === this.myIndex;
+      return { won, title: won ? "🎉 胜利！" : "💀 失败", cls: won ? "win" : "lose" };
+    },
+  });
+});
+
+// ====== Bootstrap ======
+(async () => {
   await initAuth();
-  if(AUTH.enabled){show("auth-section");if(AUTH.token){text("auth-user","已登录");$("auth-btn").textContent="退出";$("auth-btn").onclick=()=>{AUTH.token=null;sessionStorage.removeItem("auth_token");sessionStorage.removeItem("active_room");text("auth-user","未登录");$("auth-btn").textContent="登录";$("auth-btn").onclick=startLogin;if(ST.ws){ST.ws.close();backToMenu();}};}}
+  if (AUTH.enabled) { document.getElementById("auth-section")?.classList.remove("hidden"); }
 })();
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&ST.screen==="menu")joinRoom();});
+
+// Start turn timer (called reactively)
+function startTurnTimer(s) {
+  stopTimers();
+  const store = Alpine.store("g");
+  store.serverTimer = s;
+  store.turnTimerText = `${s}s`;
+  _timerInterval = setInterval(() => {
+    store.serverTimer--;
+    if (store.serverTimer < 0) store.serverTimer = 0;
+    store.turnTimerText = `${store.serverTimer}s`;
+  }, 1000);
+}

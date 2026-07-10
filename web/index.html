@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>🏫 学校杀</title>
-<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.23/dist/full.min.css" rel="stylesheet" />
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.23/dist/full.min.css" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   :root {
@@ -46,15 +47,20 @@
     font-size:11px; white-space:nowrap; z-index:10; border:1px solid #ef4444; pointer-events:none;
   }
 
-  /* 动画 */
   @keyframes flash-in { 0% { opacity: 0; transform: scale(1.3); } 50% { opacity: 1; transform: scale(1); } }
   @keyframes skill-flash { 0% { opacity: 0; transform: translateY(-8px); } 20% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
   @keyframes card-fade-in { 0% { opacity: 0; transform: translateY(-10px); } 100% { opacity: 1; transform: translateY(0); } }
   @keyframes discard-pop { 0% { opacity: 0; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes steal-fly { 0% { opacity: 0.6; transform: scale(1.2); } 50% { opacity: 0.9; transform: scale(1.5); } 100% { opacity: 0; transform: scale(0.6) translateY(-40px); } }
+  @keyframes steal-fade { 0% { opacity: 1; } 100% { opacity: 0; transform: scale(0.8); } }
+  @keyframes turn-pulse { 0%,100%{text-shadow:0 0 12px rgba(124,58,237,.4)} 50%{text-shadow:0 0 28px rgba(124,58,237,.8),0 0 40px rgba(124,58,237,.3)} }
   .animate-flash { animation: flash-in .3s ease-out; }
   .animate-skill { animation: skill-flash 3s ease-out forwards; }
   .animate-card-in { animation: card-fade-in .25s ease-out; }
   .animate-discard { animation: discard-pop .4s ease-out; }
+  .steal-fly { animation: steal-fly .5s ease-out forwards; }
+  .steal-fade { animation: steal-fade .6s ease-out forwards; }
+  .turn-active { text-shadow: 0 0 18px rgba(124,58,237,.6); color: #c4b5fd !important; animation: turn-pulse 2s ease-in-out infinite; }
 
   .chcard {
     background: var(--c-card); border: 2px solid var(--c-border);
@@ -71,22 +77,15 @@
   .lb-rank { font-weight: bold; width: 30px; }
   .lb-name { flex: 1; } .lb-elo { color: var(--c-accent); font-weight: bold; font-family: monospace; }
   .lb-stats { color: var(--c-dim); font-size: 12px; }
-  .lb-you { margin-top: 12px; padding: 10px; background: #1e1040; border-radius: 8px; border: 1px solid var(--c-accent); }
   .lb-header { color: var(--c-dim); font-size: 11px; display: flex; font-weight: bold; padding: 4px 12px; }
 
   #go-title.win { color: var(--c-green); } #go-title.lose { color: var(--c-red); }
 
-  /* 全屏游戏布局 */
-  #screen-game:not(.hidden) { display: flex !important; flex-direction: row !important; }
-  #my-area, #opp-area { transition: background .3s; }
-  #my-area { border-right: 1px solid #1e1e2e; }
-  #opp-area { border-left: 1px solid #2e1e1e; }
-  .turn-active { text-shadow: 0 0 18px rgba(124,58,237,.6); color: #c4b5fd !important; animation: turn-pulse 2s ease-in-out infinite; }
-  @keyframes turn-pulse {
-    0%, 100% { text-shadow: 0 0 12px rgba(124,58,237,.4); }
-    50% { text-shadow: 0 0 28px rgba(124,58,237,.8), 0 0 40px rgba(124,58,237,.3); }
-  }
-  /* mini card for play/discard zones */
+  /* Full-screen game layout */
+  #screen-game:not(.hidden) { display: flex !important; flex-direction: row !important; max-width: 100vw; padding: 0; height: 100vh; overflow: hidden; }
+  #my-area { border-right: 1px solid #1e1e2e; transition: background .3s; }
+  #opp-area { border-left: 1px solid #2e1e1e; transition: background .3s; }
+
   .mini-card {
     width: 44px; height: 60px; background: #1a1a2e; border: 1px solid #333; border-radius: 4px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -94,142 +93,286 @@
   }
   .mini-card .ms { font-size: 14px; }
   .mini-card .mn { font-weight: bold; font-size: 9px; }
-  .mini-card.spade,.mini-card.club { color: #ccc; } .mini-card.heart,.mini-card.diamond { color: #ef4444; }
-  /* steal card fly animation */
-  @keyframes steal-fly {
-    0% { opacity: 0.6; transform: scale(1.2); }
-    50% { opacity: 0.9; transform: scale(1.5); }
-    100% { opacity: 0; transform: scale(0.6) translateY(-40px); }
-  }
-  @keyframes steal-fade {
-    0% { opacity: 1; }
-    100% { opacity: 0; transform: scale(0.8); }
-  }
-  .steal-fly { animation: steal-fly .5s ease-out forwards; }
-  .steal-fade { animation: steal-fade .6s ease-out forwards; }
+  .mini-card.spade,.mini-card.club { color: #ccc; }
+  .mini-card.heart,.mini-card.diamond { color: #ef4444; }
 </style>
 </head>
-<body>
+<body x-data>
 
 <!-- ═══════ 菜单 ═══════ -->
-<div id="screen-menu" class="screen">
+<div id="screen-menu" class="screen" x-show="$store.g.screen === 'menu'">
   <div class="card w-full" style="background:var(--c-card);border:1px solid var(--c-border);border-radius:12px;padding:40px 32px;text-align:center;display:flex;flex-direction:column;gap:12px">
     <h1 class="text-4xl font-bold">🏫 学校杀</h1>
     <p class="text-sm opacity-60">1v1 卡牌对战</p>
     <div class="flex flex-col gap-3 mt-2">
-      <button class="btn btn-primary w-full" onclick="createRoom()">创建房间</button>
+      <button class="btn btn-primary w-full" @click="createRoom()">创建房间</button>
       <div class="flex gap-2">
-        <input id="join-code" type="text" maxlength="6" placeholder="房间码" class="input input-bordered flex-1 text-center uppercase tracking-[6px] text-2xl font-mono" style="background:#222;border-color:#333;color:#c4b5fd" autocomplete="off">
-        <button class="btn btn-outline btn-sm shrink-0" onclick="joinRoom()">加入</button>
+        <input id="join-code" type="text" maxlength="6" placeholder="房间码" class="input input-bordered flex-1 text-center uppercase tracking-[6px] text-2xl font-mono" style="background:#222;border-color:#333;color:#c4b5fd" autocomplete="off" @keydown.enter="joinRoom()">
+        <button class="btn btn-outline btn-sm shrink-0" @click="joinRoom()">加入</button>
       </div>
-      <button class="btn btn-outline w-full" onclick="quickMatch()">⚡ 快速匹配</button>
-      <button class="btn btn-outline w-full" onclick="showLeaderboard()">🏆 排行榜</button>
+      <button class="btn btn-outline w-full" @click="quickMatch()">⚡ 快速匹配</button>
+      <button class="btn btn-outline w-full" @click="showLeaderboard()">🏆 排行榜</button>
     </div>
-    <div class="flex items-center justify-center gap-3 mt-2" id="auth-section">
+    <div class="flex items-center justify-center gap-3 mt-2 hidden" id="auth-section">
       <span id="auth-user" class="text-sm opacity-60">未登录</span>
       <button id="auth-btn" class="btn btn-ghost btn-xs" onclick="startLogin()">登录</button>
     </div>
-    <p id="menu-status" class="text-sm opacity-60"></p>
   </div>
 </div>
 
 <!-- ═══════ 大厅 ═══════ -->
-<div id="screen-lobby" class="screen hidden">
+<div id="screen-lobby" class="screen hidden" x-show="$store.g.screen === 'lobby'">
   <div class="card w-full" style="background:var(--c-card);border:1px solid var(--c-border);border-radius:12px;padding:40px 32px;text-align:center;display:flex;flex-direction:column;gap:12px">
     <h2 class="text-2xl font-bold">等待对手</h2>
-    <div id="lobby-code" class="text-[56px] font-bold tracking-[10px] font-mono" style="color:#c4b5fd"></div>
-    <p id="lobby-invite" class="text-sm break-all opacity-60"></p>
+    <div class="text-[56px] font-bold tracking-[10px] font-mono" style="color:#c4b5fd" x-text="$store.g.lobbyCode"></div>
+    <p class="text-sm break-all opacity-60" x-text="$store.g.lobbyInvite"></p>
     <span class="loading loading-spinner loading-lg mx-auto"></span>
-    <p id="lobby-status" class="text-sm opacity-60">等待另一位玩家...</p>
-    <button class="btn btn-outline btn-sm" onclick="leaveLobby()">取消</button>
+    <p class="text-sm opacity-60" x-text="$store.g.lobbyStatus"></p>
+    <button class="btn btn-outline btn-sm" @click="leaveLobby()">取消</button>
   </div>
 </div>
 
 <!-- ═══════ 选角 ═══════ -->
-<div id="screen-char" class="screen hidden">
+<div id="screen-char" class="screen hidden" x-show="$store.g.screen === 'char'">
   <h2 class="text-xl font-bold text-center mb-2">选择你的角色</h2>
-  <div id="char-timer" class="font-mono text-sm mb-2" style="color:var(--c-gold)"></div>
-  <div id="char-list" class="grid gap-3 w-full" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))"></div>
-  <p id="char-status" class="text-sm opacity-80 mt-3 text-center"></p>
+  <div class="font-mono text-sm mb-2" style="color:var(--c-gold)" x-text="$store.g.charTimerText"></div>
+  <div class="grid gap-3 w-full" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr))">
+    <template x-for="c in $store.g.characters" :key="c.id">
+      <div class="chcard" @click="$store.g.pickCharacter(c.id)">
+        <h3 x-text="c.name"></h3>
+        <div class="hp" x-text="'♥ × ' + c.maxHp"></div>
+        <div class="sk" x-text="c.skills.length ? c.skills.join(' · ') : '无技能'"></div>
+      </div>
+    </template>
+  </div>
+  <p class="text-sm opacity-80 mt-3 text-center" x-html="$store.g.charStatus"></p>
 </div>
 
 <!-- ═══════ 游戏 ═══════ -->
-<div id="screen-game" class="screen hidden" style="max-width:100vw;padding:0;gap:0;height:100vh;overflow:hidden;display:none">
+<div id="screen-game" class="screen hidden" x-show="$store.g.screen === 'game'"
+     x-effect="if($store.g.screen==='game' && $store.g.gs && !$store.g.pending && $store.g.gs.turnTimeLeft !== $store.g._lastTurnTime) { $store.g._lastTurnTime = $store.g.gs.turnTimeLeft; startTurnTimer($store.g.gs.turnTimeLeft); }"
+     x-init="/* Alpine managed */">
+
   <!-- 左：自己面板 -->
-  <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);border-right:1px solid #1e1e2e;overflow:hidden">
+  <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-      <div id="my-name" style="font-size:17px;font-weight:bold;transition:color .3s;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-      <span id="my-turn-badge" style="display:none;font-size:10px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite;white-space:nowrap">你的回合</span>
-      <div id="my-hp" style="font-family:monospace;font-size:14px;margin-left:auto"></div>
+      <div style="font-size:17px;font-weight:bold;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+           :class="{'turn-active': $store.g.isMyTurn}"
+           x-text="$store.g.myNameDisplay()"></div>
+      <span x-show="$store.g.isMyTurn" style="font-size:10px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite;white-space:nowrap">你的回合</span>
+      <div style="font-family:monospace;font-size:14px;margin-left:auto" x-text="hpStr($store.g.me?.hp,$store.g.me?.maxHp)"></div>
     </div>
-    <div id="my-skills" style="font-size:11px;color:#a78bfa;min-height:16px;margin-bottom:6px;line-height:1.5"></div>
-    <div id="my-equip" style="font-size:11px;color:var(--c-gold);min-height:16px;line-height:1.5"></div>
+
+    <!-- 技能 -->
+    <div style="font-size:11px;color:#a78bfa;min-height:16px;margin-bottom:6px;line-height:1.5">
+      <template x-for="s in $store.g.me?.skills||[]" :key="s.id">
+        <div style="margin-top:2px;cursor:help" :title="getSkillDesc(s)">
+          • <span x-text="s.name"></span>
+          <span style="font-size:10px;opacity:.4" x-text="s.type==='locked'?'锁定':s.type==='passive'?'被动':''"></span>
+        </div>
+      </template>
+    </div>
+
+    <!-- 装备 -->
+    <div style="font-size:11px;color:var(--c-gold);min-height:16px;line-height:1.5">
+      <template x-if="$store.g.me?.weapon">
+        <div style="cursor:help" :title="getCardDesc($store.g.me.weapon)">🗡 <span x-text="cn($store.g.me.weapon)"></span></div>
+      </template>
+      <template x-if="$store.g.me?.armor">
+        <div style="margin-top:4px;cursor:help" :title="getCardDesc($store.g.me.armor)">🛡 <span x-text="cn($store.g.me.armor)"></span></div>
+      </template>
+    </div>
     <div style="flex:1"></div>
   </div>
 
-  <!-- 中间：共享区 + 手牌 + 按钮 -->
-  <div id="center-strip" style="flex:1;display:flex;flex-direction:column;padding:8px 12px 0;overflow:hidden;background:var(--c-bg);min-width:0">
-    <!-- 顶部 bar -->
+  <!-- 中间共享区 -->
+  <div style="flex:1;display:flex;flex-direction:column;padding:8px 12px 0;overflow:hidden;background:var(--c-bg);min-width:0">
+    <!-- Top bar -->
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-shrink:0">
-      <span id="phase-label" style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:bold;background:var(--c-accent);color:white"></span>
-      <span id="turn-timer" style="font-family:monospace;font-size:13px;color:var(--c-gold)"></span>
-      <span id="deck-count" style="font-size:11px;opacity:.4;margin-left:auto"></span>
+      <span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:bold;background:var(--c-accent);color:white" x-text="$store.g.phaseLabel"></span>
+      <span style="font-family:monospace;font-size:13px;color:var(--c-gold)" x-text="$store.g.turnTimerText"></span>
+      <span style="font-size:11px;opacity:.4;margin-left:auto" x-text="'牌堆: ' + ($store.g.gs?.deckCount||0)"></span>
     </div>
+
     <!-- Pending -->
-    <div id="pending-msg" class="hidden" style="background:#2d0a0a;color:#fca5a5;padding:6px 10px;border-radius:6px;text-align:center;font-size:11px;margin-bottom:4px;flex-shrink:0"></div>
-    <!-- Steal -->
-    <div id="steal-zone" class="hidden" style="margin-bottom:4px;flex-shrink:0"></div>
-    <!-- 出牌/弃牌区 -->
-    <div style="display:flex;gap:12px;justify-content:center;min-height:32px;align-items:center;margin-bottom:3px;flex-shrink:0">
-      <div id="play-zone" class="hidden" style="display:flex;gap:4px;align-items:center"></div>
-      <div id="discard-zone" style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;justify-content:center"></div>
+    <div x-show="$store.g.pending" style="background:#2d0a0a;color:#fca5a5;padding:6px 10px;border-radius:6px;text-align:center;font-size:11px;margin-bottom:4px;flex-shrink:0"
+         x-effect="if($store.g.pending && $store.g.isMyResp && $store.g.pending.timeout) startPendingTimer($store.g.pending.timeout); else stopPendingTimer()">
+      ⚠ <strong x-text="$store.g.pendingPrefix()"></strong>需要响应：<span x-text="$store.g.pendingLabel()"></span>
+      <span style="color:#f59e0b;font-weight:bold" x-text="$store.g.pendingTimerText"></span>
     </div>
-    <!-- 技能 flash -->
-    <div id="skill-flash" class="hidden" style="text-align:center;font-size:12px;font-weight:bold;padding:4px;border-radius:6px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:3px;flex-shrink:0"></div>
-    <!-- 卡牌说明 -->
-    <div id="card-info" style="text-align:center;font-size:12px;color:var(--c-gold);min-height:20px;flex-shrink:0"></div>
-    <!-- 日志 -->
-    <div id="game-log" style="flex:1;overflow-y:auto;font-size:10px;opacity:.45;min-height:40px;line-height:1.4;max-height:80px;flex-shrink:1"></div>
-    <!-- 手牌 -->
-    <div id="my-hand" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;padding:4px 0;min-height:56px;max-height:170px;overflow-y:auto;flex-shrink:0"></div>
-    <!-- 操作按钮 -->
-    <div id="action-bar" style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:4px 0 8px;min-height:32px;align-items:center;flex-shrink:0"></div>
+
+    <!-- Steal zone -->
+    <div x-show="$store.g.pending?.type==='steal' && $store.g.isMyResp" style="margin-bottom:4px;flex-shrink:0">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:4px 0">
+        <template x-for="pos in $store.g.stealPositions()" :key="pos">
+          <div class="gcard facedown steal-card" :data-pos="pos" @click="$store.g.stealWithAnim(pos)" style="cursor:pointer">
+            <span class="gsuit">?</span>
+            <span class="gname" x-text="'第'+pos+'张'"></span>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Play / Discard zone -->
+    <div style="display:flex;gap:12px;justify-content:center;min-height:32px;align-items:center;margin-bottom:3px;flex-shrink:0">
+      <template x-if="$store.g.recentPlayCard()">
+        <div class="mini-card animate-card-in">
+          <span class="ms">🃏</span>
+          <span class="mn" x-text="$store.g.recentPlayCard()?.cardName"></span>
+        </div>
+      </template>
+      <template x-for="(d,i) in $store.g.recentDiscards()" :key="i">
+        <div class="mini-card animate-discard" :style="'animation-delay:'+(i*0.1)+'s'">
+          <span class="mn" x-text="d.cardName"></span>
+        </div>
+      </template>
+      <span x-show="$store.g.gs?.phase==='discard' && !$store.g.recentDiscards().length" style="font-size:11px;opacity:.4">弃牌阶段</span>
+    </div>
+
+    <!-- Skill flash -->
+    <div x-show="$store.g.recentSkillUsed()" style="text-align:center;font-size:13px;font-weight:bold;padding:6px;border-radius:8px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:4px;flex-shrink:0"
+         class="animate-skill">
+      ⚡ <span x-text="$store.g.recentSkillUsed()?.skillName"></span> 发动！
+    </div>
+
+    <!-- Card info -->
+    <div style="text-align:center;font-size:12px;color:var(--c-gold);min-height:20px;flex-shrink:0">
+      <template x-if="$store.g.cardCount > 0 && $store.g.me?.hand">
+        <span x-text="getCardDesc($store.g.me.hand.find(c=>$store.g.isCardSelected(c.id))) || ''"></span>
+      </template>
+    </div>
+
+    <!-- Log -->
+    <div style="flex:1;overflow-y:auto;font-size:10px;opacity:.45;min-height:40px;max-height:80px;line-height:1.4;flex-shrink:1">
+      <template x-for="e in $store.g.gs?.log||[]" :key="e.id + Math.random()">
+        <div x-text="$store.g.formatLogEntry(e)"></div>
+      </template>
+    </div>
+
+    <!-- Hand -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;padding:4px 0;min-height:56px;max-height:170px;overflow-y:auto;flex-shrink:0">
+      <template x-for="c in $store.g.me?.hand||[]" :key="c.id">
+        <div class="gcard" :class="c.suit + ($store.g.isCardSelected(c.id)?' selected':'') + ($store.g.isCardDisabled(c)?' disabled':'')"
+             :title="$store.g.disabledReason(c)"
+             @click="$store.g.toggleCard(c.id)">
+          <span class="gsuit" x-text="suitSym(c.suit)"></span>
+          <span class="gname" x-text="c.name"></span>
+          <span class="gnum" x-text="c.number"></span>
+        </div>
+      </template>
+    </div>
+
+    <!-- Action bar -->
+    <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:center;padding:4px 0 8px;min-height:32px;align-items:center;flex-shrink:0">
+      <!-- Skill discard -->
+      <template x-if="$store.g.pending?.type==='skill_discard' && $store.g.isMyResp">
+        <template x-if="$store.g.cardCount >= ($store.g.pending.discardCount||1)">
+          <button class="btn btn-primary btn-sm" @click="$store.g.doConfirmSkill()">
+            确认发动 (<span x-text="$store.g.cardCount"></span>/<span x-text="$store.g.pending.discardCount||1"></span>)
+          </button>
+        </template>
+        <button class="btn btn-outline btn-sm" @click="$store.g.doPass()">取消</button>
+      </template>
+      <!-- Other pending response -->
+      <template x-if="$store.g.pending && $store.g.isMyResp && $store.g.pending.type!=='skill_discard'">
+        <button class="btn btn-outline btn-sm" @click="$store.g.doPass()">不响应</button>
+        <template x-if="$store.g.cardCount > 0">
+          <button class="btn btn-primary btn-sm" @click="$store.g.respondCard()">出牌响应</button>
+        </template>
+      </template>
+      <!-- Play phase actions -->
+      <template x-if="$store.g.isMyTurn && $store.g.gs?.phase==='play' && !$store.g.pending">
+        <template x-if="$store.g.cardCount > 0">
+          <button class="btn btn-primary btn-sm" @click="$store.g.playSelected()">出牌</button>
+        </template>
+        <template x-for="s in ($store.g.me?.skills||[]).filter(s=>s.type==='active')" :key="s.id">
+          <button class="btn btn-outline btn-sm" @click="$store.g.doUseSkill(s.id)">技能: <span x-text="s.name"></span></button>
+        </template>
+        <button class="btn btn-outline btn-sm" @click="$store.g.doEndPhase()">结束出牌</button>
+      </template>
+      <!-- Discard phase -->
+      <template x-if="$store.g.isMyTurn && $store.g.gs?.phase==='discard' && !$store.g.pending">
+        <template x-if="$store.g.needDiscard() > 0 && $store.g.cardCount > 0">
+          <button class="btn btn-error btn-sm" @click="$store.g.doDiscard()">
+            弃牌 (<span x-text="$store.g.cardCount"></span>/<span x-text="$store.g.needDiscard()"></span>)
+          </button>
+        </template>
+        <span x-show="$store.g.needDiscard() <= 0" class="text-sm opacity-60">无需弃牌</span>
+      </template>
+    </div>
   </div>
 
   <!-- 右：对手面板 -->
-  <div id="opp-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#1a0f0f 0%,#120a0a 100%);border-left:1px solid #2e1e1e;overflow:hidden">
+  <div id="opp-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#1a0f0f 0%,#120a0a 100%);overflow:hidden">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-      <div id="opp-name" style="font-size:17px;font-weight:bold;transition:color .3s;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
-      <span id="opp-turn-badge" style="display:none;font-size:10px;background:#991b1b;color:#fca5a5;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite;white-space:nowrap">对手回合</span>
-      <div id="opp-hp" style="font-family:monospace;font-size:14px;margin-left:auto"></div>
+      <div style="font-size:17px;font-weight:bold;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+           :class="{'turn-active': $store.g.isOppTurn()}"
+           x-text="$store.g.oppNameDisplay()"></div>
+      <span x-show="$store.g.isOppTurn()" style="font-size:10px;background:#991b1b;color:#fca5a5;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite;white-space:nowrap">对手回合</span>
+      <div style="font-family:monospace;font-size:14px;margin-left:auto" x-text="hpStr($store.g.opp?.hp,$store.g.opp?.maxHp)"></div>
     </div>
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap">
-      <span id="opp-cards" style="font-size:12px;opacity:.6"></span>
-      <div id="opp-disconnected" class="hidden" style="background:#991b1b;color:#fca5a5;font-size:10px;padding:1px 6px;border-radius:4px">已断线</div>
+      <span style="font-size:12px;opacity:.6" x-text="'手牌: '+($store.g.opp?.handCount||0)"></span>
+      <div x-show="$store.g.gs?.opponentDisconnected" style="background:#991b1b;color:#fca5a5;font-size:10px;padding:1px 6px;border-radius:4px">已断线</div>
     </div>
-    <div id="opp-skills" style="font-size:11px;color:#a78bfa;min-height:16px;margin-bottom:6px;line-height:1.5"></div>
-    <div id="opp-equip" style="font-size:11px;color:var(--c-gold);min-height:16px;line-height:1.5"></div>
+
+    <!-- 技能 -->
+    <div style="font-size:11px;color:#a78bfa;min-height:16px;margin-bottom:6px;line-height:1.5">
+      <template x-for="s in $store.g.opp?.skills||[]" :key="s.id">
+        <div style="margin-top:2px;cursor:help" :title="getSkillDesc(s)">
+          • <span x-text="s.name"></span>
+          <span style="font-size:10px;opacity:.4" x-text="s.type==='locked'?'锁定':s.type==='passive'?'被动':''"></span>
+        </div>
+      </template>
+    </div>
+
+    <!-- 装备 -->
+    <div style="font-size:11px;color:var(--c-gold);min-height:16px;line-height:1.5">
+      <template x-if="$store.g.opp?.weapon">
+        <div style="cursor:help" :title="getCardDesc($store.g.opp.weapon)">🗡 <span x-text="cn($store.g.opp.weapon)"></span></div>
+      </template>
+      <template x-if="$store.g.opp?.armor">
+        <div style="margin-top:4px;cursor:help" :title="getCardDesc($store.g.opp.armor)">🛡 <span x-text="cn($store.g.opp.armor)"></span></div>
+      </template>
+    </div>
     <div style="flex:1"></div>
   </div>
 </div>
 
 <!-- ═══════ 排行榜 ═══════ -->
-<div id="screen-leaderboard" class="screen hidden">
+<div id="screen-leaderboard" class="screen hidden" x-show="$store.g.screen === 'leaderboard'">
   <div class="card w-full" style="background:var(--c-card);border:1px solid var(--c-border);border-radius:12px;padding:40px 32px;text-align:center;display:flex;flex-direction:column;gap:12px">
     <h2 class="text-2xl font-bold">🏆 排行榜</h2>
-    <div id="lb-table" class="text-left text-sm w-full"></div>
-    <div id="lb-you" class="hidden"></div>
-    <button class="btn btn-outline w-full" onclick="showScreen('menu')">返回</button>
+    <template x-if="$store.g.lbData">
+      <div class="text-left text-sm w-full">
+        <div class="lb-header"><span class="lb-rank">#</span><span class="lb-name">玩家</span><span class="lb-elo">ELO</span><span class="lb-stats">胜/负</span></div>
+        <template x-for="p in $store.g.lbData.top10" :key="p.rank">
+          <div class="lb-row"><span class="lb-rank" x-text="p.rank"></span><span class="lb-name" x-text="p.displayName||p.userId.slice(0,8)"></span><span class="lb-elo" x-text="p.elo"></span><span class="lb-stats" x-text="p.wins+'W '+p.losses+'L'"></span></div>
+        </template>
+        <template x-if="$store.g.lbData.you">
+          <div style="margin-top:12px;padding:10px;background:#1e1040;border-radius:8px;border:1px solid var(--c-accent)" class="lb-row">
+            <span class="lb-rank" x-text="$store.g.lbData.you.rank"></span><span class="lb-name">← 你</span><span class="lb-elo" x-text="$store.g.lbData.you.elo"></span><span class="lb-stats" x-text="$store.g.lbData.you.wins+'W '+$store.g.lbData.you.losses+'L'"></span>
+          </div>
+        </template>
+      </div>
+    </template>
+    <button class="btn btn-outline w-full" @click="$store.g.screen='menu'">返回</button>
   </div>
 </div>
 
 <!-- ═══════ 游戏结束 ═══════ -->
-<div id="game-over-overlay" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] hidden">
+<div x-show="$store.g.gs?.gameOver" style="position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:100">
   <div class="text-center max-w-[360px] flex flex-col gap-3 p-10 rounded-2xl" style="background:var(--c-card);border:2px solid var(--c-accent)">
-    <h2 id="go-title" class="text-3xl"></h2>
-    <p id="go-subtitle" class="opacity-60 whitespace-pre-line"></p>
-    <p id="go-elo" class="font-mono font-bold"></p>
-    <button class="btn btn-primary" onclick="backToMenu()">返回菜单</button>
+    <h2 class="text-3xl" :class="$store.g.gameOverMsg().cls" x-text="$store.g.gameOverMsg().title"></h2>
+    <p class="opacity-60 whitespace-pre-line">
+      <span x-text="$store.g.myNameDisplay()"></span> vs <span x-text="$store.g.oppNameDisplay()"></span>
+      <br>你: ♥<span x-text="$store.g.me?.hp"></span>/<span x-text="$store.g.me?.maxHp"></span>
+      对手: ♥<span x-text="$store.g.opp?.hp"></span>/<span x-text="$store.g.opp?.maxHp"></span>
+      <template x-if="$store.g.eloResult">
+        <br><br>ELO <span :style="'color:'+($store.g.eloResult.change>0?'#22c55e':'#ef4444')+';font-weight:bold'" x-text="($store.g.eloResult.change>0?'+':'')+$store.g.eloResult.change"></span> → <span x-text="$store.g.eloResult.newElo"></span>
+      </template>
+    </p>
+    <button class="btn btn-primary" @click="backToMenu()">返回菜单</button>
   </div>
 </div>
 

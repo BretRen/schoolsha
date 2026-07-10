@@ -28,6 +28,14 @@ export function getCardEffect(name: string): CardEffect | undefined {
   return effectMap.get(name);
 }
 
+// ---------- 日志 ----------
+
+function addLog(s: GameState, player: number, msg: string) {
+  const name = `P${player}`;
+  s.log.push(`[${name}] ${msg}`);
+  if (s.log.length > 50) s.log.shift();
+}
+
 // ============================================================
 // 可复用条件原语
 // ============================================================
@@ -72,6 +80,7 @@ function dealDamage(s: GameState, source: number, target: number, amount: number
   }
   s.players[target].hp -= amount;
   if (s.players[target].hp < 0) s.players[target].hp = 0;
+  addLog(s, target, `受到 ${amount} 点伤害`);
   emit({ type: "damage", source, target, amount }, s);
   // 直接伤害可能致死，触发濒死流程
   if (s.players[target].hp <= 0 && !s.gameOver) {
@@ -81,6 +90,7 @@ function dealDamage(s: GameState, source: number, target: number, amount: number
 
 function healTo(s: GameState, player: number, amount: number) {
   s.players[player].hp = Math.min(s.players[player].hp + amount, s.players[player].maxHp);
+  addLog(s, player, `回复了 ${amount} 点体力`);
   emit({ type: "heal", player, amount }, s);
 }
 
@@ -166,6 +176,7 @@ function equipCard(s: GameState, playerIdx: number, card: Card): string | null {
   } else {
     return "不是装备牌";
   }
+  addLog(s, playerIdx, `装备了【${card.name}】`);
   emit({ type: "card_played", player: playerIdx, card }, s);
   return null;
 }
@@ -217,6 +228,7 @@ registerCardEffect("作业", {
 
     s.attackUsed = true;
     setDodgePending(s, playerIdx, card);
+    addLog(s, playerIdx, `使用了【作业】`);
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });

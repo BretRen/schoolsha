@@ -220,7 +220,19 @@ function renderGame(){
   startTimer(gs.turnTimeLeft);
 
   const sig=handSig(me.hand);if(sig!==ST.lastHandSig){ST.lastHandSig=sig;ST.selectedCards.clear();}
-  renderHand(me.hand);renderPending(gs);renderActions(gs);renderCardInfo();
+  renderHand(me.hand);renderPending(gs);renderActions(gs);renderCardInfo();renderLog(gs);
+}
+
+let _lastLogLen=0;
+function renderLog(gs){
+  const el=$("game-log");if(!el||!gs.log)return;
+  if(gs.log.length < _lastLogLen){el.innerHTML="";_lastLogLen=0;}
+  for(let i=_lastLogLen;i<gs.log.length;i++){
+    const d=document.createElement("div");d.textContent=gs.log[i];el.appendChild(d);
+  }
+  _lastLogLen=gs.log.length;
+  if(_lastLogLen>50){while(el.children.length>30)el.firstChild.remove();_lastLogLen=el.children.length;}
+  el.scrollTop=el.scrollHeight;
 }
 
 function renderHand(hand){

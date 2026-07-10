@@ -55,6 +55,7 @@ export function createGame(picks: [string, string]): GameState {
     disconnectedAt: [null, null],
     wineUsed: false,
     skillUseCount: {},
+    log: [],
   };
 
   if (picks[0]) mountPassiveSkills(state, 0, picks[0]);
@@ -381,6 +382,7 @@ export function getPlayerView(
     deckCount: state.deck.length,
     turnTimeLeft,
     opponentDisconnected: state.disconnectedAt[1 - playerIdx] !== null,
+    log: state.log,
     // 名字字段由 main.ts 的 broadcast() 填充
     playerName: "",
     playerId: "",

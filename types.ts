@@ -54,6 +54,8 @@ export interface GameState {
   wineUsed: boolean;
   /** 技能每回合使用次数（多房间隔离） */
   skillUseCount: Record<string, number>;
+  /** 对局日志 */
+  log: string[];
 }
 
 // ---------- JSON 配置类型 ----------
@@ -125,6 +127,8 @@ export interface ServerStateView {
   opponentId: string;
   /** 当前手牌上限（含技能加成） */
   handLimit: number;
+  /** 对局日志 */
+  log: string[];
 }
 
 export type ServerMsg =

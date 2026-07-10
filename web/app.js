@@ -197,7 +197,7 @@ function renderLeaderboard(data){
 }
 
 // ====== 选角 ======
-function renderCharSelect(chars,timeout){let h="";for(const c of chars)h+=`<div class="chcard" onclick="pickCharacter('${c.id}')"><h3>${c.name}</h3><div class="hp">♥ × ${c.maxHp}</div><div class="sk">${c.skills.length?c.skills.join(" · "):"无技能"}</div></div>`;html("char-list",h);text("char-timer",`${timeout}s`);}
+function renderCharSelect(chars,timeout){let h="";for(const c of chars)h+=`<div class="chcard" onclick="pickCharacter('${c.id}')"><h3>${c.name}</h3><div class="hp">♥ × ${c.maxHp}</div><div class="sk">${c.skills.length?c.skills.join(" · "):"无技能"}</div></div>`;html("char-list",h);let s=timeout;text("char-timer",`${s}s`);stopTimer();ST.timerInterval=setInterval(()=>{s--;if(s<0){stopTimer();return;}text("char-timer",`${s}s`);},1000);}
 // deno-lint-ignore no-unused-vars
 function pickCharacter(id){document.querySelectorAll(".chcard").forEach(e=>e.classList.remove("selected"));const c=[...document.querySelectorAll(".chcard")].find(e=>e.innerHTML.includes(id));if(c)c.classList.add("selected");send({action:"pick_character",id});text("char-status","已选择");}
 

@@ -279,6 +279,25 @@ export class Room {
     return !this.clients[0] && !this.clients[1];
   }
 
+  /** 踢出指定用户（如果在房间里）。返回被踢的座位号，-1 表示不在 */
+  kickUserIfPresent(userId: string, reason: string): number {
+    for (let i = 0; i < 2; i++) {
+      const c = this.clients[i];
+      if (c && c.userId === userId) {
+        this.send(c.socket, { type: "error", message: reason });
+        try { c.socket.close(); } catch { /* ok */ }
+        this.clients[i] = null;
+        if (this.game && !this.game.gameOver) {
+          this.disconnectedUserId[i] = userId;
+          this.handleDisconnect(i);
+        }
+        console.log(`[${this.code}] P${i} kicked (${c.displayName || userId}): ${reason}`);
+        return i;
+      }
+    }
+    return -1;
+  }
+
   /** 检查是否应该被清理 */
   shouldCleanup(): boolean {
     if (this.isEmpty()) {
@@ -430,6 +449,14 @@ export class RoomManager {
       }
     }
     return results;
+  }
+
+  /** 从其他房间踢出指定用户（加入新房间时调用）。exceptRoom 为 null 则踢出所有房间 */
+  kickUserFromOtherRooms(userId: string, exceptRoom: Room | null): void {
+    for (const [code, room] of this.rooms) {
+      if (room === exceptRoom) continue;
+      room.kickUserIfPresent(userId, "你在另一房间加入了游戏");
+    }
   }
 }
 

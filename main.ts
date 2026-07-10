@@ -246,6 +246,11 @@ Deno.serve({ port: PORT }, async (req) => {
     displayName = "";
   }
 
+  // 确保 displayName 不为空
+  if (!displayName) {
+    displayName = userId.startsWith("anon_") ? `匿名玩家` : `玩家_${userId.slice(-6)}`;
+  }
+
   // ---- 解析模式 ----
   const mode = url.searchParams.get("mode") || "";
   const roomCode = (url.searchParams.get("room") || "").toUpperCase();
@@ -256,6 +261,8 @@ Deno.serve({ port: PORT }, async (req) => {
 
     socket.addEventListener("open", () => {
       if (authError) { send(socket, { type: "error", message: authError }); socket.close(); return; }
+      // 从房间中踢出（全局唯一）
+      roomManager.kickUserFromOtherRooms(userId, null);
       matchmaking.join(userId, displayName, socket);
       console.log(`[matchmaking] ${displayName || userId} connected (elo=${getElo(userId)})`);
     });
@@ -327,6 +334,18 @@ Deno.serve({ port: PORT }, async (req) => {
     }
 
     // ---- 普通连接 ----
+    // 禁止同一用户在本房间占两个座位
+    for (let i = 0; i < 2; i++) {
+      if (room.clients[i]?.userId === userId) {
+        send(socket, { type: "error", message: "你已经在本房间中了" });
+        socket.close();
+        return;
+      }
+    }
+
+    // 从其他房间踢出同一用户（全局唯一）
+    roomManager.kickUserFromOtherRooms(userId, room);
+
     seat = room.findSeat() ?? -1;
     if (seat === -1) {
       send(socket, {

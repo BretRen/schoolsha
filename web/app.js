@@ -78,21 +78,22 @@ function showReconnectOverlay(code, opponent, seconds) {
 }
 function addActiveRoom(code) { const s = sessionStorage.getItem("active_room")||""; const rooms=s.split(",").filter(Boolean); if(!rooms.includes(code))rooms.push(code); sessionStorage.setItem("active_room",rooms.join(",")); }
 function clearActiveRooms() { sessionStorage.removeItem("active_room"); }
-function createOverlay(title,body,seconds,cfn,onAction,onCancel) {
+function createOverlay(title,body,seconds,cfn,onAction,onCancel,noIgnore) {
   const el=document.createElement("div");el.id="block-overlay";
   el.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999";
   let r=seconds; const upd=()=>{el.querySelector("#bl-countdown").textContent=cfn(r);};
+  const ignoreHtml=noIgnore?'':'<button class="btn btn-outline btn-sm" id="bl-ignore">忽略</button>';
   el.innerHTML=`<div style="background:#1a1a1a;border:2px solid #7c3aed;border-radius:16px;padding:40px;text-align:center;max-width:360px;display:flex;flex-direction:column;gap:12px">
     <h2 style="font-size:28px">${title}</h2><div>${body}</div>
     <p id="bl-countdown" style="color:#f59e0b;font-family:monospace;font-size:16px">${cfn(seconds)}</p>
     <div style="display:flex;gap:12px;justify-content:center;margin-top:8px">
       <button class="btn btn-primary btn-sm" id="bl-action">${onAction?'重新连接':''}</button>
-      <button class="btn btn-outline btn-sm" id="bl-ignore">忽略</button></div></div>`;
+      ${ignoreHtml}</div></div>`;
   document.body.appendChild(el);
   const t=setInterval(()=>{r--;if(r<=0){clearInterval(t);removeOverlay();if(onCancel)onCancel();}upd();},1000);
   if(onAction)el.querySelector("#bl-action").onclick=()=>{clearInterval(t);removeOverlay();onAction();};
   else el.querySelector("#bl-action").style.display="none";
-  el.querySelector("#bl-ignore").onclick=()=>{clearInterval(t);removeOverlay();if(onCancel)onCancel();};
+  if(!noIgnore)el.querySelector("#bl-ignore").onclick=()=>{clearInterval(t);removeOverlay();if(onCancel)onCancel();};
 }
 function removeOverlay(){const el=document.getElementById("block-overlay");if(el)el.remove();}
 
@@ -128,6 +129,8 @@ const CARD_DESC = {
   "涂改液":"防具：被【作业】时翻牌判定，翻出红色则自动闪避",
 };
 function getCardDesc(c){return CARD_DESC[c.name]||`${c.name}（${suitSym(c.suit)}${c.number}）`;}
+const SKILL_DESC={class_president:"出牌阶段弃一张手牌，令对手也弃一张手牌。每回合限一次。",athletic:"锁定技。手牌上限+1。",tutoring:"锁定技。摸牌阶段多摸一张牌。"};
+function getSkillDesc(s){return SKILL_DESC[s.id]||s.name;}
 
 // 响应类型→需要的牌名
 const RESP_CARDS = { dodge:["豁免"],near_death:["补给","小抄"],duel:["作业"],barbarian:["作业"],volley:["豁免"],borrow_knife:[] };
@@ -150,8 +153,10 @@ function connect(wsUrl){
 function send(msg){if(ST.ws?.readyState===WebSocket.OPEN)ST.ws.send(JSON.stringify(msg));}
 
 // ====== 倒计时 ======
-function startTimer(s){stopTimer();ST.serverTimer=s;const el=$("turn-timer");if(!el)return;el.textContent=`${s}s`;ST.timerInterval=setInterval(()=>{ST.serverTimer--;if(ST.serverTimer<0)ST.serverTimer=0;el.textContent=`${ST.serverTimer}s`;},1000);}
-function stopTimer(){if(ST.timerInterval){clearInterval(ST.timerInterval);ST.timerInterval=null;}}
+function startTimer(s){stopTimer();ST.serverTimer=s;ST.pendingTimer=null;const el=$("turn-timer");if(!el)return;el.textContent=`${s}s`;ST.timerInterval=setInterval(()=>{ST.serverTimer--;if(ST.serverTimer<0)ST.serverTimer=0;el.textContent=`${ST.serverTimer}s`;},1000);}
+function startPendingTimer(timeout){stopPendingTimer();ST.pendingTimer=setInterval(()=>{const r=Math.max(0,Math.floor((timeout-Date.now())/1000));const el=$("pending-timer");if(el)el.textContent=`${r}s`;if(r<=0)stopPendingTimer();},200);}
+function stopPendingTimer(){if(ST.pendingTimer){clearInterval(ST.pendingTimer);ST.pendingTimer=null;}}
+function stopTimer(){if(ST.timerInterval){clearInterval(ST.timerInterval);ST.timerInterval=null;}stopPendingTimer();}
 
 // ====== 消息处理 ======
 function handle(msg){
@@ -159,21 +164,21 @@ function handle(msg){
     case "room_created":ST.roomCode=msg.code;ST.mode="room";addActiveRoom(msg.code);showScreen("lobby");text("lobby-code",msg.code);text("lobby-invite",msg.inviteUrl);break;
     case "waiting":text("lobby-status",msg.message);break;
     case "character_select":
-      ST.mode="room";showScreen("char");renderCharSelect(msg.characters,msg.timeoutSec);
-      if(msg.opponent){const op=msg.opponent;const p=msg.elo?.prediction;const line=p?` (ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>)`:'';html("char-status",`对手: ${esc(op.displayName)} (ELO ${op.elo})${line}`);}
+      showScreen("char");renderCharSelect(msg.characters,msg.timeoutSec);
+      if(msg.opponent&&ST.mode==="matching"){const op=msg.opponent;const p=msg.elo?.prediction;const line=p?` (ELO ${msg.elo.my} → <span style="color:#22c55e">胜+${p.win}</span> / <span style="color:#ef4444">负${p.lose}</span>)`:'';html("char-status",`对手: ${esc(op.displayName)} (ELO ${op.elo})${line}`);}
       break;
     case "game_state":
       ST.gs=msg.state;ST.myIndex=msg.yourIndex;if(ST.screen!=="game")showScreen("game");renderGame();
       if(ST.gs.gameOver){if(msg.eloResult)ST.eloResult=msg.eloResult;sessionStorage.removeItem("active_room");stopTimer();showGameOver();}break;
     case "disconnected":show("opp-disconnected");blockGame(msg.message,msg.attemptsLeft);log(`⚠ ${msg.message}`);break;
     case "reconnected":hide("opp-disconnected");removeOverlay();ST.blocked=false;log("✓ 对手已重连");break;
-    case "queue_status":ST.mode="matching";showScreen("lobby");text("lobby-code","");text("lobby-invite","");text("lobby-status",`匹配中... 排队: ${msg.position} (预计 ${msg.estimatedWait})`);break;
-    case "match_found":ST.mode="matching";ST.roomCode=msg.room;addActiveRoom(msg.room);text("lobby-status",`匹配成功！${msg.opponent.displayName} (ELO ${msg.opponent.elo})`);connect(buildWsUrl(`?room=${msg.room}`));break;
-    case "queue_timeout":showScreen("menu");text("menu-status","匹配超时");break;
+    case "queue_status":ST.mode="matching";showScreen("lobby");text("lobby-code","");text("lobby-invite","");ST.matchStartTime=Date.now();ST.matchInterval=setInterval(()=>{const el=$("lobby-status");if(el&&ST.mode==="matching"){const s=Math.floor((Date.now()-ST.matchStartTime)/1000);el.textContent=`匹配中... 排队: ${msg.position} (已匹配 ${s}s)`;}},1000);text("lobby-status",`匹配中... 排队: ${msg.position} (已匹配 0s)`);break;
+    case "match_found":if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}ST.mode="matching";ST.roomCode=msg.room;addActiveRoom(msg.room);text("lobby-status",`匹配成功！${msg.opponent.displayName} (ELO ${msg.opponent.elo})`);connect(buildWsUrl(`?room=${msg.room}`));break;
+    case "queue_timeout":if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}showScreen("menu");text("menu-status","匹配超时");break;
     case "error":log(`错误: ${msg.message}`);if(ST.screen==="menu"||ST.screen==="lobby"){showScreen("menu");text("menu-status",msg.message);}break;
   }
 }
-function blockGame(msg,att){ST.blocked=true;createOverlay("⚠ 对手已断线",msg,30,t=>`${t} 秒后自动判胜（剩余重连: ${att} 次）`,null);}
+function blockGame(msg,att){ST.blocked=true;stopTimer();stopPendingTimer();if(ST.matchInterval){clearInterval(ST.matchInterval);ST.matchInterval=null;}createOverlay("⚠ 对手已断线",msg,30,t=>`${t} 秒后自动判胜（剩余重连: ${att} 次）`,null,null,true);}
 
 // ====== 菜单 ======
 function ensureAuth(){if(AUTH.enabled&&!AUTH.token){text("menu-status","请先登录");startLogin();return false;}return true;}
@@ -212,10 +217,10 @@ function renderGame(){
   if(isOppTurn)$("opp-name").classList.add("turn-active");else $("opp-name").classList.remove("turn-active");
   $("opp-hp").textContent=hpStr(opp.hp,opp.maxHp);
   text("opp-cards",`手牌: ${opp.handCount}`);
-  let oe="";if(opp.weapon)oe+=`<div>🗡 ${cn(opp.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.weapon)}</div>`;if(opp.armor)oe+=`<div style="margin-top:4px">🛡 ${cn(opp.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.armor)}</div>`;html("opp-equip",oe||'<span style="opacity:.3">无装备</span>');
+  let oe="";if(opp.weapon)oe+=`<div style="cursor:help" title="${esc(getCardDesc(opp.weapon))}">🗡 ${cn(opp.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.weapon)}</div>`;if(opp.armor)oe+=`<div style="margin-top:4px;cursor:help" title="${esc(getCardDesc(opp.armor))}">🛡 ${cn(opp.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(opp.armor)}</div>`;html("opp-equip",oe||'<span style="opacity:.3">无装备</span>');
   if(gs.opponentDisconnected)show("opp-disconnected");else hide("opp-disconnected");
   const oppSkills=gs.opponent.skills||[];
-  html("opp-skills",oppSkills.length?oppSkills.map(s=>`<div style="margin-top:2px">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
+  html("opp-skills",oppSkills.length?oppSkills.map(s=>`<div style="margin-top:2px;cursor:help" title="${esc(getSkillDesc(s))}">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
 
   const me=gs.you;
   const myName=gs.playerName||"你";
@@ -223,13 +228,14 @@ function renderGame(){
   html("my-name",`${esc(myName)}${isMyTurn?' <span style="font-size:11px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite">你的回合</span>':''}`);
   if(isMyTurn)$("my-name").classList.add("turn-active");else $("my-name").classList.remove("turn-active");
   $("my-hp").textContent=hpStr(me.hp,me.maxHp);
-  let meq="";if(me.weapon)meq+=`<div>🗡 ${cn(me.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.weapon)}</div>`;if(me.armor)meq+=`<div style="margin-top:4px">🛡 ${cn(me.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.armor)}</div>`;html("my-equip",meq||'<span style="opacity:.3">无装备</span>');
+  let meq="";if(me.weapon)meq+=`<div style="cursor:help" title="${esc(getCardDesc(me.weapon))}">🗡 ${cn(me.weapon)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.weapon)}</div>`;if(me.armor)meq+=`<div style="margin-top:4px;cursor:help" title="${esc(getCardDesc(me.armor))}">🛡 ${cn(me.armor)}</div><div style="font-size:10px;opacity:.5">${getCardDesc(me.armor)}</div>`;html("my-equip",meq||'<span style="opacity:.3">无装备</span>');
   const mySkills=me.skills||[];
-  html("my-skills",mySkills.length?mySkills.map(s=>`<div style="margin-top:2px">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
+  html("my-skills",mySkills.length?mySkills.map(s=>`<div style="margin-top:2px;cursor:help" title="${esc(getSkillDesc(s))}">• ${s.name} <span style="font-size:10px;opacity:.4">${s.type==="locked"?"锁定":s.type==="passive"?"被动":""}</span></div>`).join(""):"");
 
   const pn={judge:"判定",draw:"摸牌",play:"出牌",discard:"弃牌",end:"结束"};
   text("phase-label",pn[gs.phase]||gs.phase);text("deck-count",`牌堆: ${gs.deckCount}`);
-  startTimer(gs.turnTimeLeft);
+  if(!gs.pendingResponse)startTimer(gs.turnTimeLeft);
+  else{stopTimer();text("turn-timer","");}
 
   const sig=handSig(me.hand);if(sig!==ST.lastHandSig){ST.lastHandSig=sig;ST.selectedCards.clear();}
   renderHand(me.hand);renderPending(gs);renderActions(gs);renderCardInfo();renderLog(gs);renderCenterZone(gs);
@@ -300,6 +306,7 @@ const RESP_NAMES = {
   volley:"【点名批评】！请出【豁免】",
   borrow_knife:"【嫁祸】！请弃一张牌",
   steal: function(p) { return p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）"; },
+  skill_discard: "请弃一张手牌以发动技能",
 };
 const RESP_NAMES_OPP = {
   dodge:"等待对手出【豁免】响应你的【作业】",
@@ -309,15 +316,18 @@ const RESP_NAMES_OPP = {
   volley:"等待对手出【豁免】响应【点名批评】",
   borrow_knife:"等待对手弃牌响应【嫁祸】",
   steal:"对手正在盲选你的牌...",
+  skill_discard:"对手正在弃牌发动技能...",
 };
 
 function renderPending(gs){
-  const p=gs.pendingResponse;if(!p){hide("pending-msg");hide("steal-zone");return;}
+  const p=gs.pendingResponse;if(!p){hide("pending-msg");hide("steal-zone");stopPendingTimer();return;}
   const isMe=p.target===ST.myIndex;
   const label=isMe?(RESP_NAMES[p.type]||p.type):(RESP_NAMES_OPP[p.type]||p.type);
   const txt=typeof label==="function"?label(p):label;
-  html("pending-msg",`<strong>⚠ ${isMe?"你":"对手"}需要响应</strong>：${txt}`);
+  const rem=Math.max(0,Math.floor((p.timeout-Date.now())/1000));
+  html("pending-msg",`<strong>⚠ ${isMe?"你":"对手"}需要响应</strong>：${txt} <span id="pending-timer" style="color:#f59e0b;font-weight:bold">${rem}s</span>`);
   show("pending-msg");
+  if(isMe&&p.timeout)startPendingTimer(p.timeout);
   if(isMe && p.type==="steal" && p.poolSize){
     let h='<div class="flex gap-2 flex-wrap justify-center py-2">';
     for(let i=1;i<=p.poolSize;i++){

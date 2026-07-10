@@ -38,13 +38,14 @@ async function initAuth() {
 
 // ====== 重连 ======
 function addActiveRoom(code) { const s = sessionStorage.getItem("active_room")||""; const rooms=s.split(",").filter(Boolean); if(!rooms.includes(code))rooms.push(code); sessionStorage.setItem("active_room",rooms.join(",")); }
+function clearActiveRooms() { sessionStorage.removeItem("active_room"); }
 function checkReconnect() {
   const s = sessionStorage.getItem("active_room"); if(!s)return;
   const rooms=s.split(",").filter(Boolean); if(!rooms.length)return;
   const code=rooms[rooms.length-1];
-  createOverlay("🔌 断线重连",`活跃房间 <b style="color:#c4b5fd">${code}</b>`,30,t=>`${t} 秒内可重连`,()=>{ST.roomCode=code;connect(buildWsUrl(`?room=${code}`));text("menu-status","");});
+  createOverlay("🔌 断线重连",`活跃房间 <b style="color:#c4b5fd">${code}</b>`,30,t=>`${t} 秒内可重连`,()=>{ST.roomCode=code;connect(buildWsUrl(`?room=${code}`));text("menu-status","");},()=>{clearActiveRooms();});
 }
-function createOverlay(title,body,seconds,cfn,onAction) {
+function createOverlay(title,body,seconds,cfn,onAction,onCancel) {
   const el=document.createElement("div");el.id="block-overlay";
   el.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:9999";
   let r=seconds; const upd=()=>{el.querySelector("#bl-countdown").textContent=cfn(r);};
@@ -55,10 +56,10 @@ function createOverlay(title,body,seconds,cfn,onAction) {
       <button class="btn btn-primary btn-sm" id="bl-action">${onAction?'重新连接':''}</button>
       <button class="btn btn-outline btn-sm" id="bl-ignore">忽略</button></div></div>`;
   document.body.appendChild(el);
-  const t=setInterval(()=>{r--;if(r<=0){clearInterval(t);removeOverlay();}upd();},1000);
+  const t=setInterval(()=>{r--;if(r<=0){clearInterval(t);removeOverlay();if(onCancel)onCancel();}upd();},1000);
   if(onAction)el.querySelector("#bl-action").onclick=()=>{clearInterval(t);removeOverlay();onAction();};
   else el.querySelector("#bl-action").style.display="none";
-  el.querySelector("#bl-ignore").onclick=()=>{clearInterval(t);removeOverlay();};
+  el.querySelector("#bl-ignore").onclick=()=>{clearInterval(t);removeOverlay();if(onCancel)onCancel();};
 }
 function removeOverlay(){const el=document.getElementById("block-overlay");if(el)el.remove();}
 
@@ -145,8 +146,8 @@ function joinRoom(){if(!ensureAuth())return;const code=$("join-code").value.trim
 // deno-lint-ignore no-unused-vars
 function quickMatch(){if(!ensureAuth())return;connect(buildWsUrl("?mode=matching"));ST.mode="matching";text("menu-status","");}
 // deno-lint-ignore no-unused-vars
-function leaveLobby(){if(ST.ws)ST.ws.close();showScreen("menu");}
-function backToMenu(){stopTimer();if(ST.ws)ST.ws.close();ST.ws=null;ST.gs=null;ST.roomCode=null;ST.myIndex=-1;ST.selectedCards.clear();ST.blocked=false;removeOverlay();hide("game-over-overlay");showScreen("menu");}
+function leaveLobby(){if(ST.ws)ST.ws.close();clearActiveRooms();showScreen("menu");}
+function backToMenu(){stopTimer();if(ST.ws)ST.ws.close();ST.ws=null;ST.gs=null;ST.roomCode=null;ST.myIndex=-1;ST.selectedCards.clear();ST.blocked=false;removeOverlay();hide("game-over-overlay");clearActiveRooms();showScreen("menu");}
 // deno-lint-ignore no-unused-vars
 function showLeaderboard(){fetch(`${HTTP_URL}/leaderboard`+(ST.gs?.playerId?`?userId=${ST.gs.playerId}`:"")).then(r=>r.json()).then(renderLeaderboard).then(()=>showScreen("leaderboard")).catch(()=>text("menu-status","无法获取排行榜"));}
 function renderLeaderboard(data){

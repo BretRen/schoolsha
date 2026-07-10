@@ -261,9 +261,9 @@
       <!-- Other pending response -->
       <template x-if="$store.g.pending && $store.g.isMyResp && $store.g.pending.type!=='skill_discard'">
         <button class="btn btn-outline btn-sm" @click="$store.g.doPass()">不响应</button>
-        <template x-if="$store.g.cardCount > 0">
-          <button class="btn btn-primary btn-sm" @click="$store.g.respondCard()">出牌响应</button>
-        </template>
+        <button class="btn btn-primary btn-sm" @click="$store.g.respondCard()" :disabled="$store.g.cardCount <= 0">
+          出牌响应<span x-show="$store.g.cardCount <= 0" style="font-size:10px;opacity:.6">（先点击手牌选择）</span>
+        </button>
       </template>
       <!-- Play phase actions -->
       <template x-if="$store.g.isMyTurn && $store.g.gs?.phase==='play' && !$store.g.pending">

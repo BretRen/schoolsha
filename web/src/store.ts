@@ -100,26 +100,38 @@ document.addEventListener("alpine:init", () => {
     playSelected() {
       const ids = Object.keys(this.selectedCards);
       if (ids.length === 0 || this.blocked) return;
-      send({ action: "play_card", card_id: ids[0], target: this.myIndex === 0 ? 1 : 0 });
+      const sel = this.selectedCards;
       this.selectedCards = {};
+      animateCardFly(ids, "#play-discard-zone", () => {
+        send({ action: "play_card", card_id: ids[0], target: this.myIndex === 0 ? 1 : 0 });
+      });
     },
     respondCard() {
       const ids = Object.keys(this.selectedCards);
       if (ids.length === 0 || this.blocked) return;
-      send({ action: "play_card", card_id: ids[0] });
+      const sel = this.selectedCards;
       this.selectedCards = {};
+      animateCardFly(ids, "#play-discard-zone", () => {
+        send({ action: "play_card", card_id: ids[0] });
+      });
     },
     doDiscard() {
       const ids = Object.keys(this.selectedCards);
       if (ids.length === 0 || this.blocked) return;
-      send({ action: "discard", card_ids: ids });
+      const sel = this.selectedCards;
       this.selectedCards = {};
+      animateCardFly(ids, "#play-discard-zone", () => {
+        send({ action: "discard", card_ids: ids });
+      });
     },
     doConfirmSkill() {
       const ids = Object.keys(this.selectedCards);
       if (ids.length === 0 || this.blocked) return;
-      send({ action: "confirm_skill", card_ids: ids });
+      const sel = this.selectedCards;
       this.selectedCards = {};
+      animateCardFly(ids, "#play-discard-zone", () => {
+        send({ action: "confirm_skill", card_ids: ids });
+      });
     },
     doPass() { send({ action: "pass" }); },
     doEndPhase() { send({ action: "end_phase" }); },
@@ -148,18 +160,21 @@ document.addEventListener("alpine:init", () => {
     doPickDiscard() {
       const ids = Object.keys(this._pickSelections);
       if (ids.length !== this.pickDiscardNeed()) return;
-      send({ action: "pick_discard", card_ids: ids });
+      const sel = Object.assign({}, this._pickSelections);
       this._pickSelections = {};
+      // 陷害选的是对手牌，动画飞向弃牌区
+      animateCardFly(ids, "#play-discard-zone", () => {
+        send({ action: "pick_discard", card_ids: ids });
+      });
     },
     doUseSkill(skillId) { send({ action: "use_skill", skill_id: skillId }); },
     stealWithAnim(pos) {
       if (this.blocked) return;
-      // Animate the clicked card
       const cards = document.querySelectorAll(".steal-card");
-      const el = [...cards].find(c => parseInt(c.dataset.pos) === pos);
-      if (el) { el.classList.add("steal-fly"); setTimeout(() => el.remove(), 500); }
       cards.forEach(c => c.style.pointerEvents = "none");
-      send({ action: "steal_card", position: pos });
+      animateStealFly(pos, () => {
+        send({ action: "steal_card", position: pos });
+      });
     },
     stealPositions() {
       if (!this.pending || this.pending.type !== "steal") return [];

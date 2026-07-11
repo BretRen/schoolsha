@@ -83,6 +83,13 @@
   .go-overlay { display: flex; align-items: center; justify-content: center; }
   .go-card { background: var(--c-card); border: 2px solid var(--c-accent); }
 
+  @keyframes hp-glow { 0%,100%{ box-shadow:inset 0 0 30px rgba(255,0,0,.15),0 0 30px rgba(255,0,0,.1) } 50%{ box-shadow:inset 0 0 60px rgba(255,0,0,.3),0 0 60px rgba(255,0,0,.2) } }
+  #screen-game.hp-critical { animation: hp-glow 2s ease-in-out infinite; }
+  @keyframes time-warn { 0%,100%{ transform:translateY(0);opacity:.9 } 50%{ transform:translateY(-6px);opacity:1 } }
+  #time-warning { position:fixed;top:50px;left:50%;transform:translateX(-50%);font-size:32px;pointer-events:none;z-index:500; }
+  #time-warning.show { animation: time-warn .8s ease-in-out infinite; }
+  .card-fly { position:fixed;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9 }
+
   /* Full-screen game layout */
   #screen-game { display: flex; flex-direction: row; max-width: 100vw; padding: 0; height: 100vh; overflow: hidden; }
   #my-area { border-right: 1px solid #1e1e2e; transition: background .3s; }
@@ -200,7 +207,13 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'game'"
+     :class="{'hp-critical': $store.g.me?.hp === 1}"
      x-effect="(function(){ const p=$store.g.pending; const hasP=!!p; if(p && !_prevPending) { stopTurnTimer(); if($store.g.isMyResp && p.timeout) { startPendingTimer(p.timeout); } } else if(!p && _prevPending) { stopPendingTimer(); } _prevPending=hasP; })()">
+
+  <!-- ⏰ 时间警告 -->
+  <div id="time-warning" :class="{'show': $store.g.isMyTurn && $store.g.gs?.phase==='play' && !$store.g.pending && $store.g.serverTimer > 0 && $store.g.serverTimer <= 10}"
+       style="display:none" x-show="$store.g.isMyTurn && $store.g.gs?.phase==='play' && !$store.g.pending && $store.g.serverTimer > 0 && $store.g.serverTimer <= 10"
+       x-text="'⏰ '+$store.g.serverTimer+'s'"></div>
 
   <!-- 左：自己面板 -->
   <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
@@ -268,6 +281,7 @@
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;padding:4px 0">
         <template x-for="c in $store.g.pickDiscardCards()" :key="c.id">
           <div class="gcard" :class="{'selected': $store.g.isPickSelected(c.id), 'spade': c.suit==='spade', 'heart': c.suit==='heart', 'club': c.suit==='club', 'diamond': c.suit==='diamond'}"
+               :data-id="c.id"
                @click="$store.g.togglePickCard(c.id)" style="cursor:pointer">
             <span class="gsuit" x-text="suitSym(c.suit)"></span>
             <span class="gname" x-text="c.name"></span>
@@ -278,7 +292,7 @@
     </div>
 
     <!-- Play / Discard zone -->
-    <div x-effect="$store.g._playVersion" style="display:flex;gap:12px;justify-content:center;min-height:36px;align-items:center;margin-bottom:3px;flex-shrink:0">
+    <div x-effect="$store.g._playVersion" id="play-discard-zone" style="display:flex;gap:12px;justify-content:center;min-height:36px;align-items:center;margin-bottom:3px;flex-shrink:0">
       <template x-if="$store.g.recentPlayCard()">
         <div class="mini-card animate-card-in" style="font-size:13px;padding:4px 12px">
           <span class="ms" style="font-size:14px">🃏</span>
@@ -377,6 +391,7 @@
     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:flex-end;padding:4px 0;min-height:56px;max-height:170px;overflow-y:auto;flex-shrink:0;margin-top:100px">
       <template x-for="c in $store.g.me?.hand||[]" :key="c.id">
         <div class="gcard" :class="c.suit + ($store.g.isCardSelected(c.id)?' selected':'') + ($store.g.isCardDisabled(c)?' disabled':'')"
+             :data-id="c.id"
              :title="$store.g.disabledReason(c)"
              @click="$store.g.toggleCard(c.id)">
           <span class="gsuit" x-text="suitSym(c.suit)"></span>
@@ -464,6 +479,7 @@
 <script src="/web/dist/const.js"></script>
 <script src="/web/dist/overlay.js"></script>
 <script src="/web/dist/timers.js"></script>
+<script src="/web/dist/anim.js"></script>
 <script src="/web/dist/ws.js"></script>
 <script src="/web/dist/actions.js"></script>
 <script src="/web/dist/auth.js"></script>

@@ -4,8 +4,8 @@
 // ============================================================
 
 // ====== 认证 (PKCE) ======
-const HTTP_URL = `http://${location.host}`;
-const WS_URL = `ws://${location.host}/ws`;
+const HTTP_URL = `${location.protocol}//${location.host}`;
+const WS_URL = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
 const AUTH = { enabled: false, provider: "", clientId: "", token: null };
 
 function b64(buf) { const s = String.fromCharCode(...new Uint8Array(buf)); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }

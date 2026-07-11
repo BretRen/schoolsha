@@ -527,6 +527,7 @@ export function tryRespond(
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
+    addLog(state, { id: "card_played", player: playerIdx, cardName: "豁免" });
     emit({ type: "card_played", player: playerIdx, card }, state);
 
     // 尺子：出赦免后攻击者可以再出一张作业
@@ -547,6 +548,7 @@ export function tryRespond(
     state.players[playerIdx].hp = 1;
     emit({ type: "heal", player: playerIdx, amount: 1 }, state);
     state.pendingResponse = null;
+    addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
     emit({ type: "card_played", player: playerIdx, card }, state);
     return null;
   }
@@ -555,6 +557,7 @@ export function tryRespond(
   if ((pending.type === "duel" || pending.type === "barbarian") && card.name === "作业") {
     removeCard(player.hand, cardId);
     state.discard.push(card);
+    addLog(state, { id: "card_played", player: playerIdx, cardName: "作业" });
     emit({ type: "card_played", player: playerIdx, card }, state);
 
     if (pending.type === "duel") {
@@ -574,6 +577,7 @@ export function tryRespond(
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
+    addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
     emit({ type: "card_played", player: playerIdx, card }, state);
     return null;
   }
@@ -583,6 +587,7 @@ export function tryRespond(
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
+    addLog(state, { id: "card_played", player: playerIdx, cardName: "免罚券" });
     emit({ type: "card_played", player: playerIdx, card }, state);
     return null;
   }

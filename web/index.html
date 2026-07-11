@@ -117,6 +117,8 @@
   .mini-card .mn { font-weight: bold; font-size: 9px; }
   .mini-card.spade,.mini-card.club { color: #ccc; }
   .mini-card.heart,.mini-card.diamond { color: #ef4444; }
+  .mini-card.my-card { border-color: #7c3aed !important; background: #1a1530; }
+  .mini-card.opp-card { border-color: #ef4444 !important; background: #301515; }
 </style>
 </head>
 <body x-data>
@@ -323,14 +325,16 @@
     <!-- Play / Discard zone -->
     <div x-effect="$store.g._playVersion" id="play-discard-zone" style="display:flex;gap:12px;justify-content:center;min-height:36px;align-items:center;margin-bottom:3px;flex-shrink:0">
       <template x-if="$store.g.recentPlayCard()">
-        <div class="mini-card animate-card-in" style="font-size:13px;padding:4px 12px"
+        <div class="mini-card animate-card-in" :class="($store.g.recentPlayCard()?.player === $store.g.myIndex) ? 'my-card' : 'opp-card'"
+             style="font-size:13px;padding:4px 12px"
              :title="$store.g.cardTooltip($store.g.recentPlayCard())">
           <span class="ms" style="font-size:14px">🃏</span>
           <span class="mn" style="font-weight:bold" x-text="$store.g.recentPlayCard()?.cardName"></span>
         </div>
       </template>
       <template x-for="(d,i) in $store.g.recentDiscards()" :key="i">
-        <div class="mini-card animate-discard" :style="'animation-delay:'+(i*0.1)+'s'"
+        <div class="mini-card animate-discard" :class="d.player === $store.g.myIndex ? 'my-card' : 'opp-card'"
+             :style="'animation-delay:'+(i*0.1)+'s'"
              :title="$store.g.cardTooltip(d)">
           <span class="mn" x-text="d.cardName"></span>
         </div>
@@ -513,7 +517,7 @@
 function showTurnBanner(isMyTurn) {
   const b = document.getElementById("turn-banner");
   if (!b) return;
-  b.textContent = isMyTurn ? "🔵 你的回合" : "🔴 对手回合";
+  b.textContent = isMyTurn ? "你的回合" : "对手回合";
   b.style.background = isMyTurn
     ? "linear-gradient(90deg, #7c3aed, #a78bfa)"
     : "linear-gradient(90deg, #dc2626, #f87171)";

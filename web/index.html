@@ -200,7 +200,7 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'game'"
-     x-effect="(function(){ const p=$store.g.pending; const hasP=!!p; if(p && !_prevPending) { stopTurnTimer(); if($store.g.isMyResp && p.timeout) { startPendingTimer(p.timeout); } else { stopPendingTimer(); } } else if(!p && _prevPending) { stopPendingTimer(); if($store.g.gs?.phase==='play'||$store.g.gs?.phase==='discard') { startTurnTimer($store.g.gs.turnTimeLeft); } } _prevPending=hasP; })()">
+     x-effect="(function(){ const p=$store.g.pending; const hasP=!!p; if(p && !_prevPending) { stopTurnTimer(); if($store.g.isMyResp && p.timeout) { startPendingTimer(p.timeout); } } else if(!p && _prevPending) { stopPendingTimer(); } _prevPending=hasP; })()">
 
   <!-- 左：自己面板 -->
   <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
@@ -211,6 +211,7 @@
       <span x-show="$store.g.isMyTurn" style="font-size:10px;background:var(--c-accent);color:white;padding:1px 6px;border-radius:8px;animation:turn-pulse 2s ease-in-out infinite;white-space:nowrap">你的回合</span>
       <div style="font-family:monospace;font-size:14px;margin-left:auto" x-text="hpStr($store.g.me?.hp,$store.g.me?.maxHp)"></div>
     </div>
+    <div style="font-size:10px;opacity:.3;font-family:monospace;margin-bottom:4px" x-text="'⚡'+$store.g.latency"></div>
 
     <!-- 技能 -->
     <div style="font-size:11px;color:#a78bfa;min-height:16px;margin-bottom:6px;line-height:1.5">
@@ -240,7 +241,6 @@
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-shrink:0">
       <span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:bold;background:var(--c-accent);color:white" x-text="$store.g.phaseLabel"></span>
       <span style="font-family:monospace;font-size:13px;color:var(--c-gold)" x-text="$store.g.turnTimerText"></span>
-      <span style="font-size:10px;opacity:.35;font-family:monospace" x-text="'⚡'+$store.g.latency"></span>
       <span style="font-size:11px;opacity:.4;margin-left:auto" x-text="'牌堆: ' + ($store.g.gs?.deckCount||0)"></span>
     </div>
 

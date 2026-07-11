@@ -241,6 +241,13 @@ function handleMsg(msg) {
       store.gs = msg.state; store.myIndex = msg.yourIndex;
       store._playVersion++;
       store._judgeVersion++;
+      // 同步服务端倒计时
+      const st = msg.state;
+      if (!st.pendingResponse && (st.phase === "play" || st.phase === "discard")) {
+        store.serverTimer = st.turnTimeLeft;
+        store.turnTimerText = `${st.turnTimeLeft}s`;
+        if (!_timerInterval) startTurnTicker();
+      }
       if (store.gs?.pendingResponse?.type !== "pick_discard") store._pickSelections = {};
       if (store.screen !== "game") { store.screen = "game"; clearInterval(store.charTimer); }
       if (msg.eloResult) store.eloResult = msg.eloResult;
@@ -693,14 +700,18 @@ document.addEventListener("alpine:init", () => {
 })();
 
 // Start turn timer (called reactively)
-function startTurnTimer(s) {
-  stopTimers();
+function startTurnTicker() {
+  if (_timerInterval) return;
   const store = Alpine.store("g");
-  store.serverTimer = s;
-  store.turnTimerText = `${s}s`;
   _timerInterval = setInterval(() => {
     store.serverTimer--;
     if (store.serverTimer < 0) store.serverTimer = 0;
     store.turnTimerText = `${store.serverTimer}s`;
   }, 1000);
+}
+// startTurnTimer 保留兼容但只做 ticker
+function startTurnTimer(s) {
+  Alpine.store("g").serverTimer = s;
+  Alpine.store("g").turnTimerText = `${s}s`;
+  startTurnTicker();
 }

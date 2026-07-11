@@ -208,6 +208,7 @@ registerCardEffect("补给", {
   needsTarget: false,
   onUse: (s, playerIdx, card) => {
     healTo(s, playerIdx, 1);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "补给" });
     emit({ type: "card_played", player: playerIdx, card }, s);
   },
 });
@@ -226,6 +227,7 @@ registerCardEffect("小抄", {
     } else {
       s.wineUsed = true;
     }
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "小抄" });
     emit({ type: "card_played", player: playerIdx, card }, s);
   },
 });
@@ -289,6 +291,7 @@ registerCardEffect("嫁祸", {
       type: "borrow_knife", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
     };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "嫁祸", target: opponent });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("borrow_knife"),

@@ -305,15 +305,19 @@ registerCardEffect("神偷", {
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     const opp = s.players[opponent];
-    const pool: Card[] = [...opp.hand];
-    if (opp.weapon) pool.push(opp.weapon);
-    if (opp.armor) pool.push(opp.armor);
+    const exposed: Array<{card: Card; position: number}> = [];
+    let pos = 1;
+    // 手牌盲选
+    const handSize = opp.hand.length;
+    pos += handSize;
+    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
+    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
     s.pendingResponse = {
       type: "steal", source: playerIdx, target: playerIdx,
       card, timeout: Date.now() + 10_000,
-      poolSize: pool.length,
+      poolSize: handSize,
+      exposedCards: exposed,
     };
-    // 注意：不传 selectableCards — 盲选，客户端只知道数量
     addLog(s, { id: "card_played", player: playerIdx, cardName: "神偷", target: opponent });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
@@ -328,13 +332,17 @@ registerCardEffect("告密", {
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     const opp = s.players[opponent];
-    const pool: Card[] = [...opp.hand];
-    if (opp.weapon) pool.push(opp.weapon);
-    if (opp.armor) pool.push(opp.armor);
+    const exposed: Array<{card: Card; position: number}> = [];
+    let pos = 1;
+    const handSize = opp.hand.length;
+    pos += handSize;
+    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
+    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
     s.pendingResponse = {
       type: "steal", source: playerIdx, target: playerIdx,
       card, timeout: Date.now() + 10_000,
-      poolSize: pool.length,
+      poolSize: handSize,
+      exposedCards: exposed,
       stealAction: "discard",
     };
     addLog(s, { id: "card_played", player: playerIdx, cardName: "告密", target: opponent });
@@ -391,7 +399,20 @@ registerCardEffect("午饭留堂", {
   }),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
-    discardFromPool(s, 1 - playerIdx);
+    const opp = s.players[1 - playerIdx];
+    const pool: Card[] = [...opp.hand];
+    if (opp.weapon) pool.push(opp.weapon);
+    if (opp.armor) pool.push(opp.armor);
+    s.pendingResponse = {
+      type: "pick_discard",
+      source: playerIdx,
+      target: playerIdx,
+      card,
+      selectableCards: pool,
+      discardCount: 1,
+      timeout: Date.now() + 15000,
+    };
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "午饭留堂", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });

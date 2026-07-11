@@ -64,6 +64,8 @@ export interface PendingResponse {
   poolSize?: number;
   /** 选牌后的动作：偷(默认) 或 弃 */
   stealAction?: "steal" | "discard";
+  /** steal 盲选时，装备牌直接公开，{ card, position } */
+  exposedCards?: Array<{ card: Card; position: number }>;
   /** skill_discard 类型时，待确认的技能 ID */
   pendingSkillId?: string;
   /** skill_discard 类型时，需要弃牌的数量 */

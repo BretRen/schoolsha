@@ -266,10 +266,23 @@
     <!-- Steal zone -->
     <div x-show="$store.g.pending?.type==='steal' && $store.g.isMyResp" style="margin-bottom:4px;flex-shrink:0">
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;padding:4px 0">
-        <template x-for="pos in $store.g.stealPositions()" :key="pos">
+        <!-- 盲选手牌 -->
+        <template x-for="pos in $store.g.stealPositions()" :key="'s'+pos">
           <div class="gcard facedown steal-card" :data-pos="pos" @click="$store.g.stealWithAnim(pos)" style="cursor:pointer">
             <span class="gsuit">?</span>
             <span class="gname" x-text="'第'+pos+'张'"></span>
+          </div>
+        </template>
+        <!-- 可见装备 -->
+        <template x-for="ec in ($store.g.pending?.exposedCards||[])" :key="'e'+ec.position">
+          <div class="gcard steal-card"
+               :class="ec.card.suit"
+               :data-pos="ec.position"
+               @click="$store.g.stealWithAnim(ec.position)"
+               style="cursor:pointer">
+            <span class="gsuit" x-text="suitSym(ec.card.suit)"></span>
+            <span class="gname" x-text="ec.card.name"></span>
+            <span class="gnum" x-text="ec.card.number"></span>
           </div>
         </template>
       </div>

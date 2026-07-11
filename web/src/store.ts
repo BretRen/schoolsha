@@ -1,6 +1,9 @@
 // store.ts — Alpine.js 全局状态
 
-Alpine.store("g", {
+// Alpine 从 CDN 异步加载；直接调用 Alpine.store() 会在 Alpine 未就绪时报错
+// 用 alpine:init 事件确保 Alpine 初始化后再创建 store
+document.addEventListener("alpine:init", () => {
+  Alpine.store("g", {
     screen: "menu",
     ws: null, gs: null, myIndex: -1,
     selectedCards: {},  // {cardId: true} for Alpine reactivity
@@ -255,3 +258,4 @@ Alpine.store("g", {
       return { won, title: won ? "🎉 胜利！" : "💀 失败", cls: won ? "win" : "lose" };
     },
   });
+});

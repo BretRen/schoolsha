@@ -221,7 +221,7 @@ function handleMsg(msg) {
     case "waiting":
       store.lobbyStatus = msg.message; break;
     case "character_select":
-      store.mode = "room"; store.screen = "char";
+      store.mode = store.mode || "room"; store.screen = "char";
       store.characters = msg.characters; store.charTimeout = msg.timeoutSec;
       store.selectedChar = null; store.charLocked = false;
       store.opponentPicked = false; store.opponentLocked = false;
@@ -291,8 +291,6 @@ function handleMsg(msg) {
         msg.message + (msg.eloResult ? `\nELO ${msg.eloResult.change > 0 ? '+' : ''}${msg.eloResult.change} → ${msg.eloResult.newElo}` : ""),
         5, t => `${t} 秒后关闭`, () => { removeOverlay(); }, () => { removeOverlay(); }, true, "确认");
       break;
-    case "reconnected":
-      store.blocked = false; removeOverlay(); break;
     case "opponent_reconnected":
       removeOverlay(); break;
     case "error":
@@ -333,7 +331,13 @@ function joinRoom() {
 function joinRoomByCode(code) {
   const store = Alpine.store("g");
   store.roomCode = code; store.mode = "room";
-  store.screen = "lobby"; connect(buildWsUrl(`?room=${code}`));
+  store.screen = "lobby";
+  const url = buildWsUrl(`?room=${code}`);
+  const ws = new WebSocket(url);
+  // 用临时 ws 先验证房间是否存在
+  ws.onopen = () => { ws.close(); connect(url); };
+  ws.onerror = () => { store.screen = "menu"; showToast("房间不存在或无法连接"); };
+  setTimeout(() => { if (ws.readyState !== WebSocket.OPEN) { ws.close(); store.screen = "menu"; } }, 5000);
 }
 function quickMatch() {
   if (!ensureAuth()) return;
@@ -356,6 +360,7 @@ function backToMenu() {
   store.eloResult = null; store._lastLogLen = 0; store._lastPlayId = null; store._lastDiscardKeys = "";
   store.selectedChar = null; store.charLocked = false;
   store.opponentPicked = false; store.opponentLocked = false;
+  _creating = false;
   removeOverlay(); store.screen = "menu";
 }
 function showLeaderboard() {

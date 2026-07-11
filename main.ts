@@ -302,18 +302,15 @@ Deno.serve({ port: PORT }, async (req) => {
 
     // ---- 断线重连 ----
     if (room.game && !room.game.gameOver && anyoneDisconnected(room.game)) {
+      let anyDisconnectedFree = false;
       for (let i = 0; i < 2; i++) {
         if (room.game.disconnectedAt[i] !== null && !room.clients[i]) {
+          anyDisconnectedFree = true;
           // 验证身份（匿名模式下也必须校验，防止座位劫持）
           const savedId = room.disconnectedUserId[i];
           if (savedId && savedId !== userId) {
-            console.log(`[${room.code}] reconnect denied: userId mismatch for P${i}`);
-            send(socket, {
-              type: "error",
-              message: "重连失败：身份不匹配（不是同一位玩家）",
-            });
-            socket.close();
-            return;
+            // 不是这个座位的玩家，继续检查另一个座位
+            continue;
           }
 
           seat = i;
@@ -330,6 +327,15 @@ Deno.serve({ port: PORT }, async (req) => {
           console.log(`[${room.code}] P${seat} reconnected (${nameTag})`);
           return;
         }
+      }
+      // 两个断线座位都不匹配 → 拒绝连接
+      if (anyDisconnectedFree) {
+        send(socket, {
+          type: "error",
+          message: "重连失败：身份不匹配（不是断线玩家）",
+        });
+        socket.close();
+        return;
       }
     }
 

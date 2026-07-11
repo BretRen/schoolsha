@@ -439,6 +439,12 @@ Deno.serve({ port: PORT }, async (req) => {
       return;
     }
 
+    // ---- ping/pong 延迟测量 ----
+    if (msg.action === "ping") {
+      send(socket, { type: "pong", ts: msg.ts } as ServerMsg);
+      return;
+    }
+
     // ---- 游戏中 ----
     const err = handleMessage(room.game, idx, msg);
     if (err) {

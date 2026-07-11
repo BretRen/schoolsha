@@ -193,9 +193,10 @@ function connect(wsUrl) {
   store.selectedCards = {};
   store.blocked = false;
   removeOverlay();
-  store.ws.onopen = () => {};
+  store.ws.onopen = () => { startPing(); };
   store.ws.onmessage = ev => { let msg; try { msg = JSON.parse(ev.data); } catch { return; } handleMsg(msg); };
   store.ws.onclose = () => {
+    stopPing();
     stopTimers();
     if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
     if (store.screen === "lobby" && store.mode === "matching") {
@@ -289,6 +290,9 @@ function handleMsg(msg) {
       removeOverlay(); break;
     case "error":
       showToast(msg.message); break;
+    case "pong":
+      store._latency = Date.now() - msg.ts;
+      break;
   }
 }
 
@@ -389,6 +393,22 @@ function resetTimerState() {
   stopTimers();
 }
 
+// ====== Ping (延迟测量) ======
+function startPing() {
+  const store = Alpine.store("g");
+  if (store._pingTimer) clearInterval(store._pingTimer);
+  store._pingTimer = setInterval(() => {
+    if (store.ws?.readyState === WebSocket.OPEN) {
+      send({ action: "ping", ts: Date.now() });
+    }
+  }, 3000);
+}
+function stopPing() {
+  const store = Alpine.store("g");
+  if (store._pingTimer) { clearInterval(store._pingTimer); store._pingTimer = null; }
+  store._latency = -1;
+}
+
 // ====== Init ======
 document.addEventListener("alpine:init", () => {
   Alpine.store("g", {
@@ -411,6 +431,8 @@ document.addEventListener("alpine:init", () => {
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
     _playVersion: 0, _judgeVersion: 0,
     _pickSelections: {},
+    _latency: -1,
+    _pingTimer: null,
 
     // Computed helpers
     get isMyTurn() { return this.gs?.turnPlayer === this.myIndex; },
@@ -420,6 +442,7 @@ document.addEventListener("alpine:init", () => {
     get isMyResp() { return this.pending && this.pending.target === this.myIndex; },
     get phaseLabel() { return PN[this.gs?.phase] || this.gs?.phase; },
     get cardCount() { return this.selectedCards ? Object.keys(this.selectedCards).length : 0; },
+    get latency() { return this._latency < 0 ? "…" : this._latency + "ms"; },
 
     // Actions
     toggleCard(id) {

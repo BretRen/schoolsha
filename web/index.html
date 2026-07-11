@@ -240,6 +240,7 @@
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-shrink:0">
       <span style="font-size:11px;padding:2px 8px;border-radius:4px;font-weight:bold;background:var(--c-accent);color:white" x-text="$store.g.phaseLabel"></span>
       <span style="font-family:monospace;font-size:13px;color:var(--c-gold)" x-text="$store.g.turnTimerText"></span>
+      <span style="font-size:10px;opacity:.35;font-family:monospace" x-text="'⚡'+$store.g.latency"></span>
       <span style="font-size:11px;opacity:.4;margin-left:auto" x-text="'牌堆: ' + ($store.g.gs?.deckCount||0)"></span>
     </div>
 

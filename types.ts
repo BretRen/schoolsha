@@ -194,7 +194,8 @@ export type ServerMsg =
   | { type: "queue_timeout"; message: string }
   | { type: "opponent_picked"; picked: boolean }
   | { type: "opponent_locked"; locked: boolean }
-  | { type: "opponent_left_win"; message: string; title?: string; eloResult?: { change: number; newElo: number } };
+  | { type: "opponent_left_win"; message: string; title?: string; eloResult?: { change: number; newElo: number } }
+  | { type: "pong"; ts: number };
 
 /** /room/create 响应 */
 export interface RoomInfo {

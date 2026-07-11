@@ -21,7 +21,7 @@ export { cardLabel };
 
 // ---------- 常量 ----------
 
-const TURN_TIMEOUT_SEC = 20;
+const TURN_TIMEOUT_SEC = 45;
 
 // ---------- 创建新游戏 ----------
 

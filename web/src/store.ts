@@ -1,7 +1,6 @@
 // store.ts — Alpine.js 全局状态
 
-document.addEventListener("alpine:init", () => {
-  Alpine.store("g", {
+Alpine.store("g", {
     screen: "menu",
     ws: null, gs: null, myIndex: -1,
     selectedCards: {},  // {cardId: true} for Alpine reactivity
@@ -256,4 +255,3 @@ document.addEventListener("alpine:init", () => {
       return { won, title: won ? "🎉 胜利！" : "💀 失败", cls: won ? "win" : "lose" };
     },
   });
-});

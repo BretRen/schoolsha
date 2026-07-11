@@ -86,6 +86,7 @@ export function createGame(picks: [string, string]): GameState {
     disconnectCount: [0, 0],
     disconnectedAt: [null, null],
     wineUsed: false,
+    skipNextPlay: null,
     skillUseCount: {},
     log: [],
   };
@@ -182,6 +183,12 @@ function enterPhase(state: GameState, phase: Phase) {
     }
 
     case "play": {
+      // 请家长：跳过出牌阶段
+      if (state.skipNextPlay === state.turnPlayer) {
+        state.skipNextPlay = null;
+        advancePhase(state);
+        break;
+      }
       state.turnStartTime = Date.now();
       break;
     }

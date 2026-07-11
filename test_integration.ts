@@ -9,14 +9,19 @@ const URL = "http://localhost:8099";
 let passed = 0;
 let failed = 0;
 function ok(name: string, cond: boolean, detail?: string) {
-  if (cond) { passed++; console.log(`  ✅ ${name}`); }
-  else { failed++; console.error(`  ❌ ${name}${detail ? " — " + detail : ""}`); }
+  if (cond) {
+    passed++;
+    console.log(`  ✅ ${name}`);
+  } else {
+    failed++;
+    console.error(`  ❌ ${name}${detail ? " — " + detail : ""}`);
+  }
 }
 
 // 消息队列模式的 recv — 避免 Deno WebSocket 消息丢失
 class WsClient {
   ws: WebSocket;
-// deno-lint-ignore no-explicit-any
+  // deno-lint-ignore no-explicit-any
   private queue: any[] = [];
   // deno-lint-ignore no-explicit-any
   private waiters: ((m: any) => void)[] = [];
@@ -29,7 +34,9 @@ class WsClient {
       else this.queue.push(m);
     };
     this.ws.onerror = () => {
-      if (this.waiters.length) this.waiters.shift()!({ type: "error", message: "ws error" });
+      if (this.waiters.length) {
+        this.waiters.shift()!({ type: "error", message: "ws error" });
+      }
     };
   }
 
@@ -41,14 +48,21 @@ class WsClient {
         clearTimeout(t);
         resolve(this.queue.shift());
       } else {
-        this.waiters.push((m) => { clearTimeout(t); resolve(m); });
+        this.waiters.push((m) => {
+          clearTimeout(t);
+          resolve(m);
+        });
       }
     });
   }
 
   // deno-lint-ignore no-explicit-any
-  send(msg: any) { this.ws.send(JSON.stringify(msg)); }
-  close() { this.ws.close(); }
+  send(msg: any) {
+    this.ws.send(JSON.stringify(msg));
+  }
+  close() {
+    this.ws.close();
+  }
 }
 
 // ---------- HTTP 测试 ----------
@@ -80,7 +94,10 @@ async function testHTTP(): Promise<string> {
   ok("top10 数组", Array.isArray(lb.top10));
 
   const webResp = await fetch(`${URL}/`);
-  ok("/ HTML", webResp.status === 200 && (await webResp.text()).includes("学校杀"));
+  ok(
+    "/ HTML",
+    webResp.status === 200 && (await webResp.text()).includes("学校杀"),
+  );
 
   ok("/web/style.css", (await fetch(`${URL}/web/style.css`)).status === 200);
   ok("/web/app.js", (await fetch(`${URL}/web/app.js`)).status === 200);
@@ -136,7 +153,7 @@ async function testMatchmaking() {
   ok("P1 入队", q1.type === "queue_status");
 
   // P2 在 P1 完全入队后再连接（避免 Deno WS 竞态）
-  await new Promise(r => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 200));
   const ws2 = new WsClient("ws://localhost:8099/ws?mode=matching");
 
   // P2 会先收到 queue_status，再收到 match_found
@@ -166,7 +183,9 @@ async function main() {
     await testRoomGame(code);
     await testMatchmaking();
   } finally {
-    try { Deno.removeSync("./elo.json"); } catch { /* ok */ }
+    try {
+      Deno.removeSync("./elo.json");
+    } catch { /* ok */ }
   }
 
   console.log(`\n${"=".repeat(40)}`);

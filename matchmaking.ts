@@ -45,7 +45,9 @@ class MatchmakingQueue {
     };
 
     this.queue.push(player);
-    console.log(`[matchmaking] ${displayName || userId} joined queue (elo=${elo})`);
+    console.log(
+      `[matchmaking] ${displayName || userId} joined queue (elo=${elo})`,
+    );
 
     this.send(socket, {
       type: "queue_status",
@@ -158,7 +160,9 @@ class MatchmakingQueue {
     this.removePlayer(player.userId);
     this.removePlayer(opponent.userId);
 
-    console.log(`[matchmaking] matched: ${player.displayName} (${player.elo}) vs ${opponent.displayName} (${opponent.elo})`);
+    console.log(
+      `[matchmaking] matched: ${player.displayName} (${player.elo}) vs ${opponent.displayName} (${opponent.elo})`,
+    );
 
     // 生成房间码并预创建房间
     const code = generateRoomCode();
@@ -191,8 +195,12 @@ class MatchmakingQueue {
     // 关闭双方的匹配 WebSocket（客户端收到 match_found 后会自己关）
     // 延迟关闭，确保消息送达
     setTimeout(() => {
-      try { player.socket.close(); } catch { /* ok */ }
-      try { opponent.socket.close(); } catch { /* ok */ }
+      try {
+        player.socket.close();
+      } catch { /* ok */ }
+      try {
+        opponent.socket.close();
+      } catch { /* ok */ }
     }, 500);
 
     if (this.queue.length === 0) this.stopRetry();

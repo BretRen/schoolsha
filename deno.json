@@ -1,4 +1,7 @@
 {
+  "tasks": {
+    "dev": "deno run --allow-net --allow-env --allow-read --allow-write --env-file=.env main.ts"
+  },
   "imports": {
     "cliffy/ansi": "https://deno.land/x/cliffy@v1.0.0-rc.4/ansi/mod.ts",
     "cliffy/prompt": "https://deno.land/x/cliffy@v1.0.0-rc.4/prompt/mod.ts",

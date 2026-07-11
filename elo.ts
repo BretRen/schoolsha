@@ -61,14 +61,38 @@ export function updateElo(
   loserId: string,
   winnerName: string,
   loserName: string,
-): { winnerChange: number; loserChange: number; winnerNewElo: number; loserNewElo: number } {
+): {
+  winnerChange: number;
+  loserChange: number;
+  winnerNewElo: number;
+  loserNewElo: number;
+} {
   // 整个 read-modify-write 在锁内，防竞态
-  let result: { winnerChange: number; loserChange: number; winnerNewElo: number; loserNewElo: number };
+  let result: {
+    winnerChange: number;
+    loserChange: number;
+    winnerNewElo: number;
+    loserNewElo: number;
+  };
   withEloLock(() => {
     const data = loadElo();
 
-    if (!data[winnerId]) data[winnerId] = { elo: INITIAL_ELO, wins: 0, losses: 0, displayName: winnerName || winnerId };
-    if (!data[loserId]) data[loserId] = { elo: INITIAL_ELO, wins: 0, losses: 0, displayName: loserName || loserId };
+    if (!data[winnerId]) {
+      data[winnerId] = {
+        elo: INITIAL_ELO,
+        wins: 0,
+        losses: 0,
+        displayName: winnerName || winnerId,
+      };
+    }
+    if (!data[loserId]) {
+      data[loserId] = {
+        elo: INITIAL_ELO,
+        wins: 0,
+        losses: 0,
+        displayName: loserName || loserId,
+      };
+    }
     if (winnerName) data[winnerId].displayName = winnerName.slice(0, 64);
     if (loserName) data[loserId].displayName = loserName.slice(0, 64);
 
@@ -82,9 +106,15 @@ export function updateElo(
     if (w.elo < 0) w.elo = 0;
     if (l.elo < 0) l.elo = 0;
 
-    w.wins++; l.losses++;
+    w.wins++;
+    l.losses++;
     saveElo(data);
-    result = { winnerChange: w.elo - oldW, loserChange: l.elo - oldL, winnerNewElo: w.elo, loserNewElo: l.elo };
+    result = {
+      winnerChange: w.elo - oldW,
+      loserChange: l.elo - oldL,
+      winnerNewElo: w.elo,
+      loserNewElo: l.elo,
+    };
   });
   return result!;
 }
@@ -92,7 +122,10 @@ export function updateElo(
 /**
  * 预测 ELO 变化（不保存）
  */
-export function predictEloChange(myElo: number, oppElo: number): { win: number; lose: number } {
+export function predictEloChange(
+  myElo: number,
+  oppElo: number,
+): { win: number; lose: number } {
   const eWin = 1 / (1 + Math.pow(10, (oppElo - myElo) / 400));
   return {
     win: Math.round(K_FACTOR * (1 - eWin)),

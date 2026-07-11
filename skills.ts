@@ -3,7 +3,7 @@
 // ============================================================
 
 import type { GameState } from "./types.ts";
-import { onEvent, emit } from "./events.ts";
+import { emit, onEvent } from "./events.ts";
 import { drawCards } from "./cards.ts";
 import { addLog } from "./effects.ts";
 import charactersConfig from "./characters.json" with { type: "json" };
@@ -44,7 +44,9 @@ const skillMap = new Map<string, SkillDef>();
 // 技能已使用次数（per-turn 限制）— 已迁移到 GameState.skillUseCount
 
 (function load() {
-  for (const ch of (charactersConfig as { characters: CharacterDef[] }).characters) {
+  for (
+    const ch of (charactersConfig as { characters: CharacterDef[] }).characters
+  ) {
     charMap.set(ch.id, ch);
   }
   for (const sk of (skillsConfig as { skills: SkillDef[] }).skills) {
@@ -94,7 +96,11 @@ export function mountPassiveSkills(
 }
 
 /** 获取玩家当前手牌上限（含技能加成） */
-export function getHandLimit(state: GameState, playerIdx: number, charId: string): number {
+export function getHandLimit(
+  state: GameState,
+  playerIdx: number,
+  charId: string,
+): number {
   const char = getCharacter(charId);
   if (!char) return state.players[playerIdx].hp;
 
@@ -123,14 +129,20 @@ export function tryUseSkill(
   const skill = getSkill(skillId);
   if (!skill) return "未知技能";
 
-  if (skill.type !== "active") return `${skill.name} 是${skill.type === "locked" ? "锁定" : "被动"}技，不能主动使用`;
+  if (skill.type !== "active") {
+    return `${skill.name} 是${
+      skill.type === "locked" ? "锁定" : "被动"
+    }技，不能主动使用`;
+  }
 
   // 必须是自己回合且出牌阶段
   if (playerIdx !== state.turnPlayer) return "不是你的回合";
   if (state.phase !== "play") return "只能在出牌阶段使用";
 
   // 不能有进行中的 pending（除非是 skill_discard）
-  if (state.pendingResponse && state.pendingResponse.type !== "skill_discard") return "有进行中的响应";
+  if (state.pendingResponse && state.pendingResponse.type !== "skill_discard") {
+    return "有进行中的响应";
+  }
 
   // 检查阶段
   if (skill.trigger?.phase && state.phase !== skill.trigger.phase) {
@@ -144,9 +156,14 @@ export function tryUseSkill(
   }
 
   // 效果前置检查：force_discard 需对手有牌
-  if (skill.effect.type === "force_discard" && skill.effect.target === "opponent") {
+  if (
+    skill.effect.type === "force_discard" && skill.effect.target === "opponent"
+  ) {
     const oppHand = state.players[1 - playerIdx].hand;
-    if (oppHand.length === 0 && !state.players[1 - playerIdx].weapon && !state.players[1 - playerIdx].armor) {
+    if (
+      oppHand.length === 0 && !state.players[1 - playerIdx].weapon &&
+      !state.players[1 - playerIdx].armor
+    ) {
       return "对手没有牌可以弃";
     }
   }
@@ -179,7 +196,11 @@ export function tryUseSkill(
   return null;
 }
 
-export function executeSkillEffect(state: GameState, playerIdx: number, skill: SkillDef) {
+export function executeSkillEffect(
+  state: GameState,
+  playerIdx: number,
+  skill: SkillDef,
+) {
   const effect = skill.effect;
 
   switch (effect.type) {
@@ -199,7 +220,11 @@ export function executeSkillEffect(state: GameState, playerIdx: number, skill: S
     }
     case "draw_cards": {
       // 被动技：额外摸牌（不触发递归事件）
-      const { drawn, deck, discard } = drawCards(state.deck, state.discard, effect.count);
+      const { drawn, deck, discard } = drawCards(
+        state.deck,
+        state.discard,
+        effect.count,
+      );
       state.deck = deck;
       state.discard = discard;
       state.players[playerIdx].hand.push(...drawn);
@@ -219,7 +244,10 @@ export function executeSkillEffect(state: GameState, playerIdx: number, skill: S
       const target = 1 - playerIdx;
       state.players[target].hp -= effect.amount;
       if (state.players[target].hp < 0) state.players[target].hp = 0;
-      emit({ type: "damage", source: playerIdx, target, amount: effect.amount }, state);
+      emit(
+        { type: "damage", source: playerIdx, target, amount: effect.amount },
+        state,
+      );
       if (state.players[target].hp <= 0 && !state.gameOver) {
         state.players[target].alive = false;
         state.gameOver = true;

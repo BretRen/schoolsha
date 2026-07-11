@@ -2,7 +2,8 @@
 
 ## 概述
 
-服务端通过 Zitadel OIDC 验证用户身份。客户端需要在建立 WebSocket 连接前完成 PKCE 流程获取 `access_token`。
+服务端通过 Zitadel OIDC 验证用户身份。客户端需要在建立 WebSocket 连接前完成 PKCE
+流程获取 `access_token`。
 
 ## 连接时传递 token（优先级）
 
@@ -12,18 +13,18 @@
    ```
 2. **Sec-WebSocket-Protocol**（浏览器专用）
    ```js
-   new WebSocket("wss://host/ws", [access_token])
+   new WebSocket("wss://host/ws", [access_token]);
    ```
 3. **URL query param**（后备，Godot 等受限客户端）
 
 ## Zitadel 端点
 
-| 端点 | URL |
-|------|-----|
-| Issuer | `https://auth.pdnode.com` |
+| 端点      | URL                                          |
+| --------- | -------------------------------------------- |
+| Issuer    | `https://auth.pdnode.com`                    |
 | Authorize | `https://auth.pdnode.com/oauth/v2/authorize` |
-| Token | `https://auth.pdnode.com/oauth/v2/token` |
-| UserInfo | `https://auth.pdnode.com/oidc/v1/userinfo` |
+| Token     | `https://auth.pdnode.com/oauth/v2/token`     |
+| UserInfo  | `https://auth.pdnode.com/oidc/v1/userinfo`   |
 
 ## PKCE 流程 (S256)
 
@@ -60,6 +61,7 @@ code_verifier=<VERIFIER>
 ```
 
 返回:
+
 ```json
 {
   "access_token": "eyJhbG...",
@@ -87,7 +89,7 @@ const ws = new WebSocket("wss://host:8099/ws", [accessToken]);
 ```typescript
 // Deno 的 WebSocket 支持自定义 headers
 const ws = new WebSocket("ws://localhost:8099/ws");
-ws.addEventListener("open", () => { /* ready */ });
+ws.addEventListener("open", () => {/* ready */});
 
 // 但创建时无法设 header，需要在 HTTP upgrade 阶段处理。
 // 推荐：先走 HTTP → 拿 token → 用 ?token= 参数连接

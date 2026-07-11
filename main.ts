@@ -2,11 +2,11 @@
 // main.ts — WebSocket 服务器入口 (多房间 + Zitadel OIDC)
 // ============================================================
 
-import { handleMessage, anyoneDisconnected, markReconnected } from "./game.ts";
-import { validateToken, extractToken, fetchUserInfo } from "./auth.ts";
-import { roomManager, type Client } from "./room.ts";
+import { anyoneDisconnected, handleMessage, markReconnected } from "./game.ts";
+import { extractToken, fetchUserInfo, validateToken } from "./auth.ts";
+import { type Client, roomManager } from "./room.ts";
 import { matchmaking } from "./matchmaking.ts";
-import { getLeaderboard, getElo, updateElo } from "./elo.ts";
+import { getElo, getLeaderboard, updateElo } from "./elo.ts";
 import { getAllCharacters } from "./skills.ts";
 import type { ClientMsg, RoomInfo } from "./types.ts";
 
@@ -24,7 +24,10 @@ const RATE_LIMIT = 30; // 每秒最多 30 条 WS 消息
 function checkRateLimit(key: string): boolean {
   const now = Date.now();
   const entry = rateMap.get(key);
-  if (!entry) { rateMap.set(key, { tokens: RATE_LIMIT - 1, last: now }); return true; }
+  if (!entry) {
+    rateMap.set(key, { tokens: RATE_LIMIT - 1, last: now });
+    return true;
+  }
   const elapsed = (now - entry.last) / 1000;
   entry.tokens = Math.min(RATE_LIMIT, entry.tokens + elapsed * RATE_LIMIT);
   entry.last = now;
@@ -56,9 +59,12 @@ function deepLink(code: string): string {
 function serveStatic(filePath: string, mime: string): Response {
   try {
     const content = Deno.readFileSync(filePath);
-    const headers: Record<string, string> = { "content-type": `${mime}; charset=utf-8` };
+    const headers: Record<string, string> = {
+      "content-type": `${mime}; charset=utf-8`,
+    };
     if (mime === "text/html") {
-      headers["content-security-policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' ws: wss: https://auth.pdnode.com https://cdn.jsdelivr.net; img-src 'self' data:;";
+      headers["content-security-policy"] =
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' ws: wss: https://auth.pdnode.com https://cdn.jsdelivr.net; img-src 'self' data:;";
     }
     return new Response(content, { headers });
   } catch {
@@ -154,19 +160,22 @@ Deno.serve({ port: PORT }, async (req) => {
 
     // 服务器信息
     if (url.pathname === "/info") {
-      return new Response(JSON.stringify({
-        version: "0.6.0",
-        auth: {
-          mode: AUTH_ENABLED ? "zitadel_oidc" : "none",
-          provider: AUTH_ENABLED ? Deno.env.get("ZITADEL_ISSUER") : null,
-          clientId: AUTH_ENABLED ? Deno.env.get("ZITADEL_CLIENT_ID") : null,
-          pkce: AUTH_ENABLED ? true : false,
-        },
-        rooms: roomManager.count,
-        queue: matchmaking.length,
-        ws: `ws://localhost:${PORT}/ws`,
-        publicUrl: PUBLIC_URL,
-      }), { headers: { "content-type": "application/json" } });
+      return new Response(
+        JSON.stringify({
+          version: "0.6.0",
+          auth: {
+            mode: AUTH_ENABLED ? "zitadel_oidc" : "none",
+            provider: AUTH_ENABLED ? Deno.env.get("ZITADEL_ISSUER") : null,
+            clientId: AUTH_ENABLED ? Deno.env.get("ZITADEL_CLIENT_ID") : null,
+            pkce: AUTH_ENABLED ? true : false,
+          },
+          rooms: roomManager.count,
+          queue: matchmaking.length,
+          ws: `ws://localhost:${PORT}/ws`,
+          publicUrl: PUBLIC_URL,
+        }),
+        { headers: { "content-type": "application/json" } },
+      );
     }
 
     // 排行榜
@@ -211,8 +220,12 @@ Deno.serve({ port: PORT }, async (req) => {
       }
       const ext = filePath.split(".").pop() || "";
       const mime: Record<string, string> = {
-        html: "text/html", css: "text/css", js: "application/javascript",
-        png: "image/png", svg: "image/svg+xml", ico: "image/x-icon",
+        html: "text/html",
+        css: "text/css",
+        js: "application/javascript",
+        png: "image/png",
+        svg: "image/svg+xml",
+        ico: "image/x-icon",
       };
       return serveStatic(filePath, mime[ext] || "application/octet-stream");
     }
@@ -248,7 +261,9 @@ Deno.serve({ port: PORT }, async (req) => {
 
   // 确保 displayName 不为空
   if (!displayName) {
-    displayName = userId.startsWith("anon_") ? `匿名玩家` : `玩家_${userId.slice(-6)}`;
+    displayName = userId.startsWith("anon_")
+      ? `匿名玩家`
+      : `玩家_${userId.slice(-6)}`;
   }
 
   // ---- 解析模式 ----
@@ -260,11 +275,19 @@ Deno.serve({ port: PORT }, async (req) => {
     const { socket, response } = Deno.upgradeWebSocket(req);
 
     socket.addEventListener("open", () => {
-      if (authError) { send(socket, { type: "error", message: authError }); socket.close(); return; }
+      if (authError) {
+        send(socket, { type: "error", message: authError });
+        socket.close();
+        return;
+      }
       // 从房间中踢出（全局唯一）
       roomManager.kickUserFromOtherRooms(userId, null);
       matchmaking.join(userId, displayName, socket);
-      console.log(`[matchmaking] ${displayName || userId} connected (elo=${getElo(userId)})`);
+      console.log(
+        `[matchmaking] ${displayName || userId} connected (elo=${
+          getElo(userId)
+        })`,
+      );
     });
 
     socket.addEventListener("close", () => {
@@ -277,11 +300,17 @@ Deno.serve({ port: PORT }, async (req) => {
   // ---- 房间模式 WebSocket ----
   const { socket, response } = Deno.upgradeWebSocket(req);
 
-  const room = roomCode ? (roomManager.getRoom(roomCode) ?? null) : roomManager.createRoom();
+  const room = roomCode
+    ? (roomManager.getRoom(roomCode) ?? null)
+    : roomManager.createRoom();
   let seat = -1;
 
   socket.addEventListener("open", () => {
-    if (authError) { send(socket, { type: "error", message: authError }); socket.close(); return; }
+    if (authError) {
+      send(socket, { type: "error", message: authError });
+      socket.close();
+      return;
+    }
     if (!room) {
       send(socket, { type: "error", message: "房间不存在或已失效" });
       socket.close();
@@ -404,7 +433,7 @@ Deno.serve({ port: PORT }, async (req) => {
         return;
       }
       const validChars = getAllCharacters();
-      const valid = validChars.find(c => c.id === msg.id);
+      const valid = validChars.find((c) => c.id === msg.id);
       if (!valid) {
         send(socket, { type: "error", message: "无效的角色选择" });
         return;
@@ -415,7 +444,10 @@ Deno.serve({ port: PORT }, async (req) => {
       // 通知对手：对手已选择角色（但不透露具体角色）
       const opp = room.clients[1 - idx];
       if (opp) {
-        send(opp.socket, { type: "opponent_picked", picked: true } as ServerMsg);
+        send(
+          opp.socket,
+          { type: "opponent_picked", picked: true } as ServerMsg,
+        );
       }
       return;
     }
@@ -427,11 +459,16 @@ Deno.serve({ port: PORT }, async (req) => {
       }
       room.locked[idx] = true;
       const nameTag = room.clients[idx]?.displayName || "?";
-      console.log(`[${room.code}] P${idx} (${nameTag}) locked: ${room.picks[idx]}`);
+      console.log(
+        `[${room.code}] P${idx} (${nameTag}) locked: ${room.picks[idx]}`,
+      );
       // 通知对手：对手已锁定
       const opp = room.clients[1 - idx];
       if (opp) {
-        send(opp.socket, { type: "opponent_locked", locked: true } as ServerMsg);
+        send(
+          opp.socket,
+          { type: "opponent_locked", locked: true } as ServerMsg,
+        );
       }
       // 双方都锁定了 → 开始游戏
       if (room.locked[0] && room.locked[1]) {
@@ -474,7 +511,10 @@ Deno.serve({ port: PORT }, async (req) => {
       room.handleDisconnect(idx);
     } else if (!room.game && !room.gameStarted) {
       // 选角阶段有人离开
-      if (room.selectTimer) { clearTimeout(room.selectTimer); room.selectTimer = null; }
+      if (room.selectTimer) {
+        clearTimeout(room.selectTimer);
+        room.selectTimer = null;
+      }
       const other = room.clients[1 - idx];
       if (other && room.isMatch) {
         // 匹配对战：对手退出 → 剩余玩家立即获胜
@@ -483,16 +523,38 @@ Deno.serve({ port: PORT }, async (req) => {
         const loser = room.clients[idx];
         let eloResult = null;
         if (winner && loser) {
-          const result = updateElo(winner.userId, loser.userId, winner.displayName, loser.displayName);
-          eloResult = { change: result.winnerChange, newElo: result.winnerNewElo };
+          const result = updateElo(
+            winner.userId,
+            loser.userId,
+            winner.displayName,
+            loser.displayName,
+          );
+          eloResult = {
+            change: result.winnerChange,
+            newElo: result.winnerNewElo,
+          };
         }
-        send(other.socket, { type: "opponent_left_win", message: "对手在选角阶段退出，你获胜！", eloResult } as ServerMsg);
-        console.log(`[${room.code}] P${1-idx} wins by opponent leave during character select`);
+        send(
+          other.socket,
+          {
+            type: "opponent_left_win",
+            message: "对手在选角阶段退出，你获胜！",
+            eloResult,
+          } as ServerMsg,
+        );
+        console.log(
+          `[${room.code}] P${
+            1 - idx
+          } wins by opponent leave during character select`,
+        );
       } else if (other) {
         // 手动房间：等待新玩家
         room.picks = [null, null];
         room.locked = [false, false];
-        send(other.socket, { type: "error", message: "对手已离开，等待新玩家..." });
+        send(other.socket, {
+          type: "error",
+          message: "对手已离开，等待新玩家...",
+        });
         send(other.socket, { type: "waiting", message: "等待另一位玩家..." });
       }
     }
@@ -506,7 +568,9 @@ Deno.serve({ port: PORT }, async (req) => {
 const authStatus = AUTH_ENABLED
   ? `auth=zitadel (${Deno.env.get("ZITADEL_ISSUER")})`
   : "auth=none";
-console.log(`🔪 Sanguosha v0.6.0 (multi-room + elo) running on ws://0.0.0.0:${PORT} (${authStatus})`);
+console.log(
+  `🔪 Sanguosha v0.6.0 (multi-room + elo) running on ws://0.0.0.0:${PORT} (${authStatus})`,
+);
 console.log(`   Room API:    ${PUBLIC_URL}/room/create`);
 console.log(`   Matchmaking: ws://localhost:${PORT}/ws?mode=matching`);
 console.log(`   Leaderboard: ${PUBLIC_URL}/leaderboard`);

@@ -3,14 +3,14 @@
 // ============================================================
 // 用法: deno run --allow-net cli.ts [ws://localhost:8099]
 
-import type { ServerStateView, Card } from "./types.ts";
+import type { Card, ServerStateView } from "./types.ts";
 
 const WS_URL = Deno.args[0] || "ws://localhost:8099";
 
 // ─── ANSI 颜色 ──────────────────────────────────────────
-const R = "\x1b[0m";    // 重置
-const B = "\x1b[1m";    // 粗体
-const D = "\x1b[2m";    // 暗色
+const R = "\x1b[0m"; // 重置
+const B = "\x1b[1m"; // 粗体
+const D = "\x1b[2m"; // 暗色
 const RED = "\x1b[31m";
 const GRN = "\x1b[32m";
 const YEL = "\x1b[33m";
@@ -27,7 +27,11 @@ let myIndex = -1;
 let errorMsg = "";
 
 ws.onopen = () => render();
-ws.onclose = () => { clear(); console.log("\n连接断开"); Deno.exit(0); };
+ws.onclose = () => {
+  clear();
+  console.log("\n连接断开");
+  Deno.exit(0);
+};
 
 ws.onmessage = (e) => {
   const msg = JSON.parse(e.data);
@@ -56,7 +60,10 @@ function suitColor(s: string): string {
 }
 
 function suitIcon(s: string): string {
-  return ({ spade: "♠", heart: "♥", club: "♣", diamond: "♦" } as Record<string, string>)[s] || "?";
+  return ({ spade: "♠", heart: "♥", club: "♣", diamond: "♦" } as Record<
+    string,
+    string
+  >)[s] || "?";
 }
 
 function cardStr(c: Card): string {
@@ -66,7 +73,13 @@ function cardStr(c: Card): string {
 }
 
 function phaseName(p: string): string {
-  return ({ judge: "判定", draw: "摸牌", play: "出牌", discard: "弃牌", end: "结束" } as Record<string, string>)[p] || p;
+  return ({
+    judge: "判定",
+    draw: "摸牌",
+    play: "出牌",
+    discard: "弃牌",
+    end: "结束",
+  } as Record<string, string>)[p] || p;
 }
 
 function hpBar(hp: number, maxHp: number): string {
@@ -78,10 +91,11 @@ function hpBar(hp: number, maxHp: number): string {
 }
 
 function box(lines: string[]): string {
-  const w = Math.max(...lines.map(l => stripAnsi(l)));
-  const top  = "┌" + "─".repeat(w + 2) + "┐";
-  const mid  = lines.map(l => "│ " + l + " ".repeat(w - stripAnsi(l)) + " │").join("\n");
-  const bot  = "└" + "─".repeat(w + 2) + "┘";
+  const w = Math.max(...lines.map((l) => stripAnsi(l)));
+  const top = "┌" + "─".repeat(w + 2) + "┐";
+  const mid = lines.map((l) => "│ " + l + " ".repeat(w - stripAnsi(l)) + " │")
+    .join("\n");
+  const bot = "└" + "─".repeat(w + 2) + "┘";
   return top + "\n" + mid + "\n" + bot;
 }
 
@@ -118,9 +132,12 @@ function render() {
   const title = `${B}三国杀${R}  ${D}1v1${R}`;
   const turnTag = state.gameOver
     ? `${BG_R} GAME OVER ${R}`
-    : isMyTurn() ? `${BG_G} 你的回合 ${R}`
-    : needResponse() ? `${BG_R} 需要响应 ${R}`
-    : needDiscard() ? `${YEL} 需要弃牌 ${R}`
+    : isMyTurn()
+    ? `${BG_G} 你的回合 ${R}`
+    : needResponse()
+    ? `${BG_R} 需要响应 ${R}`
+    : needDiscard()
+    ? `${YEL} 需要弃牌 ${R}`
     : `${D}等待中${R}`;
 
   console.log(box([
@@ -149,7 +166,9 @@ function render() {
 
   // ── 对手 ──
   const opp = state.opponent;
-  const oppLine = `${D}对手${R}  ${hpBar(opp.hp, opp.maxHp)}  ${D}手牌: ${opp.handCount}${R}`;
+  const oppLine = `${D}对手${R}  ${
+    hpBar(opp.hp, opp.maxHp)
+  }  ${D}手牌: ${opp.handCount}${R}`;
   console.log("");
   console.log(`  ${oppLine}`);
 
@@ -184,7 +203,9 @@ function render() {
 
   // ── 你的手牌 ──
   console.log("");
-  console.log(`  ${B}你的手牌${R}  (HP: ${hpBar(state.you.hp, state.you.maxHp)})`);
+  console.log(
+    `  ${B}你的手牌${R}  (HP: ${hpBar(state.you.hp, state.you.maxHp)})`,
+  );
 
   if (state.you.hand.length === 0) {
     console.log(`  ${D}(空)${R}`);
@@ -286,13 +307,10 @@ function handleCmd(cmd: string) {
     const card = state.you.hand[n - 1];
     const target = state.pendingResponse ? undefined : 1 - myIndex;
     send({ action: "play_card", card_id: card.id, target });
-
   } else if (action === "pass" || action === "跳过") {
     send({ action: "pass" });
-
   } else if (action === "结束" || action === "end") {
     send({ action: "end_phase" });
-
   } else if (action === "弃" || action === "discard") {
     const nums = parts.slice(1).map(Number);
     if (nums.some(isNaN) || !state) {
@@ -300,19 +318,17 @@ function handleCmd(cmd: string) {
       render();
       return;
     }
-    const ids = nums.map(n => state!.you.hand[n - 1]?.id).filter(Boolean);
+    const ids = nums.map((n) => state!.you.hand[n - 1]?.id).filter(Boolean);
     if (ids.length === 0) {
       errorMsg = "无效编号";
       render();
       return;
     }
     send({ action: "discard", card_ids: ids });
-
   } else if (action === "q" || action === "quit") {
     console.log("\n👋 再见");
     ws.close();
     Deno.exit(0);
-
   } else {
     errorMsg = `未知指令: ${action}`;
     render();

@@ -2,13 +2,17 @@
 // test_core.ts — 核心逻辑单元测试
 // ============================================================
 
-import { assertEquals, assert, assertFalse } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { createDeck, shuffle, drawCards, cardLabel } from "./cards.ts";
+import {
+  assert,
+  assertEquals,
+  assertFalse,
+} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { cardLabel, createDeck, drawCards, shuffle } from "./cards.ts";
 import { getElo, predictEloChange } from "./elo.ts";
-import { onEvent, emit } from "./events.ts";
+import { emit, onEvent } from "./events.ts";
 import { getCardEffect } from "./effects.ts";
 import { getAllCharacters, getHandLimit } from "./skills.ts";
-import { createGame, checkTimeout } from "./game.ts";
+import { checkTimeout, createGame } from "./game.ts";
 import { roomManager } from "./room.ts";
 
 // ---- cards.ts ----
@@ -24,8 +28,8 @@ Deno.test("cards: shuffle 不改变牌数", () => {
   const deckLen = deck.length;
   const shuffled = shuffle(structuredClone(deck));
   assertEquals(shuffled.length, deckLen);
-  const ids1 = deck.map(c => c.id).sort();
-  const ids2 = shuffled.map(c => c.id).sort();
+  const ids1 = deck.map((c) => c.id).sort();
+  const ids2 = shuffled.map((c) => c.id).sort();
   assertEquals(ids1, ids2);
 });
 
@@ -44,7 +48,13 @@ Deno.test("cards: drawCards 牌堆空时重洗弃牌堆", () => {
 });
 
 Deno.test("cards: cardLabel 含花色和牌名", () => {
-  const card = { id: "T1", suit: "heart" as const, number: 7, name: "作业", type: "basic" as const };
+  const card = {
+    id: "T1",
+    suit: "heart" as const,
+    number: 7,
+    name: "作业",
+    type: "basic" as const,
+  };
   const label = cardLabel(card);
   assert(label.includes("作业"));
   assert(label.includes("♥"));
@@ -104,26 +114,55 @@ Deno.test("effects: 作业 canUse 需要目标", () => {
 Deno.test("effects: 豁免不能主动使用", () => {
   const e = getCardEffect("豁免");
   assert(e);
-  assertEquals(e.canUse({ phase: "play", turnPlayer: 0, pendingResponse: null } as any, 0, {} as any), false);
+  assertEquals(
+    e.canUse(
+      { phase: "play", turnPlayer: 0, pendingResponse: null } as any,
+      0,
+      {} as any,
+    ),
+    false,
+  );
   assert(e.canRespond);
 });
 
 Deno.test("effects: 免罚券响应 duel 不响应 dodge", () => {
   const e = getCardEffect("免罚券");
   assert(e);
-  assert(e.canRespond!({ pendingResponse: { type: "duel", target: 0 } } as any, 0, {} as any));
-  assertFalse(e.canRespond!({ pendingResponse: { type: "dodge", target: 0 } } as any, 0, {} as any));
+  assert(
+    e.canRespond!(
+      { pendingResponse: { type: "duel", target: 0 } } as any,
+      0,
+      {} as any,
+    ),
+  );
+  assertFalse(
+    e.canRespond!(
+      { pendingResponse: { type: "dodge", target: 0 } } as any,
+      0,
+      {} as any,
+    ),
+  );
 });
 
 Deno.test("effects: 神偷对手空手不能出", () => {
   const s = getCardEffect("神偷");
-  const state = { players: [{ hp: 3 }, { hp: 3, hand: [], weapon: null, armor: null }], phase: "play", turnPlayer: 0, pendingResponse: null } as any;
+  const state = {
+    players: [{ hp: 3 }, { hp: 3, hand: [], weapon: null, armor: null }],
+    phase: "play",
+    turnPlayer: 0,
+    pendingResponse: null,
+  } as any;
   assertFalse(s!.canUse(state, 0, {} as any));
 });
 
 Deno.test("effects: 告密对手空手不能出", () => {
   const d = getCardEffect("告密");
-  const state = { players: [{ hp: 3 }, { hp: 3, hand: [], weapon: null, armor: null }], phase: "play", turnPlayer: 0, pendingResponse: null } as any;
+  const state = {
+    players: [{ hp: 3 }, { hp: 3, hand: [], weapon: null, armor: null }],
+    phase: "play",
+    turnPlayer: 0,
+    pendingResponse: null,
+  } as any;
   assertFalse(d!.canUse(state, 0, {} as any));
 });
 
@@ -145,7 +184,12 @@ Deno.test("game: createGame 状态正确", () => {
 Deno.test("game: pending超时自动处理", () => {
   const chars = getAllCharacters();
   const state = createGame([chars[0].id, chars[1].id]);
-  state.pendingResponse = { type: "dodge", source: 0, target: 1, timeout: Date.now() - 1000 };
+  state.pendingResponse = {
+    type: "dodge",
+    source: 0,
+    target: 1,
+    timeout: Date.now() - 1000,
+  };
   const changed = checkTimeout(state);
   assert(changed);
   assertEquals(state.pendingResponse, null);
@@ -178,7 +222,12 @@ Deno.test("room: getOrCreateRoom 幂等", () => {
 
 Deno.test("room: startGame 防重复", () => {
   const room = roomManager.createRoom();
-  const chars = [{ id: "x", name: "X", maxHp: 3, skills: [] }, { id: "y", name: "Y", maxHp: 3, skills: [] }] as any;
+  const chars = [{ id: "x", name: "X", maxHp: 3, skills: [] }, {
+    id: "y",
+    name: "Y",
+    maxHp: 3,
+    skills: [],
+  }] as any;
   room.picks = ["x", "y"];
   room.startGame();
   assert(room.gameStarted);
@@ -206,7 +255,9 @@ Deno.test("security: 匿名ID使用UUID", () => {
 });
 
 Deno.test("security: HTML转义函数", () => {
-  const esc = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   assertEquals(esc("<script>"), "&lt;script&gt;");
   assertEquals(esc("hello"), "hello");
   assertEquals(esc(`<img onerror="x">`), `&lt;img onerror=&quot;x&quot;&gt;`);

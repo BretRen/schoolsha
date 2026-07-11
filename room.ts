@@ -3,13 +3,17 @@
 // ============================================================
 
 import {
-  createGame, getPlayerView, checkTimeout,
-  markDisconnected, markReconnected, checkDisconnectTimeout,
   anyoneDisconnected,
+  checkDisconnectTimeout,
+  checkTimeout,
+  createGame,
+  getPlayerView,
+  markDisconnected,
+  markReconnected,
 } from "./game.ts";
 import { getAllCharacters, getSkill } from "./skills.ts";
-import { updateElo, predictEloChange, getElo } from "./elo.ts";
-import type { GameState, ServerMsg, CharacterInfo } from "./types.ts";
+import { getElo, predictEloChange, updateElo } from "./elo.ts";
+import type { CharacterInfo, GameState, ServerMsg } from "./types.ts";
 
 // ---------- 常量 ----------
 
@@ -89,7 +93,11 @@ export class Room {
       view.opponentName = opp?.displayName || "?";
       view.opponentId = opp?.userId || "";
 
-      this.send(client.socket, { type: "game_state", state: view, yourIndex: i });
+      this.send(client.socket, {
+        type: "game_state",
+        state: view,
+        yourIndex: i,
+      });
     }
 
     // 游戏结束 → 记录 ELO（仅匹配对战）
@@ -100,7 +108,12 @@ export class Room {
       const w = this.clients[wIdx];
       const l = this.clients[lIdx];
       if (w && l) {
-        const result = updateElo(w.userId, l.userId, w.displayName, l.displayName);
+        const result = updateElo(
+          w.userId,
+          l.userId,
+          w.displayName,
+          l.displayName,
+        );
         // 广播带有 ELO 结果的 game_state
         for (let i = 0; i < 2; i++) {
           const c = this.clients[i];
@@ -114,8 +127,16 @@ export class Room {
           const change = i === wIdx ? result.winnerChange : result.loserChange;
           const newElo = i === wIdx ? result.winnerNewElo : result.loserNewElo;
           this.send(c.socket, {
-            type: "game_state", state: view, yourIndex: i,
-            eloResult: { change, newElo, opponentChange: i === wIdx ? result.loserChange : result.winnerChange },
+            type: "game_state",
+            state: view,
+            yourIndex: i,
+            eloResult: {
+              change,
+              newElo,
+              opponentChange: i === wIdx
+                ? result.loserChange
+                : result.winnerChange,
+            },
           });
         }
         return;
@@ -131,11 +152,20 @@ export class Room {
       // 检查是否有玩家未锁定 — 未锁定=弃权，平局
       const anyUnlocked = !this.locked[0] || !this.locked[1];
       if (anyUnlocked && !this.gameStarted) {
-        console.log(`[${this.code}] Select timeout with unlocked players — tie`);
+        console.log(
+          `[${this.code}] Select timeout with unlocked players — tie`,
+        );
         for (let i = 0; i < 2; i++) {
           const c = this.clients[i];
           if (c) {
-            this.send(c.socket, { type: "opponent_left_win", message: "双方均未锁定角色，对局作废（平局，不计ELO）", title: "🤝 有人在选角阶段未锁定" } as ServerMsg);
+            this.send(
+              c.socket,
+              {
+                type: "opponent_left_win",
+                message: "双方均未锁定角色，对局作废（平局，不计ELO）",
+                title: "🤝 有人在选角阶段未锁定",
+              } as ServerMsg,
+            );
           }
         }
         // 标记为已开始防止重复触发，稍后由清理器回收
@@ -148,7 +178,9 @@ export class Room {
       for (let i = 0; i < 2; i++) {
         if (this.picks[i] === null) {
           this.picks[i] = chars[0].id;
-          console.log(`[${this.code}] P${i} select timeout, auto-picked ${chars[0].name}`);
+          console.log(
+            `[${this.code}] P${i} select timeout, auto-picked ${chars[0].name}`,
+          );
         }
       }
 
@@ -157,7 +189,10 @@ export class Room {
   }
 
   clearSelectTimer(): void {
-    if (this.selectTimer) { clearTimeout(this.selectTimer); this.selectTimer = null; }
+    if (this.selectTimer) {
+      clearTimeout(this.selectTimer);
+      this.selectTimer = null;
+    }
   }
 
   startGame(): void {
@@ -168,7 +203,11 @@ export class Room {
     // 确保双方都有选择
     if (this.picks[0] === null || this.picks[1] === null) return;
 
-    console.log(`[${this.code}] Starting game: ${chars.find(c => c.id === this.picks[0])?.name} vs ${chars.find(c => c.id === this.picks[1])?.name}`);
+    console.log(
+      `[${this.code}] Starting game: ${
+        chars.find((c) => c.id === this.picks[0])?.name
+      } vs ${chars.find((c) => c.id === this.picks[1])?.name}`,
+    );
     this._eloRecorded = false;
     this.game = createGame([this.picks[0], this.picks[1]]);
     this.gameStarted = true;
@@ -219,7 +258,8 @@ export class Room {
       const left = MAX_DISCONNECTS - this.game.disconnectCount[idx];
       this.send(opponent.socket, {
         type: "disconnected",
-        message: `对手已断线，${RECONNECT_WINDOW_SEC}秒内可重连（剩余次数: ${left}）`,
+        message:
+          `对手已断线，${RECONNECT_WINDOW_SEC}秒内可重连（剩余次数: ${left}）`,
         attemptsLeft: left,
       });
     }
@@ -239,7 +279,9 @@ export class Room {
     for (let i = 0; i < 2; i++) {
       if (this.game.disconnectedAt[i] !== null && !this.clients[i]) {
         // 验证重连者身份
-        if (this.disconnectedUserId[i] && this.disconnectedUserId[i] !== userId) {
+        if (
+          this.disconnectedUserId[i] && this.disconnectedUserId[i] !== userId
+        ) {
           return i; // 返回座位号用于提示
         }
 
@@ -274,30 +316,39 @@ export class Room {
       id: c.id,
       name: c.name,
       maxHp: c.maxHp,
-      skills: c.skills.map(sid => ({ id: sid, name: getSkill(sid)?.name ?? sid })),
+      skills: c.skills.map((sid) => ({
+        id: sid,
+        name: getSkill(sid)?.name ?? sid,
+      })),
     }));
     for (const c of this.clients) {
       if (!c) continue;
       const opp = this.clients[1 - c.index];
-      const oppInfo = opp ? {
-        displayName: opp.displayName,
-        elo: getElo(opp.userId),
-        userId: opp.userId,
-      } : null;
+      const oppInfo = opp
+        ? {
+          displayName: opp.displayName,
+          elo: getElo(opp.userId),
+          userId: opp.userId,
+        }
+        : null;
 
       const myElo = getElo(c.userId);
-      const prediction = opp ? predictEloChange(myElo, getElo(opp.userId)) : null;
+      const prediction = opp
+        ? predictEloChange(myElo, getElo(opp.userId))
+        : null;
 
       this.send(c.socket, {
         type: "character_select",
         characters: chars,
         timeoutSec: CHAR_SELECT_TIMEOUT_SEC,
         opponent: this.isMatch ? (oppInfo ?? undefined) : undefined,
-        elo: this.isMatch ? { my: myElo, prediction } : { my: 0, prediction: null },
+        elo: this.isMatch
+          ? { my: myElo, prediction }
+          : { my: 0, prediction: null },
       });
     }
     this.startSelectTimer();
-    const names = this.clients.map(c => c?.displayName || "?").join(" vs ");
+    const names = this.clients.map((c) => c?.displayName || "?").join(" vs ");
     console.log(`[${this.code}] Lobby full (${names}), character select sent`);
   }
 
@@ -314,13 +365,17 @@ export class Room {
       const c = this.clients[i];
       if (c && c.userId === userId) {
         this.send(c.socket, { type: "error", message: reason });
-        try { c.socket.close(); } catch { /* ok */ }
+        try {
+          c.socket.close();
+        } catch { /* ok */ }
         this.clients[i] = null;
         if (this.game && !this.game.gameOver) {
           this.disconnectedUserId[i] = userId;
           this.handleDisconnect(i);
         }
-        console.log(`[${this.code}] P${i} kicked (${c.displayName || userId}): ${reason}`);
+        console.log(
+          `[${this.code}] P${i} kicked (${c.displayName || userId}): ${reason}`,
+        );
         return i;
       }
     }
@@ -353,8 +408,10 @@ export class Room {
   /** 获取断线玩家所在座位（用于身份校验提示） */
   getDisconnectedSeatFor(userId: string): number | null {
     for (let i = 0; i < 2; i++) {
-      if (this.game?.disconnectedAt[i] !== null &&
-          this.disconnectedUserId[i] === userId) {
+      if (
+        this.game?.disconnectedAt[i] !== null &&
+        this.disconnectedUserId[i] === userId
+      ) {
         return i;
       }
     }
@@ -453,13 +510,19 @@ export class RoomManager {
       this.removeRoom(code);
     }
     if (toRemove.length > 0) {
-      console.log(`Cleaned up ${toRemove.length} rooms (remaining: ${this.rooms.size})`);
+      console.log(
+        `Cleaned up ${toRemove.length} rooms (remaining: ${this.rooms.size})`,
+      );
     }
   }
 
   /** 查找某用户在所有房间中断线的对局 */
-  findDisconnectedGames(userId: string): Array<{ roomCode: string; opponent: string; disconnectedAt: number }> {
-    const results: Array<{ roomCode: string; opponent: string; disconnectedAt: number }> = [];
+  findDisconnectedGames(
+    userId: string,
+  ): Array<{ roomCode: string; opponent: string; disconnectedAt: number }> {
+    const results: Array<
+      { roomCode: string; opponent: string; disconnectedAt: number }
+    > = [];
     for (const [code, room] of this.rooms) {
       if (!room.game || room.game.gameOver) continue;
       for (let i = 0; i < 2; i++) {

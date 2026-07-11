@@ -3,6 +3,7 @@
 [English](./README.md) | **Chinese**
 
 学校杀是由 Stoller 学生共同创造的类三国杀卡牌游戏
+
 > 完整名称：Stoller SchoolSha | 思多乐学校杀
 
 ---
@@ -11,7 +12,8 @@
 
 - **[卡牌图鉴](./docs/CARDS.md)** — 全部 88 张牌的效果与花色
 - **[角色与技能](./docs/CHARACTERS.md)** — 4 个角色及技能说明
-- **[PKCE 认证流程](./docs/PKCE_FLOW.md)** — 客户端接入指南（Godot / 浏览器 / Deno）
+- **[PKCE 认证流程](./docs/PKCE_FLOW.md)** — 客户端接入指南（Godot / 浏览器 /
+  Deno）
 
 ---
 
@@ -61,16 +63,20 @@ deno run --allow-env test_equip.ts
 ---
 
 ## 制作人员
+
 > 排名不分先后
+
 - 开发：[皮蛋](https://github.com/bretren)
 - 角色与策划：孽慈，棉兔砸，[皮蛋](https://github.com/bretren)
 - 审核：孽慈，Tim
 
 ## 起源
+
 某天在学校玩三国杀的时候，突然想到为什么不做一个学校版本？
 然后因为暑假和一些原因导致纸质版的成功的废弃了，转而制作软件版本。
 
 ## 免责 与 声明
+
 - 本项目和 Stoller Middle School 没有任何关系
 - 本项目不属于 Beaverton School District
 - 本项目的角色（包括学生以及老师等）和现实人物没有任何关联，请勿过度解读

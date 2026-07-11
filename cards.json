@@ -1,80 +1,440 @@
 {
   "cards": [
-    { "name": "作业", "type": "basic",  "suit": "spade",   "number": 7,  "count": 5 },
-    { "name": "作业", "type": "basic",  "suit": "spade",   "number": 8,  "count": 3 },
-    { "name": "作业", "type": "basic",  "suit": "spade",   "number": 9,  "count": 2 },
-    { "name": "作业", "type": "basic",  "suit": "spade",   "number": 10, "count": 2 },
-    { "name": "作业", "type": "basic",  "suit": "club",    "number": 2,  "count": 4 },
-    { "name": "作业", "type": "basic",  "suit": "club",    "number": 3,  "count": 3 },
-    { "name": "作业", "type": "basic",  "suit": "club",    "number": 4,  "count": 2 },
-    { "name": "作业", "type": "basic",  "suit": "heart",   "number": 10, "count": 2 },
-    { "name": "作业", "type": "basic",  "suit": "diamond", "number": 10, "count": 1 },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "spade",
+      "number": 7,
+      "count": 5
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "spade",
+      "number": 8,
+      "count": 3
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "spade",
+      "number": 9,
+      "count": 2
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "spade",
+      "number": 10,
+      "count": 2
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "club",
+      "number": 2,
+      "count": 4
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "club",
+      "number": 3,
+      "count": 3
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "club",
+      "number": 4,
+      "count": 2
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "heart",
+      "number": 10,
+      "count": 2
+    },
+    {
+      "name": "作业",
+      "type": "basic",
+      "suit": "diamond",
+      "number": 10,
+      "count": 1
+    },
 
-    { "name": "豁免", "type": "basic",  "suit": "diamond", "number": 2,  "count": 3 },
-    { "name": "豁免", "type": "basic",  "suit": "diamond", "number": 3,  "count": 3 },
-    { "name": "豁免", "type": "basic",  "suit": "diamond", "number": 4,  "count": 2 },
-    { "name": "豁免", "type": "basic",  "suit": "diamond", "number": 5,  "count": 2 },
-    { "name": "豁免", "type": "basic",  "suit": "diamond", "number": 6,  "count": 2 },
+    {
+      "name": "豁免",
+      "type": "basic",
+      "suit": "diamond",
+      "number": 2,
+      "count": 3
+    },
+    {
+      "name": "豁免",
+      "type": "basic",
+      "suit": "diamond",
+      "number": 3,
+      "count": 3
+    },
+    {
+      "name": "豁免",
+      "type": "basic",
+      "suit": "diamond",
+      "number": 4,
+      "count": 2
+    },
+    {
+      "name": "豁免",
+      "type": "basic",
+      "suit": "diamond",
+      "number": 5,
+      "count": 2
+    },
+    {
+      "name": "豁免",
+      "type": "basic",
+      "suit": "diamond",
+      "number": 6,
+      "count": 2
+    },
 
-    { "name": "补给", "type": "basic",  "suit": "heart",   "number": 2,  "count": 3 },
-    { "name": "补给", "type": "basic",  "suit": "heart",   "number": 3,  "count": 2 },
-    { "name": "补给", "type": "basic",  "suit": "heart",   "number": 4,  "count": 1 },
-    { "name": "补给", "type": "basic",  "suit": "heart",   "number": 5,  "count": 1 },
-    { "name": "补给", "type": "basic",  "suit": "heart",   "number": 6,  "count": 1 },
+    {
+      "name": "补给",
+      "type": "basic",
+      "suit": "heart",
+      "number": 2,
+      "count": 3
+    },
+    {
+      "name": "补给",
+      "type": "basic",
+      "suit": "heart",
+      "number": 3,
+      "count": 2
+    },
+    {
+      "name": "补给",
+      "type": "basic",
+      "suit": "heart",
+      "number": 4,
+      "count": 1
+    },
+    {
+      "name": "补给",
+      "type": "basic",
+      "suit": "heart",
+      "number": 5,
+      "count": 1
+    },
+    {
+      "name": "补给",
+      "type": "basic",
+      "suit": "heart",
+      "number": 6,
+      "count": 1
+    },
 
-    { "name": "小抄", "type": "basic",  "suit": "spade",   "number": 3,  "count": 1 },
-    { "name": "小抄", "type": "basic",  "suit": "club",    "number": 3,  "count": 1 },
-    { "name": "小抄", "type": "basic",  "suit": "club",    "number": 9,  "count": 1 },
-    { "name": "小抄", "type": "basic",  "suit": "diamond", "number": 9,  "count": 1 },
+    {
+      "name": "小抄",
+      "type": "basic",
+      "suit": "spade",
+      "number": 3,
+      "count": 1
+    },
+    {
+      "name": "小抄",
+      "type": "basic",
+      "suit": "club",
+      "number": 3,
+      "count": 1
+    },
+    {
+      "name": "小抄",
+      "type": "basic",
+      "suit": "club",
+      "number": 9,
+      "count": 1
+    },
+    {
+      "name": "小抄",
+      "type": "basic",
+      "suit": "diamond",
+      "number": 9,
+      "count": 1
+    },
 
-    { "name": "陷害", "type": "trick",  "suit": "spade",   "number": 1,  "count": 1 },
-    { "name": "陷害", "type": "trick",  "suit": "club",    "number": 11, "count": 1 },
+    {
+      "name": "陷害",
+      "type": "trick",
+      "suit": "spade",
+      "number": 1,
+      "count": 1
+    },
+    {
+      "name": "陷害",
+      "type": "trick",
+      "suit": "club",
+      "number": 11,
+      "count": 1
+    },
 
-    { "name": "辩论", "type": "trick",  "suit": "spade",   "number": 1,  "count": 1 },
-    { "name": "辩论", "type": "trick",  "suit": "club",    "number": 1,  "count": 1 },
-    { "name": "辩论", "type": "trick",  "suit": "diamond", "number": 1,  "count": 1 },
+    {
+      "name": "辩论",
+      "type": "trick",
+      "suit": "spade",
+      "number": 1,
+      "count": 1
+    },
+    {
+      "name": "辩论",
+      "type": "trick",
+      "suit": "club",
+      "number": 1,
+      "count": 1
+    },
+    {
+      "name": "辩论",
+      "type": "trick",
+      "suit": "diamond",
+      "number": 1,
+      "count": 1
+    },
 
-    { "name": "突击测验", "type": "trick",  "suit": "spade",   "number": 7,  "count": 1 },
-    { "name": "突击测验", "type": "trick",  "suit": "club",    "number": 7,  "count": 1 },
-    { "name": "突击测验", "type": "trick",  "suit": "spade",   "number": 13, "count": 1 },
+    {
+      "name": "突击测验",
+      "type": "trick",
+      "suit": "spade",
+      "number": 7,
+      "count": 1
+    },
+    {
+      "name": "突击测验",
+      "type": "trick",
+      "suit": "club",
+      "number": 7,
+      "count": 1
+    },
+    {
+      "name": "突击测验",
+      "type": "trick",
+      "suit": "spade",
+      "number": 13,
+      "count": 1
+    },
 
-    { "name": "最终测试", "type": "trick",  "suit": "heart",   "number": 1,  "count": 1 },
+    {
+      "name": "最终测试",
+      "type": "trick",
+      "suit": "heart",
+      "number": 1,
+      "count": 1
+    },
 
-    { "name": "神偷", "type": "trick",  "suit": "spade",   "number": 3,  "count": 1 },
-    { "name": "神偷", "type": "trick",  "suit": "spade",   "number": 4,  "count": 1 },
-    { "name": "神偷", "type": "trick",  "suit": "diamond", "number": 3,  "count": 1 },
+    {
+      "name": "神偷",
+      "type": "trick",
+      "suit": "spade",
+      "number": 3,
+      "count": 1
+    },
+    {
+      "name": "神偷",
+      "type": "trick",
+      "suit": "spade",
+      "number": 4,
+      "count": 1
+    },
+    {
+      "name": "神偷",
+      "type": "trick",
+      "suit": "diamond",
+      "number": 3,
+      "count": 1
+    },
 
-    { "name": "告密", "type": "trick",  "suit": "spade",   "number": 5,  "count": 1 },
-    { "name": "告密", "type": "trick",  "suit": "club",    "number": 5,  "count": 1 },
-    { "name": "告密", "type": "trick",  "suit": "heart",   "number": 12, "count": 1 },
+    {
+      "name": "告密",
+      "type": "trick",
+      "suit": "spade",
+      "number": 5,
+      "count": 1
+    },
+    {
+      "name": "告密",
+      "type": "trick",
+      "suit": "club",
+      "number": 5,
+      "count": 1
+    },
+    {
+      "name": "告密",
+      "type": "trick",
+      "suit": "heart",
+      "number": 12,
+      "count": 1
+    },
 
-    { "name": "点名批评", "type": "trick",  "suit": "heart",   "number": 2,  "count": 1 },
-    { "name": "点名批评", "type": "trick",  "suit": "heart",   "number": 3,  "count": 1 },
+    {
+      "name": "点名批评",
+      "type": "trick",
+      "suit": "heart",
+      "number": 2,
+      "count": 1
+    },
+    {
+      "name": "点名批评",
+      "type": "trick",
+      "suit": "heart",
+      "number": 3,
+      "count": 1
+    },
 
-    { "name": "嫁祸", "type": "trick",  "suit": "club",    "number": 12, "count": 1 },
-    { "name": "嫁祸", "type": "trick",  "suit": "club",    "number": 13, "count": 1 },
+    {
+      "name": "嫁祸",
+      "type": "trick",
+      "suit": "club",
+      "number": 12,
+      "count": 1
+    },
+    {
+      "name": "嫁祸",
+      "type": "trick",
+      "suit": "club",
+      "number": 13,
+      "count": 1
+    },
 
-    { "name": "午饭留堂", "type": "trick",  "suit": "club",    "number": 8,  "count": 1 },
-    { "name": "午饭留堂", "type": "trick",  "suit": "club",    "number": 9,  "count": 1 },
+    {
+      "name": "午饭留堂",
+      "type": "trick",
+      "suit": "club",
+      "number": 8,
+      "count": 1
+    },
+    {
+      "name": "午饭留堂",
+      "type": "trick",
+      "suit": "club",
+      "number": 9,
+      "count": 1
+    },
 
-    { "name": "午饭", "type": "trick",  "suit": "heart",   "number": 7,  "count": 1 },
-    { "name": "午饭", "type": "trick",  "suit": "heart",   "number": 8,  "count": 1 },
+    {
+      "name": "午饭",
+      "type": "trick",
+      "suit": "heart",
+      "number": 7,
+      "count": 1
+    },
+    {
+      "name": "午饭",
+      "type": "trick",
+      "suit": "heart",
+      "number": 8,
+      "count": 1
+    },
 
-    { "name": "感冒", "type": "trick",  "suit": "heart",   "number": 6,  "count": 1 },
-    { "name": "感冒", "type": "trick",  "suit": "spade",   "number": 6,  "count": 1 },
-    { "name": "感冒", "type": "trick",  "suit": "club",    "number": 6,  "count": 1 },
+    {
+      "name": "感冒",
+      "type": "trick",
+      "suit": "heart",
+      "number": 6,
+      "count": 1
+    },
+    {
+      "name": "感冒",
+      "type": "trick",
+      "suit": "spade",
+      "number": 6,
+      "count": 1
+    },
+    {
+      "name": "感冒",
+      "type": "trick",
+      "suit": "club",
+      "number": 6,
+      "count": 1
+    },
 
-    { "name": "免罚券", "type": "trick",  "suit": "spade",   "number": 11, "count": 1 },
-    { "name": "免罚券", "type": "trick",  "suit": "club",    "number": 11, "count": 1 },
-    { "name": "免罚券", "type": "trick",  "suit": "heart",   "number": 11, "count": 1 },
-    { "name": "免罚券", "type": "trick",  "suit": "diamond", "number": 11, "count": 1 },
+    {
+      "name": "免罚券",
+      "type": "trick",
+      "suit": "spade",
+      "number": 11,
+      "count": 1
+    },
+    {
+      "name": "免罚券",
+      "type": "trick",
+      "suit": "club",
+      "number": 11,
+      "count": 1
+    },
+    {
+      "name": "免罚券",
+      "type": "trick",
+      "suit": "heart",
+      "number": 11,
+      "count": 1
+    },
+    {
+      "name": "免罚券",
+      "type": "trick",
+      "suit": "diamond",
+      "number": 11,
+      "count": 1
+    },
 
-    { "name": "钢笔",   "type": "weapon", "suit": "diamond", "number": 1,  "count": 1 },
-    { "name": "圆规",   "type": "weapon", "suit": "diamond", "number": 1,  "count": 1 },
-    { "name": "尺子",   "type": "weapon", "suit": "spade",   "number": 5,  "count": 1 },
-    { "name": "橡皮",   "type": "weapon", "suit": "diamond", "number": 5,  "count": 1 },
-    { "name": "校服",   "type": "armor",  "suit": "club",    "number": 2,  "count": 1 },
-    { "name": "黑名单", "type": "armor",  "suit": "club",    "number": 2,  "count": 1 },
-    { "name": "涂改液", "type": "armor",  "suit": "spade",   "number": 2,  "count": 1 }
+    {
+      "name": "钢笔",
+      "type": "weapon",
+      "suit": "diamond",
+      "number": 1,
+      "count": 1
+    },
+    {
+      "name": "圆规",
+      "type": "weapon",
+      "suit": "diamond",
+      "number": 1,
+      "count": 1
+    },
+    {
+      "name": "尺子",
+      "type": "weapon",
+      "suit": "spade",
+      "number": 5,
+      "count": 1
+    },
+    {
+      "name": "橡皮",
+      "type": "weapon",
+      "suit": "diamond",
+      "number": 5,
+      "count": 1
+    },
+    {
+      "name": "校服",
+      "type": "armor",
+      "suit": "club",
+      "number": 2,
+      "count": 1
+    },
+    {
+      "name": "黑名单",
+      "type": "armor",
+      "suit": "club",
+      "number": 2,
+      "count": 1
+    },
+    {
+      "name": "涂改液",
+      "type": "armor",
+      "suit": "spade",
+      "number": 2,
+      "count": 1
+    }
   ]
 }

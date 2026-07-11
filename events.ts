@@ -2,7 +2,7 @@
 // events.ts — 事件系统（技能系统的核心入口）
 // ============================================================
 
-import type { GameState, Card, Phase } from "./types.ts";
+import type { Card, GameState, Phase } from "./types.ts";
 
 // ---------- 事件类型 ----------
 

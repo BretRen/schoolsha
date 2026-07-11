@@ -2,7 +2,9 @@
 
 **English** | [Chinese](./README.zh.md)
 
-"School Sha" is a 1v1 card game inspired by *Three Kingdoms Kill* (Sanguosha), co-created by Stoller students.
+"School Sha" is a 1v1 card game inspired by _Three Kingdoms Kill_ (Sanguosha),
+co-created by Stoller students.
+
 > Full Name: Stoller SchoolSha
 
 ---
@@ -11,7 +13,8 @@
 
 - **[卡牌图鉴](./docs/CARDS.md)** — 全部 88 张牌的效果与花色
 - **[角色与技能](./docs/CHARACTERS.md)** — 4 个角色及技能说明
-- **[PKCE 认证流程](./docs/PKCE_FLOW.md)** — 客户端接入指南（Godot / 浏览器 / Deno）
+- **[PKCE 认证流程](./docs/PKCE_FLOW.md)** — 客户端接入指南（Godot / 浏览器 /
+  Deno）
 
 ---
 
@@ -61,21 +64,30 @@ deno run --allow-env test_equip.ts
 ---
 
 ## Credits
+
 > In no particular order
+
 - Development: [Pidan](https://github.com/bretren)
-- Characters & Game Design: NieCi, CottonBunny, [Pidan](https://github.com/bretren)
+- Characters & Game Design: NieCi, CottonBunny,
+  [Pidan](https://github.com/bretren)
 - Review: NieCi, Tim
 
 ## Origins
-One day, while playing *Three Kingdoms Kill* at school, the idea struck: why not create a school-themed version?
-Although a physical paper version was initially attempted, it was abandoned due to the summer break and other factors; the project subsequently shifted to a software-based version.
+
+One day, while playing _Three Kingdoms Kill_ at school, the idea struck: why not
+create a school-themed version? Although a physical paper version was initially
+attempted, it was abandoned due to the summer break and other factors; the
+project subsequently shifted to a software-based version.
 
 ## Disclaimer & Statement
+
 - This project has no affiliation with Stoller Middle School.
 - This project is not part of the Beaverton School District.
-- The characters in this project (including students, teachers, etc.) are not connected to real-life individuals; please do not over-interpret them.
+- The characters in this project (including students, teachers, etc.) are not
+  connected to real-life individuals; please do not over-interpret them.
 - **This software is provided "as-is."**
-- This project is open-source under the MIT License, covering all code. However, this excludes:
+- This project is open-source under the MIT License, covering all code. However,
+  this excludes:
   - Artwork copyrights
   - Characters
 - Code Copyright: Bret Ren

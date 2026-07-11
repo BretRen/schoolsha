@@ -2,10 +2,10 @@
 // effects.ts — 卡牌效果 + 装备系统
 // ============================================================
 
-import type { GameState, Card, PendingType, LogEntry } from "./types.ts";
-import { hasCard, removeCard, drawCards } from "./cards.ts";
+import type { Card, GameState, LogEntry, PendingType } from "./types.ts";
+import { drawCards, hasCard, removeCard } from "./cards.ts";
 import { emit } from "./events.ts";
-import { getSkill, executeSkillEffect } from "./skills.ts";
+import { executeSkillEffect, getSkill } from "./skills.ts";
 import { cardLabel } from "./cards.ts";
 
 // ---------- 效果类型 ----------
@@ -14,7 +14,12 @@ export interface CardEffect {
   canUse: (state: GameState, playerIdx: number, card: Card) => boolean;
   needsTarget: boolean;
   targetFilter?: (state: GameState, source: number, target: number) => boolean;
-  onUse: (state: GameState, playerIdx: number, card: Card, target?: number) => void;
+  onUse: (
+    state: GameState,
+    playerIdx: number,
+    card: Card,
+    target?: number,
+  ) => void;
   canRespond?: (state: GameState, playerIdx: number, card: Card) => boolean;
 }
 
@@ -69,7 +74,13 @@ function pendingIs(pendingType: PendingType): Condition {
 // 可复用效果原语
 // ============================================================
 
-function dealDamage(s: GameState, source: number, target: number, amount: number, reason?: string) {
+function dealDamage(
+  s: GameState,
+  source: number,
+  target: number,
+  amount: number,
+  reason?: string,
+) {
   // 黑名单：点名批评伤害+1
   if (s.players[target].armor?.name === "黑名单" && reason === "volley") {
     amount++;
@@ -85,7 +96,10 @@ function dealDamage(s: GameState, source: number, target: number, amount: number
 }
 
 function healTo(s: GameState, player: number, amount: number) {
-  s.players[player].hp = Math.min(s.players[player].hp + amount, s.players[player].maxHp);
+  s.players[player].hp = Math.min(
+    s.players[player].hp + amount,
+    s.players[player].maxHp,
+  );
   addLog(s, { id: "heal", player: player, amount });
   emit({ type: "heal", player, amount }, s);
 }
@@ -120,7 +134,7 @@ function discardFromPool(s: GameState, player: number): boolean {
 
   const idx = Math.floor(Math.random() * pool.length);
   const c = pool[idx];
-  if (target.hand.some(h => h.id === c.id)) removeCard(target.hand, c.id);
+  if (target.hand.some((h) => h.id === c.id)) removeCard(target.hand, c.id);
   else if (target.weapon?.id === c.id) target.weapon = null;
   else target.armor = null;
 
@@ -136,13 +150,21 @@ function equipCard(s: GameState, playerIdx: number, card: Card): string | null {
   if (card.type === "weapon") {
     if (player.weapon) {
       s.discard.push(player.weapon);
-      addLog(s, { id: "card_discarded", player: playerIdx, cardName: player.weapon.name });
+      addLog(s, {
+        id: "card_discarded",
+        player: playerIdx,
+        cardName: player.weapon.name,
+      });
     }
     player.weapon = card;
   } else if (card.type === "armor") {
     if (player.armor) {
       s.discard.push(player.armor);
-      addLog(s, { id: "card_discarded", player: playerIdx, cardName: player.armor.name });
+      addLog(s, {
+        id: "card_discarded",
+        player: playerIdx,
+        cardName: player.armor.name,
+      });
     }
     player.armor = card;
   } else {
@@ -163,7 +185,10 @@ registerCardEffect("作业", {
   canUse: all(playPhase, isTurn, noPending, canAttack, (s, p, card) => {
     const opp = s.players[1 - p];
     if (opp.armor?.name === "黑名单") return false;
-    if (opp.armor?.name === "校服" && (card.suit === "spade" || card.suit === "club")) return false;
+    if (
+      opp.armor?.name === "校服" &&
+      (card.suit === "spade" || card.suit === "club")
+    ) return false;
     return true;
   }),
   needsTarget: true,
@@ -183,16 +208,36 @@ registerCardEffect("作业", {
           card,
           timeout: Date.now() + 8000,
         };
-        addLog(s, { id: "card_played", player: playerIdx, cardName: "作业", target: 1 - playerIdx });
-        emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+        addLog(s, {
+          id: "card_played",
+          player: playerIdx,
+          cardName: "作业",
+          target: 1 - playerIdx,
+        });
+        emit({
+          type: "card_played",
+          player: playerIdx,
+          card,
+          target: 1 - playerIdx,
+        }, s);
         return;
       }
     }
 
     s.attackUsed = true;
     setDodgePending(s, playerIdx, card);
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "作业", target: 1 - playerIdx });
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "作业",
+      target: 1 - playerIdx,
+    });
+    emit({
+      type: "card_played",
+      player: playerIdx,
+      card,
+      target: 1 - playerIdx,
+    }, s);
   },
 });
 
@@ -204,7 +249,10 @@ registerCardEffect("豁免", {
 });
 
 registerCardEffect("补给", {
-  canUse: any(pendingIs("near_death"), all(playPhase, isTurn, noPending, hpBelowMax)),
+  canUse: any(
+    pendingIs("near_death"),
+    all(playPhase, isTurn, noPending, hpBelowMax),
+  ),
   needsTarget: false,
   onUse: (s, playerIdx, card) => {
     healTo(s, playerIdx, 1);
@@ -235,30 +283,56 @@ registerCardEffect("小抄", {
 // --- 锦囊牌 — 需要响应 ---
 
 registerCardEffect("辩论", {
-  canUse: all(playPhase, isTurn, noPending, (s, p) => s.players[1 - p].armor?.name !== "黑名单"),
+  canUse: all(
+    playPhase,
+    isTurn,
+    noPending,
+    (s, p) => s.players[1 - p].armor?.name !== "黑名单",
+  ),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     s.pendingResponse = {
-      type: "duel", source: playerIdx, target: opponent, card,
+      type: "duel",
+      source: playerIdx,
+      target: opponent,
+      card,
       timeout: Date.now() + 15_000,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "辩论", target: opponent });
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "辩论",
+      target: opponent,
+    });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("duel"),
 });
 
 registerCardEffect("突击测验", {
-  canUse: all(playPhase, isTurn, noPending, (s, p) => s.players[1 - p].armor?.name !== "黑名单"),
+  canUse: all(
+    playPhase,
+    isTurn,
+    noPending,
+    (s, p) => s.players[1 - p].armor?.name !== "黑名单",
+  ),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     s.pendingResponse = {
-      type: "barbarian", source: playerIdx, target: opponent, card,
+      type: "barbarian",
+      source: playerIdx,
+      target: opponent,
+      card,
       timeout: Date.now() + 15_000,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "突击测验", target: opponent });
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "突击测验",
+      target: opponent,
+    });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("barbarian"),
@@ -288,10 +362,18 @@ registerCardEffect("嫁祸", {
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     s.pendingResponse = {
-      type: "borrow_knife", source: playerIdx, target: opponent, card,
+      type: "borrow_knife",
+      source: playerIdx,
+      target: opponent,
+      card,
       timeout: Date.now() + 15_000,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "嫁祸", target: opponent });
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "嫁祸",
+      target: opponent,
+    });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("borrow_knife"),
@@ -308,20 +390,34 @@ registerCardEffect("神偷", {
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     const opp = s.players[opponent];
-    const exposed: Array<{card: Card; position: number}> = [];
+    const exposed: Array<{ card: Card; position: number }> = [];
     let pos = 1;
     // 手牌盲选
     const handSize = opp.hand.length;
     pos += handSize;
-    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
-    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
+    if (opp.weapon) {
+      exposed.push({ card: opp.weapon, position: pos });
+      pos++;
+    }
+    if (opp.armor) {
+      exposed.push({ card: opp.armor, position: pos });
+      pos++;
+    }
     s.pendingResponse = {
-      type: "steal", source: playerIdx, target: playerIdx,
-      card, timeout: Date.now() + 10_000,
+      type: "steal",
+      source: playerIdx,
+      target: playerIdx,
+      card,
+      timeout: Date.now() + 10_000,
       poolSize: handSize,
       exposedCards: exposed,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "神偷", target: opponent });
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "神偷",
+      target: opponent,
+    });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
 });
@@ -335,20 +431,34 @@ registerCardEffect("告密", {
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     const opp = s.players[opponent];
-    const exposed: Array<{card: Card; position: number}> = [];
+    const exposed: Array<{ card: Card; position: number }> = [];
     let pos = 1;
     const handSize = opp.hand.length;
     pos += handSize;
-    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
-    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
+    if (opp.weapon) {
+      exposed.push({ card: opp.weapon, position: pos });
+      pos++;
+    }
+    if (opp.armor) {
+      exposed.push({ card: opp.armor, position: pos });
+      pos++;
+    }
     s.pendingResponse = {
-      type: "steal", source: playerIdx, target: playerIdx,
-      card, timeout: Date.now() + 10_000,
+      type: "steal",
+      source: playerIdx,
+      target: playerIdx,
+      card,
+      timeout: Date.now() + 10_000,
       poolSize: handSize,
       exposedCards: exposed,
       stealAction: "discard",
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "告密", target: opponent });
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "告密",
+      target: opponent,
+    });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
 });
@@ -362,10 +472,16 @@ registerCardEffect("陷害", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opp = s.players[1 - playerIdx];
-    const exposed: Array<{card: Card; position: number}> = [];
+    const exposed: Array<{ card: Card; position: number }> = [];
     let pos = opp.hand.length + 1;
-    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
-    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
+    if (opp.weapon) {
+      exposed.push({ card: opp.weapon, position: pos });
+      pos++;
+    }
+    if (opp.armor) {
+      exposed.push({ card: opp.armor, position: pos });
+      pos++;
+    }
     s.pendingResponse = {
       type: "pick_discard",
       source: playerIdx,
@@ -376,8 +492,18 @@ registerCardEffect("陷害", {
       discardCount: 2,
       timeout: Date.now() + 15000,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "陷害", target: 1 - playerIdx });
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "陷害",
+      target: 1 - playerIdx,
+    });
+    emit({
+      type: "card_played",
+      player: playerIdx,
+      card,
+      target: 1 - playerIdx,
+    }, s);
   },
 });
 
@@ -387,10 +513,18 @@ registerCardEffect("点名批评", {
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
     s.pendingResponse = {
-      type: "volley", source: playerIdx, target: opponent, card,
+      type: "volley",
+      source: playerIdx,
+      target: opponent,
+      card,
       timeout: Date.now() + 15_000,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "点名批评", target: opponent });
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "点名批评",
+      target: opponent,
+    });
     emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
   },
   canRespond: pendingIs("volley"),
@@ -404,10 +538,16 @@ registerCardEffect("午饭留堂", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opp = s.players[1 - playerIdx];
-    const exposed: Array<{card: Card; position: number}> = [];
+    const exposed: Array<{ card: Card; position: number }> = [];
     let pos = opp.hand.length + 1;
-    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
-    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
+    if (opp.weapon) {
+      exposed.push({ card: opp.weapon, position: pos });
+      pos++;
+    }
+    if (opp.armor) {
+      exposed.push({ card: opp.armor, position: pos });
+      pos++;
+    }
     s.pendingResponse = {
       type: "pick_discard",
       source: playerIdx,
@@ -418,8 +558,18 @@ registerCardEffect("午饭留堂", {
       discardCount: 1,
       timeout: Date.now() + 15000,
     };
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "午饭留堂", target: 1 - playerIdx });
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "午饭留堂",
+      target: 1 - playerIdx,
+    });
+    emit({
+      type: "card_played",
+      player: playerIdx,
+      card,
+      target: 1 - playerIdx,
+    }, s);
   },
 });
 
@@ -442,8 +592,18 @@ registerCardEffect("感冒", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     dealDamage(s, playerIdx, 1 - playerIdx, 1);
-    addLog(s, { id: "card_played", player: playerIdx, cardName: "感冒", target: 1 - playerIdx });
-    emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
+    addLog(s, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: "感冒",
+      target: 1 - playerIdx,
+    });
+    emit({
+      type: "card_played",
+      player: playerIdx,
+      card,
+      target: 1 - playerIdx,
+    }, s);
   },
 });
 
@@ -459,7 +619,9 @@ registerCardEffect("免罚券", {
 });
 
 // --- 装备牌（批量注册） ---
-for (const name of ["钢笔", "圆规", "尺子", "橡皮", "校服", "黑名单", "涂改液"]) {
+for (
+  const name of ["钢笔", "圆规", "尺子", "橡皮", "校服", "黑名单", "涂改液"]
+) {
   registerCardEffect(name, {
     canUse: all(playPhase, isTurn, noPending),
     needsTarget: false,
@@ -531,7 +693,10 @@ export function tryRespond(
   const card = player.hand.find((c) => c.id === cardId)!;
 
   // 赦免 → dodge / volley
-  if (card.name === "豁免" && (pending.type === "dodge" || pending.type === "volley")) {
+  if (
+    card.name === "豁免" &&
+    (pending.type === "dodge" || pending.type === "volley")
+  ) {
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
@@ -539,30 +704,46 @@ export function tryRespond(
     emit({ type: "card_played", player: playerIdx, card }, state);
 
     // 尺子：出赦免后攻击者可以再出一张作业
-    if (pending.type === "dodge" && state.players[pending.source].weapon?.name === "尺子") {
+    if (
+      pending.type === "dodge" &&
+      state.players[pending.source].weapon?.name === "尺子"
+    ) {
       state.attackUsed = false;
     }
     // 三角尺：出赦免后仍受到1点伤害
-    if (pending.type === "dodge" && state.players[pending.source].weapon?.name === "橡皮") {
+    if (
+      pending.type === "dodge" &&
+      state.players[pending.source].weapon?.name === "橡皮"
+    ) {
       dealDamage(state, pending.source, playerIdx, 1);
     }
     return null;
   }
 
   // 放假/辣条 → near_death
-  if (pending.type === "near_death" && (card.name === "补给" || card.name === "小抄")) {
+  if (
+    pending.type === "near_death" &&
+    (card.name === "补给" || card.name === "小抄")
+  ) {
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.players[playerIdx].hp = 1;
     emit({ type: "heal", player: playerIdx, amount: 1 }, state);
     state.pendingResponse = null;
-    addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
+    addLog(state, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: card.name,
+    });
     emit({ type: "card_played", player: playerIdx, card }, state);
     return null;
   }
 
   // 作业 → duel / barbarian
-  if ((pending.type === "duel" || pending.type === "barbarian") && card.name === "作业") {
+  if (
+    (pending.type === "duel" || pending.type === "barbarian") &&
+    card.name === "作业"
+  ) {
     removeCard(player.hand, cardId);
     state.discard.push(card);
     addLog(state, { id: "card_played", player: playerIdx, cardName: "作业" });
@@ -571,8 +752,11 @@ export function tryRespond(
     if (pending.type === "duel") {
       const [source, target] = [pending.source, pending.target];
       state.pendingResponse = {
-        type: "duel", source: target, target: source,
-        card: pending.card, timeout: Date.now() + 15_000,
+        type: "duel",
+        source: target,
+        target: source,
+        card: pending.card,
+        timeout: Date.now() + 15_000,
       };
     } else {
       state.pendingResponse = null;
@@ -585,13 +769,20 @@ export function tryRespond(
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
-    addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
+    addLog(state, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: card.name,
+    });
     emit({ type: "card_played", player: playerIdx, card }, state);
     return null;
   }
 
   // 免罚券 → 取消任何锦囊 pending
-  if (card.name === "免罚券" && ["barbarian", "volley", "borrow_knife", "duel"].includes(pending.type)) {
+  if (
+    card.name === "免罚券" &&
+    ["barbarian", "volley", "borrow_knife", "duel"].includes(pending.type)
+  ) {
     removeCard(player.hand, cardId);
     state.discard.push(card);
     state.pendingResponse = null;
@@ -602,7 +793,9 @@ export function tryRespond(
 
   if (pending.type === "dodge") return "需要出【豁免】";
   if (pending.type === "near_death") return "需要出【补给】或【小抄】";
-  if (pending.type === "duel" || pending.type === "barbarian") return "需要出【作业】";
+  if (pending.type === "duel" || pending.type === "barbarian") {
+    return "需要出【作业】";
+  }
   if (pending.type === "volley") return "需要出【豁免】";
   if (pending.type === "steal") return "请选择要偷的牌";
   if (pending.type === "skill_discard") return "需要选择要弃置的牌";
@@ -611,12 +804,15 @@ export function tryRespond(
   return "无效响应";
 }
 
-
 // ============================================================
 // steal 选牌处理
 // ============================================================
 
-export function handleStealCard(state: GameState, playerIdx: number, position?: number): string | null {
+export function handleStealCard(
+  state: GameState,
+  playerIdx: number,
+  position?: number,
+): string | null {
   const pending = state.pendingResponse;
   if (!pending || pending.type !== "steal") return "没有正在进行的偷牌";
   if (playerIdx !== pending.target) return "不是你在选择";
@@ -631,11 +827,13 @@ export function handleStealCard(state: GameState, playerIdx: number, position?: 
   if (pool.length === 0) return "无可选牌";
 
   // 盲选：根据位置（1-indexed），超时时由 handleTimeout 随机选
-  const pos = (position != null && position >= 1 && position <= pool.length) ? position : Math.floor(Math.random() * pool.length) + 1;
+  const pos = (position != null && position >= 1 && position <= pool.length)
+    ? position
+    : Math.floor(Math.random() * pool.length) + 1;
   const card = pool[pos - 1];
 
   // 从对手手中或装备区移除
-  if (opp.hand.some(c => c.id === card.id)) {
+  if (opp.hand.some((c) => c.id === card.id)) {
     removeCard(opp.hand, card.id);
   } else if (opp.weapon?.id === card.id) {
     opp.weapon = null;
@@ -648,12 +846,20 @@ export function handleStealCard(state: GameState, playerIdx: number, position?: 
     state.discard.push(card);
     state.pendingResponse = null;
     state.discard.push(pending.card!);
-    addLog(state, { id: "card_discarded", player: 1 - playerIdx, cardName: card.name });
+    addLog(state, {
+      id: "card_discarded",
+      player: 1 - playerIdx,
+      cardName: card.name,
+    });
   } else {
     state.players[playerIdx].hand.push(card);
     state.pendingResponse = null;
     state.discard.push(pending.card!);
-    addLog(state, { id: "card_played", player: playerIdx, cardName: card.name });
+    addLog(state, {
+      id: "card_played",
+      player: playerIdx,
+      cardName: card.name,
+    });
   }
   emit({ type: "card_played", player: playerIdx, card }, state);
   return null;
@@ -666,7 +872,10 @@ export function handleTimeout(state: GameState) {
   if (pending.type === "dodge") {
     const target = pending.target;
     let dmg = 1;
-    if (state.wineUsed) { dmg++; state.wineUsed = false; }
+    if (state.wineUsed) {
+      dmg++;
+      state.wineUsed = false;
+    }
     if (state.players[pending.source].weapon?.name === "钢笔") dmg++;
     state.pendingResponse = null; // 先清原始 pending，dealDamage 内会设 near_death
     dealDamage(state, pending.source, target, dmg);
@@ -685,7 +894,12 @@ export function handleTimeout(state: GameState) {
   }
 
   // duel / barbarian / volley / borrow_knife 超时
-  const plainTypes = ["duel", "barbarian", "volley", "borrow_knife"] as string[];
+  const plainTypes = [
+    "duel",
+    "barbarian",
+    "volley",
+    "borrow_knife",
+  ] as string[];
   if (plainTypes.includes(pending.type)) {
     const target = pending.target;
     state.pendingResponse = null; // 先清，dealDamage 内处理 near_death
@@ -728,7 +942,10 @@ export function handleTimeout(state: GameState) {
 }
 
 // 涂改液主动技 — 玩家确认发动后翻牌判定
-export function handleActivateArmor(state: GameState, playerIdx: number): string | null {
+export function handleActivateArmor(
+  state: GameState,
+  playerIdx: number,
+): string | null {
   const pending = state.pendingResponse;
   if (!pending || pending.type !== "judge_armor") return "没有需要响应的判定";
   if (playerIdx !== pending.target) return "不是你需要响应";
@@ -742,10 +959,21 @@ export function handleActivateArmor(state: GameState, playerIdx: number): string
     const judge = drawn[0];
     state.discard.push(judge);
     const isRed = judge.suit === "heart" || judge.suit === "diamond";
-    addLog(state, { id: "judge_result", player: playerIdx, cardName: judge.name, suit: judge.suit, result: isRed ? "success" : "fail" });
+    addLog(state, {
+      id: "judge_result",
+      player: playerIdx,
+      cardName: judge.name,
+      suit: judge.suit,
+      result: isRed ? "success" : "fail",
+    });
     if (isRed) {
       // 红色 → 闪避成功，作业无效
-      emit({ type: "card_played", player: pending.source, card: pending.card!, target: playerIdx }, state);
+      emit({
+        type: "card_played",
+        player: pending.source,
+        card: pending.card!,
+        target: playerIdx,
+      }, state);
       return null;
     }
     // 黑色 → 判定失败，作业正常生效
@@ -759,7 +987,11 @@ export function handleActivateArmor(state: GameState, playerIdx: number): string
 }
 
 // 陷害等：攻击方从对手牌中盲选弃置
-export function handlePickDiscard(state: GameState, playerIdx: number, positions: number[]): string | null {
+export function handlePickDiscard(
+  state: GameState,
+  playerIdx: number,
+  positions: number[],
+): string | null {
   const pending = state.pendingResponse;
   if (!pending || pending.type !== "pick_discard") return "没有待选择的弃牌";
   if (playerIdx !== pending.target) return "不是你需要选择";
@@ -778,7 +1010,7 @@ export function handlePickDiscard(state: GameState, playerIdx: number, positions
   for (const pos of positions) {
     if (pos < 1 || pos > pool.length) return `无效位置 ${pos}`;
     const c = pool[pos - 1];
-    if (opp.hand.some(h => h.id === c.id)) {
+    if (opp.hand.some((h) => h.id === c.id)) {
       removeCard(opp.hand, c.id);
     } else if (opp.weapon?.id === c.id) {
       opp.weapon = null;

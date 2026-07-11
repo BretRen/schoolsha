@@ -2,7 +2,8 @@
 
 ## 项目概述
 
-学校杀 (SchoolSha) 是一个 1v1 卡牌对战游戏，Deno + TypeScript 后端，Godot 4 前端。
+学校杀 (SchoolSha) 是一个 1v1 卡牌对战游戏，Deno + TypeScript 后端，Godot 4
+前端。
 
 ## 技术栈
 
@@ -67,8 +68,10 @@ deno run --allow-net cli.ts
 ### 架构原则
 
 1. **后端是唯一真相源** — 前端只做渲染和发送操作，不包含游戏逻辑
-2. **JSON 驱动** — 卡牌/角色/技能通过 JSON 配置，新增一张牌只需改 JSON + 注册效果
-3. **事件总线** — 所有技能通过 `events.ts` 的 `onEvent` / `emit` 绑定，不修改核心逻辑
+2. **JSON 驱动** — 卡牌/角色/技能通过 JSON 配置，新增一张牌只需改 JSON +
+   注册效果
+3. **事件总线** — 所有技能通过 `events.ts` 的 `onEvent` / `emit`
+   绑定，不修改核心逻辑
 
 ### 多房间架构
 
@@ -76,7 +79,8 @@ deno run --allow-net cli.ts
 - 房间码 6 位大写字母数字（排除 0/O/1/I/L），`GET /room/create` 创建新房间
 - `?room=CODE` 参数加入指定房间；不带参数则自动创建
 - WebSocket 断线重连：先验证 userId（如有），再恢复连接
-- 邀请链接：`pdnode://schoolsha/invite/CODE`（自定义 scheme）+ HTML 落地页 `GET /invite/CODE`
+- 邀请链接：`pdnode://schoolsha/invite/CODE`（自定义 scheme）+ HTML 落地页
+  `GET /invite/CODE`
 
 ### 如何新增一张牌
 

@@ -32,16 +32,24 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
       const { payload } = await jwtVerify(token, jwks, { issuer });
       // 校验 azp
       if (clientId && payload.azp !== clientId) {
-        console.error(`[auth] JWT azp mismatch: expected ${clientId}, got ${payload.azp}`);
+        console.error(
+          `[auth] JWT azp mismatch: expected ${clientId}, got ${payload.azp}`,
+        );
         return null;
       }
       console.log(`[auth] JWT validated (sub=${payload.sub})`);
       return {
         sub: payload.sub as string,
-        displayName: (payload.nickname || payload.name || payload.preferred_username || payload.sub) as string,
+        displayName:
+          (payload.nickname || payload.name || payload.preferred_username ||
+            payload.sub) as string,
       };
     } catch (e) {
-      console.warn(`[auth] JWT verify failed (will try introspection): ${(e as Error).message}`);
+      console.warn(
+        `[auth] JWT verify failed (will try introspection): ${
+          (e as Error).message
+        }`,
+      );
       // 继续走 introspection
     }
   }
@@ -61,7 +69,8 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
     console.log(`[auth] opaque token validated via userinfo (sub=${data.sub})`);
     return {
       sub: data.sub as string,
-      displayName: (data.nickname || data.name || data.preferred_username || data.sub) as string,
+      displayName: (data.nickname || data.name || data.preferred_username ||
+        data.sub) as string,
       name: data.name as string | undefined,
       email: data.email as string | undefined,
     };
@@ -75,7 +84,9 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
  * 从 Zitadel userinfo 端点拉取用户显示名称
  * JWT 里可能没有昵称字段，所以通过 API 补全
  */
-export async function fetchUserInfo(token: string): Promise<{ name: string } | null> {
+export async function fetchUserInfo(
+  token: string,
+): Promise<{ name: string } | null> {
   try {
     const res = await fetch(`${issuer}/oidc/v1/userinfo`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -86,7 +97,8 @@ export async function fetchUserInfo(token: string): Promise<{ name: string } | n
     }
     const data = await res.json();
     // 优先级：nickname > name > preferred_username > sub
-    const name = data.nickname || data.name || data.preferred_username || data.sub;
+    const name = data.nickname || data.name || data.preferred_username ||
+      data.sub;
     return { name };
   } catch (e) {
     console.warn("[auth] userinfo fetch error:", (e as Error).message);
@@ -107,14 +119,22 @@ export function extractToken(req: Request): string | null {
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Bearer ")) {
     const t = auth.slice(7);
-    console.log(`[auth] token from Authorization header: ${t.slice(0, 20)}... (len=${t.length})`);
+    console.log(
+      `[auth] token from Authorization header: ${
+        t.slice(0, 20)
+      }... (len=${t.length})`,
+    );
     return t;
   }
 
   // 2. Sec-WebSocket-Protocol（浏览器 WS 构造函数的第二个参数）
   const proto = req.headers.get("sec-websocket-protocol");
   if (proto) {
-    console.log(`[auth] token from Sec-WebSocket-Protocol: ${proto.slice(0, 20)}... (len=${proto.length})`);
+    console.log(
+      `[auth] token from Sec-WebSocket-Protocol: ${
+        proto.slice(0, 20)
+      }... (len=${proto.length})`,
+    );
     return proto;
   }
 
@@ -122,7 +142,11 @@ export function extractToken(req: Request): string | null {
   const url = new URL(req.url);
   const queryToken = url.searchParams.get("token");
   if (queryToken) {
-    console.log(`[auth] token from URL query: ${queryToken.slice(0, 20)}... (len=${queryToken.length})`);
+    console.log(
+      `[auth] token from URL query: ${
+        queryToken.slice(0, 20)
+      }... (len=${queryToken.length})`,
+    );
     return queryToken;
   }
 

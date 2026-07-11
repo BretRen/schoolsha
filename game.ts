@@ -2,19 +2,33 @@
 // game.ts — 阶段机 + 游戏状态管理
 // ============================================================
 
-import type { GameState, Player, Phase, ServerStateView, PlayerView, ClientMsg } from "./types.ts";
-import { createDeck, shuffle, drawCards } from "./cards.ts";
-import { tryUseCard, handleTimeout, handleStealCard, addLog, handleActivateArmor, handlePickDiscard } from "./effects.ts";
+import type {
+  ClientMsg,
+  GameState,
+  Phase,
+  Player,
+  PlayerView,
+  ServerStateView,
+} from "./types.ts";
+import { createDeck, drawCards, shuffle } from "./cards.ts";
+import {
+  addLog,
+  handleActivateArmor,
+  handlePickDiscard,
+  handleStealCard,
+  handleTimeout,
+  tryUseCard,
+} from "./effects.ts";
 import { cardLabel } from "./cards.ts";
 import { emit } from "./events.ts";
 import {
-  getCharacter,
-  mountPassiveSkills,
-  getHandLimit,
-  tryUseSkill,
-  resetSkillCounts,
-  getSkill,
   executeSkillEffect,
+  getCharacter,
+  getHandLimit,
+  getSkill,
+  mountPassiveSkills,
+  resetSkillCounts,
+  tryUseSkill,
 } from "./skills.ts";
 
 export { cardLabel };
@@ -33,8 +47,24 @@ export function createGame(picks: [string, string]): GameState {
   const char1 = getCharacter(picks[1]);
 
   const players: [Player, Player] = [
-    { hp: char0?.maxHp ?? 3, maxHp: char0?.maxHp ?? 3, hand: [], alive: true, characterId: picks[0], weapon: null, armor: null },
-    { hp: char1?.maxHp ?? 3, maxHp: char1?.maxHp ?? 3, hand: [], alive: true, characterId: picks[1], weapon: null, armor: null },
+    {
+      hp: char0?.maxHp ?? 3,
+      maxHp: char0?.maxHp ?? 3,
+      hand: [],
+      alive: true,
+      characterId: picks[0],
+      weapon: null,
+      armor: null,
+    },
+    {
+      hp: char1?.maxHp ?? 3,
+      maxHp: char1?.maxHp ?? 3,
+      hand: [],
+      alive: true,
+      characterId: picks[1],
+      weapon: null,
+      armor: null,
+    },
   ];
 
   const r1 = drawCards(deck, [], 4);
@@ -64,8 +94,16 @@ export function createGame(picks: [string, string]): GameState {
   if (picks[1]) mountPassiveSkills(state, 1, picks[1]);
 
   console.log("Game created. Starting hands:");
-  console.log(`  P0 (${char0?.name ?? "?"}): ${players[0].hand.map(cardLabel).join(", ")}`);
-  console.log(`  P1 (${char1?.name ?? "?"}): ${players[1].hand.map(cardLabel).join(", ")}`);
+  console.log(
+    `  P0 (${char0?.name ?? "?"}): ${
+      players[0].hand.map(cardLabel).join(", ")
+    }`,
+  );
+  console.log(
+    `  P1 (${char1?.name ?? "?"}): ${
+      players[1].hand.map(cardLabel).join(", ")
+    }`,
+  );
 
   advancePhase(state);
   return state;
@@ -78,28 +116,40 @@ export function advancePhase(state: GameState) {
   if (state.pendingResponse) return;
 
   if (state.phase === "judge") {
-    emit({ type: "phase_exit", phase: "judge", player: state.turnPlayer }, state);
+    emit(
+      { type: "phase_exit", phase: "judge", player: state.turnPlayer },
+      state,
+    );
     state.phase = "draw";
     enterPhase(state, "draw");
     return;
   }
 
   if (state.phase === "draw") {
-    emit({ type: "phase_exit", phase: "draw", player: state.turnPlayer }, state);
+    emit(
+      { type: "phase_exit", phase: "draw", player: state.turnPlayer },
+      state,
+    );
     state.phase = "play";
     enterPhase(state, "play");
     return;
   }
 
   if (state.phase === "play") {
-    emit({ type: "phase_exit", phase: "play", player: state.turnPlayer }, state);
+    emit(
+      { type: "phase_exit", phase: "play", player: state.turnPlayer },
+      state,
+    );
     state.phase = "discard";
     enterPhase(state, "discard");
     return;
   }
 
   if (state.phase === "discard") {
-    emit({ type: "phase_exit", phase: "discard", player: state.turnPlayer }, state);
+    emit(
+      { type: "phase_exit", phase: "discard", player: state.turnPlayer },
+      state,
+    );
     state.phase = "end";
     enterPhase(state, "end");
     return;
@@ -120,7 +170,10 @@ function enterPhase(state: GameState, phase: Phase) {
       state.deck = deck;
       state.discard = discard;
       state.players[state.turnPlayer].hand.push(...drawn);
-      emit({ type: "draw_card", player: state.turnPlayer, cards: drawn }, state);
+      emit(
+        { type: "draw_card", player: state.turnPlayer, cards: drawn },
+        state,
+      );
       console.log(
         `P${state.turnPlayer} draws: ${drawn.map(cardLabel).join(", ")}`,
       );
@@ -136,7 +189,11 @@ function enterPhase(state: GameState, phase: Phase) {
     case "discard": {
       state.turnStartTime = Date.now();
       const player = state.players[state.turnPlayer];
-      const limit = getHandLimit(state, state.turnPlayer, player.characterId ?? "");
+      const limit = getHandLimit(
+        state,
+        state.turnPlayer,
+        player.characterId ?? "",
+      );
       if (player.hand.length <= limit) {
         console.log(
           `P${state.turnPlayer} discard: hand=${player.hand.length} <= hp+skill=${limit}, skip`,
@@ -193,7 +250,10 @@ export function handleMessage(
 
     case "discard": {
       // 技能弃牌：对手选择弃牌
-      if (state.pendingResponse?.type === "opponent_discard" && playerIdx === state.pendingResponse.target) {
+      if (
+        state.pendingResponse?.type === "opponent_discard" &&
+        playerIdx === state.pendingResponse.target
+      ) {
         return handleOpponentDiscard(state, playerIdx, msg.card_ids);
       }
       if (playerIdx !== state.turnPlayer) return "不是你的回合";
@@ -272,18 +332,23 @@ function handleConfirmSkill(
   if (cardIds.length !== count) return `需要选 ${count} 张牌`;
 
   for (const id of cardIds) {
-    const idx = player.hand.findIndex(c => c.id === id);
+    const idx = player.hand.findIndex((c) => c.id === id);
     if (idx === -1) return `你没有牌 ${id}`;
     const card = player.hand.splice(idx, 1)[0];
     state.discard.push(card);
-    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
+    addLog(state, {
+      id: "card_discarded",
+      player: playerIdx,
+      cardName: card.name,
+    });
   }
 
   state.pendingResponse = null;
 
   // 标记使用
   if (skill.perTurn) {
-    state.skillUseCount[pending.pendingSkillId!] = (state.skillUseCount[pending.pendingSkillId!] ?? 0) + 1;
+    state.skillUseCount[pending.pendingSkillId!] =
+      (state.skillUseCount[pending.pendingSkillId!] ?? 0) + 1;
   }
 
   // 执行效果
@@ -320,7 +385,11 @@ function handleDiscard(
 
   state.discard.push(...discarded);
   for (const c of discarded) {
-    addLog(state, { id: "card_discarded", player: playerIdx, cardName: c.name });
+    addLog(state, {
+      id: "card_discarded",
+      player: playerIdx,
+      cardName: c.name,
+    });
   }
   emit(
     { type: "card_discarded", player: playerIdx, cards: discarded },
@@ -337,16 +406,22 @@ function handleOpponentDiscard(
   cardIds: string[],
 ): string | null {
   const pending = state.pendingResponse;
-  if (!pending || pending.type !== "opponent_discard") return "没有待处理的弃牌";
+  if (!pending || pending.type !== "opponent_discard") {
+    return "没有待处理的弃牌";
+  }
   const count = pending.discardCount ?? 1;
   if (cardIds.length !== count) return `需要弃 ${count} 张牌`;
   const player = state.players[playerIdx];
   for (const id of cardIds) {
-    const idx = player.hand.findIndex(c => c.id === id);
+    const idx = player.hand.findIndex((c) => c.id === id);
     if (idx === -1) return `你没有牌 ${id}`;
     const [card] = player.hand.splice(idx, 1);
     state.discard.push(card);
-    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
+    addLog(state, {
+      id: "card_discarded",
+      player: playerIdx,
+      cardName: card.name,
+    });
   }
   state.pendingResponse = null;
   return null;
@@ -364,7 +439,9 @@ export function checkTimeout(state: GameState): boolean {
 
   // Pending 超时
   if (state.pendingResponse && Date.now() >= state.pendingResponse.timeout) {
-    console.log(`P${state.pendingResponse.target} timeout on ${state.pendingResponse.type}`);
+    console.log(
+      `P${state.pendingResponse.target} timeout on ${state.pendingResponse.type}`,
+    );
     handleTimeout(state);
     changed = true;
   }
@@ -376,7 +453,9 @@ export function checkTimeout(state: GameState): boolean {
     (state.phase === "play" || state.phase === "discard") &&
     Date.now() - state.turnStartTime > TURN_TIMEOUT_MS
   ) {
-    console.log(`P${state.turnPlayer} turn timeout (${TURN_TIMEOUT_SEC}s) in ${state.phase}`);
+    console.log(
+      `P${state.turnPlayer} turn timeout (${TURN_TIMEOUT_SEC}s) in ${state.phase}`,
+    );
     if (state.phase === "discard") {
       // discard 超时：直接进入下一阶段，不随机弃牌
     }
@@ -395,7 +474,11 @@ const MAX_DISCONNECTS = 3;
 export function markDisconnected(state: GameState, playerIdx: number): boolean {
   state.disconnectedAt[playerIdx] = Date.now();
   state.disconnectCount[playerIdx]++;
-  console.log(`P${playerIdx} disconnected (${state.disconnectCount[playerIdx]}/${MAX_DISCONNECTS})`);
+  console.log(
+    `P${playerIdx} disconnected (${
+      state.disconnectCount[playerIdx]
+    }/${MAX_DISCONNECTS})`,
+  );
 
   if (state.disconnectCount[playerIdx] > MAX_DISCONNECTS && !state.gameOver) {
     console.log(`P${playerIdx} exceeded disconnect limit, opponent wins`);
@@ -413,7 +496,10 @@ export function markReconnected(state: GameState, playerIdx: number) {
 }
 
 /** 检查断线是否超时（30秒）。返回是否已判负 */
-export function checkDisconnectTimeout(state: GameState, playerIdx: number): boolean {
+export function checkDisconnectTimeout(
+  state: GameState,
+  playerIdx: number,
+): boolean {
   const at = state.disconnectedAt[playerIdx];
   if (at === null) return false;
   if (Date.now() - at > 30_000 && !state.gameOver) {
@@ -439,7 +525,9 @@ export function getPlayerView(
   const me = state.players[playerIdx];
   const opponent = state.players[1 - playerIdx];
 
-  const oppChar = opponent.characterId ? getCharacter(opponent.characterId) : null;
+  const oppChar = opponent.characterId
+    ? getCharacter(opponent.characterId)
+    : null;
   const oppView: PlayerView = {
     hp: opponent.hp,
     maxHp: opponent.maxHp,
@@ -448,22 +536,40 @@ export function getPlayerView(
     characterId: opponent.characterId,
     weapon: opponent.weapon,
     armor: opponent.armor,
-    skills: (oppChar?.skills ?? []).map(id => ({ id, name: getSkill(id)?.name || id, type: getSkill(id)?.type || "active" })),
+    skills: (oppChar?.skills ?? []).map((id) => ({
+      id,
+      name: getSkill(id)?.name || id,
+      type: getSkill(id)?.type || "active",
+    })),
   };
 
   const char = me.characterId ? getCharacter(me.characterId) : null;
 
-  const pendingView = state.pendingResponse ? { ...state.pendingResponse } : null;
+  const pendingView = state.pendingResponse
+    ? { ...state.pendingResponse }
+    : null;
 
   // 回合剩余时间
-  const turnTimeLeft = (state.phase === "play" || state.phase === "discard") && !state.pendingResponse
-    ? Math.max(0, TURN_TIMEOUT_SEC - Math.floor((Date.now() - state.turnStartTime) / 1000))
+  const turnTimeLeft = (state.phase === "play" || state.phase === "discard") &&
+      !state.pendingResponse
+    ? Math.max(
+      0,
+      TURN_TIMEOUT_SEC -
+        Math.floor((Date.now() - state.turnStartTime) / 1000),
+    )
     : TURN_TIMEOUT_SEC;
 
   return {
     phase: state.phase,
     turnPlayer: state.turnPlayer,
-    you: { ...me, skills: (char?.skills ?? []).map(id => ({ id, name: getSkill(id)?.name || id, type: getSkill(id)?.type || "active" })) },
+    you: {
+      ...me,
+      skills: (char?.skills ?? []).map((id) => ({
+        id,
+        name: getSkill(id)?.name || id,
+        type: getSkill(id)?.type || "active",
+      })),
+    },
     opponent: oppView,
     attackUsed: state.attackUsed,
     pendingResponse: pendingView,

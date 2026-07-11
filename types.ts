@@ -9,27 +9,51 @@ export type CardType = "basic" | "trick" | "weapon" | "armor";
 // ---------- 结构化日志（便于 i18n）----------
 
 export type LogEntry = {
-  id: "card_played"; player: number; cardName: string; target?: number;
+  id: "card_played";
+  player: number;
+  cardName: string;
+  target?: number;
 } | {
-  id: "card_equipped"; player: number; cardName: string;
+  id: "card_equipped";
+  player: number;
+  cardName: string;
 } | {
-  id: "damage"; player: number; amount: number;
+  id: "damage";
+  player: number;
+  amount: number;
 } | {
-  id: "heal"; player: number; amount: number;
+  id: "heal";
+  player: number;
+  amount: number;
 } | {
-  id: "skill_used"; player: number; skillName: string;
+  id: "skill_used";
+  player: number;
+  skillName: string;
 } | {
-  id: "phase"; player: number; phase: string;
+  id: "phase";
+  player: number;
+  phase: string;
 } | {
-  id: "draw"; player: number; count: number;
+  id: "draw";
+  player: number;
+  count: number;
 } | {
-  id: "discard"; player: number; cardName: string;
+  id: "discard";
+  player: number;
+  cardName: string;
 } | {
-  id: "card_discarded"; player: number; cardName: string;
+  id: "card_discarded";
+  player: number;
+  cardName: string;
 } | {
-  id: "death"; player: number;
+  id: "death";
+  player: number;
 } | {
-  id: "judge_result"; player: number; cardName: string; suit: string; result: "success" | "fail";
+  id: "judge_result";
+  player: number;
+  cardName: string;
+  suit: string;
+  result: "success" | "fail";
 };
 
 export interface Card {
@@ -50,7 +74,18 @@ export interface Player {
   armor: Card | null;
 }
 
-export type PendingType = "dodge" | "near_death" | "duel" | "barbarian" | "volley" | "borrow_knife" | "steal" | "skill_discard" | "opponent_discard" | "judge_armor" | "pick_discard";
+export type PendingType =
+  | "dodge"
+  | "near_death"
+  | "duel"
+  | "barbarian"
+  | "volley"
+  | "borrow_knife"
+  | "steal"
+  | "skill_discard"
+  | "opponent_discard"
+  | "judge_armor"
+  | "pick_discard";
 
 export interface PendingResponse {
   type: PendingType;
@@ -154,9 +189,14 @@ export interface ServerStateView {
   phase: Phase;
   turnPlayer: number;
   you: {
-    hp: number; maxHp: number; hand: Card[]; alive: boolean;
-    characterId: string | null; skills: SkillView[];
-    weapon: Card | null; armor: Card | null;
+    hp: number;
+    maxHp: number;
+    hand: Card[];
+    alive: boolean;
+    characterId: string | null;
+    skills: SkillView[];
+    weapon: Card | null;
+    armor: Card | null;
   };
   opponent: PlayerView;
   attackUsed: boolean;
@@ -183,20 +223,45 @@ export interface ServerStateView {
 }
 
 export type ServerMsg =
-  | { type: "character_select"; characters: CharacterInfo[]; timeoutSec: number; opponent?: { displayName: string; elo: number; userId: string }; elo?: { my: number; prediction: { win: number; lose: number } | null } }
-  | { type: "game_state"; state: ServerStateView; yourIndex: number; eloResult?: { change: number; newElo: number; opponentChange: number } }
+  | {
+    type: "character_select";
+    characters: CharacterInfo[];
+    timeoutSec: number;
+    opponent?: { displayName: string; elo: number; userId: string };
+    elo?: { my: number; prediction: { win: number; lose: number } | null };
+  }
+  | {
+    type: "game_state";
+    state: ServerStateView;
+    yourIndex: number;
+    eloResult?: { change: number; newElo: number; opponentChange: number };
+  }
   | { type: "waiting"; message: string }
   | { type: "disconnected"; message: string; attemptsLeft: number }
   | { type: "room_created"; code: string; inviteUrl: string; wsUrl: string }
   | { type: "reconnected"; message: string }
   | { type: "opponent_reconnected" }
   | { type: "error"; message: string }
-  | { type: "queue_status"; status: string; position: number; estimatedWait: string }
-  | { type: "match_found"; room: string; opponent: { displayName: string; elo: number } }
+  | {
+    type: "queue_status";
+    status: string;
+    position: number;
+    estimatedWait: string;
+  }
+  | {
+    type: "match_found";
+    room: string;
+    opponent: { displayName: string; elo: number };
+  }
   | { type: "queue_timeout"; message: string }
   | { type: "opponent_picked"; picked: boolean }
   | { type: "opponent_locked"; locked: boolean }
-  | { type: "opponent_left_win"; message: string; title?: string; eloResult?: { change: number; newElo: number } }
+  | {
+    type: "opponent_left_win";
+    message: string;
+    title?: string;
+    eloResult?: { change: number; newElo: number };
+  }
   | { type: "pong"; ts: number };
 
 /** /room/create 响应 */

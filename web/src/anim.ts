@@ -3,9 +3,14 @@
 /** 卡牌飞行动画：从手牌飞到目标区域，细线跟随缩短 */
 function animateCardFly(cardIds, destSelector, onDone) {
   const store = Alpine.store("g");
-  const cards = cardIds.map(id => document.querySelector(`.gcard[data-id="${id}"]`)).filter(Boolean);
+  const cards = cardIds.map((id) =>
+    document.querySelector(`.gcard[data-id="${id}"]`)
+  ).filter(Boolean);
   const destEl = document.querySelector(destSelector);
-  if (!cards.length || !destEl) { if (onDone) onDone(); return; }
+  if (!cards.length || !destEl) {
+    if (onDone) onDone();
+    return;
+  }
 
   const destRect = destEl.getBoundingClientRect();
   const destX = destRect.left + destRect.width / 2;
@@ -42,7 +47,8 @@ function animateCardFly(cardIds, destSelector, onDone) {
     // Clone card
     const clone = card.cloneNode(true);
     clone.classList.add("card-fly");
-    clone.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9`;
+    clone.style.cssText =
+      `position:fixed;left:${r.left}px;top:${r.top}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9`;
     document.body.appendChild(clone);
     clones.push(clone);
   }
@@ -55,7 +61,8 @@ function animateCardFly(cardIds, destSelector, onDone) {
         c.style.top = destY + "px";
       }
       for (const l of lines) {
-        l.line.style.transition = "stroke-dashoffset .45s cubic-bezier(.4,0,.2,1)";
+        l.line.style.transition =
+          "stroke-dashoffset .45s cubic-bezier(.4,0,.2,1)";
         l.line.setAttribute("stroke-dashoffset", l.len);
       }
     });
@@ -88,8 +95,10 @@ function animateCardAction(entry, zone, fromMy) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999";
   const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  line.setAttribute("x1", sx); line.setAttribute("y1", sy);
-  line.setAttribute("x2", dx); line.setAttribute("y2", dy);
+  line.setAttribute("x1", sx);
+  line.setAttribute("y1", sy);
+  line.setAttribute("x2", dx);
+  line.setAttribute("y2", dy);
   line.setAttribute("stroke", zone === "play" ? "#22c55e" : "#ef4444");
   line.setAttribute("stroke-width", "2");
   line.setAttribute("stroke-dasharray", len);
@@ -100,8 +109,11 @@ function animateCardAction(entry, zone, fromMy) {
   // 鬼牌
   const ghost = document.createElement("div");
   ghost.className = "gcard facedown card-fly";
-  ghost.style.cssText = `position:fixed;left:${sx-40}px;top:${sy-55}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.7);opacity:.85`;
-  ghost.innerHTML = `<span class="gsuit">🃏</span><span class="gname" style="font-size:10px">${entry.cardName}</span>`;
+  ghost.style.cssText = `position:fixed;left:${sx - 40}px;top:${
+    sy - 55
+  }px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.7);opacity:.85`;
+  ghost.innerHTML =
+    `<span class="gsuit">🃏</span><span class="gname" style="font-size:10px">${entry.cardName}</span>`;
   document.body.appendChild(ghost);
 
   requestAnimationFrame(() => {
@@ -113,7 +125,10 @@ function animateCardAction(entry, zone, fromMy) {
     });
   });
 
-  setTimeout(() => { ghost.remove(); svg.remove(); }, 500);
+  setTimeout(() => {
+    ghost.remove();
+    svg.remove();
+  }, 500);
 }
 
 /** 盲选弃牌飞行动画 */
@@ -133,15 +148,20 @@ function animatePickDiscardFly(cards, destEl, onDone) {
     const len = Math.hypot(dx - sx, dy - sy);
 
     const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", sx); line.setAttribute("y1", sy);
-    line.setAttribute("x2", dx); line.setAttribute("y2", dy);
-    line.setAttribute("stroke", "#ef4444"); line.setAttribute("stroke-width", "2");
-    line.setAttribute("stroke-dasharray", len); line.setAttribute("stroke-dashoffset", "0");
+    line.setAttribute("x1", sx);
+    line.setAttribute("y1", sy);
+    line.setAttribute("x2", dx);
+    line.setAttribute("y2", dy);
+    line.setAttribute("stroke", "#ef4444");
+    line.setAttribute("stroke-width", "2");
+    line.setAttribute("stroke-dasharray", len);
+    line.setAttribute("stroke-dashoffset", "0");
     svg.appendChild(line);
 
     const clone = card.cloneNode(true);
     clone.classList.add("card-fly");
-    clone.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;z-index:10000;pointer-events:none;transition:left .45s,top .45s;transform:scale(.8);opacity:.9`;
+    clone.style.cssText =
+      `position:fixed;left:${r.left}px;top:${r.top}px;z-index:10000;pointer-events:none;transition:left .45s,top .45s;transform:scale(.8);opacity:.9`;
     document.body.appendChild(clone);
     clones.push({ el: clone, line, len, dx, dy });
   }
@@ -152,7 +172,8 @@ function animatePickDiscardFly(cards, destEl, onDone) {
       for (const c of clones) {
         c.el.style.left = c.dx + "px";
         c.el.style.top = c.dy + "px";
-        c.line.style.transition = "stroke-dashoffset .45s cubic-bezier(.4,0,.2,1)";
+        c.line.style.transition =
+          "stroke-dashoffset .45s cubic-bezier(.4,0,.2,1)";
         c.line.setAttribute("stroke-dashoffset", c.len);
       }
     });
@@ -169,7 +190,10 @@ function animatePickDiscardFly(cards, destEl, onDone) {
 function animateStealFly(pos, onDone) {
   const stealCard = document.querySelector(`.steal-card[data-pos="${pos}"]`);
   const dest = document.getElementById("my-area");
-  if (!stealCard || !dest) { if (onDone) onDone(); return; }
+  if (!stealCard || !dest) {
+    if (onDone) onDone();
+    return;
+  }
 
   const sr = stealCard.getBoundingClientRect();
   const dr = dest.getBoundingClientRect();
@@ -183,16 +207,21 @@ function animateStealFly(pos, onDone) {
   svg.classList.add("fly-line");
   svg.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999";
   const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  line.setAttribute("x1", sx); line.setAttribute("y1", sy);
-  line.setAttribute("x2", dx); line.setAttribute("y2", dy);
-  line.setAttribute("stroke", "#7c3aed"); line.setAttribute("stroke-width", "2");
-  line.setAttribute("stroke-dasharray", len); line.setAttribute("stroke-dashoffset", "0");
+  line.setAttribute("x1", sx);
+  line.setAttribute("y1", sy);
+  line.setAttribute("x2", dx);
+  line.setAttribute("y2", dy);
+  line.setAttribute("stroke", "#7c3aed");
+  line.setAttribute("stroke-width", "2");
+  line.setAttribute("stroke-dasharray", len);
+  line.setAttribute("stroke-dashoffset", "0");
   svg.appendChild(line);
   document.body.appendChild(svg);
 
   const clone = stealCard.cloneNode(true);
   clone.classList.add("card-fly");
-  clone.style.cssText = `position:fixed;left:${sr.left}px;top:${sr.top}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9`;
+  clone.style.cssText =
+    `position:fixed;left:${sr.left}px;top:${sr.top}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9`;
   document.body.appendChild(clone);
 
   requestAnimationFrame(() => {
@@ -204,5 +233,9 @@ function animateStealFly(pos, onDone) {
     });
   });
 
-  setTimeout(() => { clone.remove(); svg.remove(); if (onDone) onDone(); }, 500);
+  setTimeout(() => {
+    clone.remove();
+    svg.remove();
+    if (onDone) onDone();
+  }, 500);
 }

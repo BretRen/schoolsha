@@ -2,16 +2,22 @@
 // cards.ts — 卡牌定义与操作
 // ============================================================
 
-import type { Card, Suit, CardType, CardsConfig } from "./types.ts";
+import type { Card, CardsConfig, CardType, Suit } from "./types.ts";
 import cardsConfig from "./cards.json" with { type: "json" };
 
 // 中文显示
 export function cardLabel(c: Card): string {
   const suitMap: Record<Suit, string> = {
-    spade: "♠", heart: "♥", club: "♣", diamond: "♦",
+    spade: "♠",
+    heart: "♥",
+    club: "♣",
+    diamond: "♦",
   };
   const numMap: Record<number, string> = {
-    1: "A", 11: "J", 12: "Q", 13: "K",
+    1: "A",
+    11: "J",
+    12: "Q",
+    13: "K",
   };
   const num = numMap[c.number] ?? String(c.number);
   return `${suitMap[c.suit]}${num} ${c.name}`;

@@ -1,13 +1,25 @@
 // const.ts — 常量和工具函数
 
 const HTTP_URL = `${location.protocol}//${location.host}`;
-const WS_URL = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
+const WS_URL = `${
+  location.protocol === "https:" ? "wss:" : "ws:"
+}//${location.host}/ws`;
 const AUTH = { enabled: false, provider: "", clientId: "", token: null };
-const esc = s => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
-const suitSym = s => ({ spade: "♠", heart: "♥", club: "♣", diamond: "♦" }[s] || "?");
-const cn = c => c?.name || "?";
-const hpStr = (hp, max) => { let s = ""; for (let i = 0; i < max; i++) s += i < hp ? "♥" : "♡"; return s; };
-const isWeapon = n => WEAPON_NAMES.has(n);
+const esc = (s) => {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+};
+const suitSym = (
+  s,
+) => ({ spade: "♠", heart: "♥", club: "♣", diamond: "♦" }[s] || "?");
+const cn = (c) => c?.name || "?";
+const hpStr = (hp, max) => {
+  let s = "";
+  for (let i = 0; i < max; i++) s += i < hp ? "♥" : "♡";
+  return s;
+};
+const isWeapon = (n) => WEAPON_NAMES.has(n);
 
 // ====== 常量 ======
 const CARD_DESC = {
@@ -42,7 +54,14 @@ const SKILL_DESC = {
 };
 const WEAPON_NAMES = new Set(["钢笔", "圆规", "尺子", "橡皮"]);
 const DEFENSIVE_ONLY = ["豁免", "免罚券"];
-const RESP_CARDS = { dodge: ["豁免"], near_death: ["补给", "小抄"], duel: ["作业"], barbarian: ["作业"], volley: ["豁免"], borrow_knife: null };
+const RESP_CARDS = {
+  dodge: ["豁免"],
+  near_death: ["补给", "小抄"],
+  duel: ["作业"],
+  barbarian: ["作业"],
+  volley: ["豁免"],
+  borrow_knife: null,
+};
 const RESP_NAMES = {
   dodge: "对手对你使用了【作业】，请出【豁免】",
   near_death: "你处于濒死状态，请出【补给】或【小抄】自救",
@@ -50,7 +69,10 @@ const RESP_NAMES = {
   barbarian: "【突击测验】！请出【作业】",
   volley: "【点名批评】！请出【豁免】",
   borrow_knife: "【嫁祸】！请弃一张牌",
-  steal: p => p.stealAction === "discard" ? "【告密】！选择对手一张牌弃掉（10秒）" : "【神偷】！选择对手一张牌获取（10秒）",
+  steal: (p) =>
+    p.stealAction === "discard"
+      ? "【告密】！选择对手一张牌弃掉（10秒）"
+      : "【神偷】！选择对手一张牌获取（10秒）",
   skill_discard: "请弃一张手牌以发动技能",
   opponent_discard: "对手技能生效！请选择要弃的牌",
   judge_armor: "是否发动【涂改液】翻牌判定？（8秒）",
@@ -69,7 +91,17 @@ const RESP_NAMES_OPP = {
   judge_armor: "等待对手决定是否发动【涂改液】...",
   pick_discard: "正在选择要弃置的牌...",
 };
-const PN = { judge: "判定", draw: "摸牌", play: "出牌", discard: "弃牌", end: "结束" };
+const PN = {
+  judge: "判定",
+  draw: "摸牌",
+  play: "出牌",
+  discard: "弃牌",
+  end: "结束",
+};
 
-function getCardDesc(c) { return CARD_DESC[c.name] || `${c.name}（${suitSym(c.suit)}${c.number}）`; }
-function getSkillDesc(s) { return SKILL_DESC[s.id] || s.name; }
+function getCardDesc(c) {
+  return CARD_DESC[c.name] || `${c.name}（${suitSym(c.suit)}${c.number}）`;
+}
+function getSkillDesc(s) {
+  return SKILL_DESC[s.id] || s.name;
+}

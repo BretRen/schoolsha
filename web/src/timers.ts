@@ -2,14 +2,23 @@
 
 let _timerInterval = null;
 let _pendingTimer = null;
-let _prevPending = false;  // non-reactive: was pending true last time?
+let _prevPending = false; // non-reactive: was pending true last time?
 
 function stopTimers() {
-  if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
-  if (_pendingTimer) { clearInterval(_pendingTimer); _pendingTimer = null; }
+  if (_timerInterval) {
+    clearInterval(_timerInterval);
+    _timerInterval = null;
+  }
+  if (_pendingTimer) {
+    clearInterval(_pendingTimer);
+    _pendingTimer = null;
+  }
 }
 function stopTurnTimer() {
-  if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
+  if (_timerInterval) {
+    clearInterval(_timerInterval);
+    _timerInterval = null;
+  }
   Alpine.store("g").turnTimerText = "";
 }
 
@@ -19,12 +28,18 @@ function startPendingTimer(timeout) {
   _pendingTimer = setInterval(() => {
     const r = Math.max(0, Math.floor((timeout - Date.now()) / 1000));
     store.pendingTimerText = r + "s";
-    if (r <= 0) { clearInterval(_pendingTimer); _pendingTimer = null; }
+    if (r <= 0) {
+      clearInterval(_pendingTimer);
+      _pendingTimer = null;
+    }
   }, 200);
 }
 
 function stopPendingTimer() {
-  if (_pendingTimer) { clearInterval(_pendingTimer); _pendingTimer = null; }
+  if (_pendingTimer) {
+    clearInterval(_pendingTimer);
+    _pendingTimer = null;
+  }
   Alpine.store("g").pendingTimerText = "";
 }
 
@@ -45,7 +60,10 @@ function startPing() {
 }
 function stopPing() {
   const store = Alpine.store("g");
-  if (store._pingTimer) { clearInterval(store._pingTimer); store._pingTimer = null; }
+  if (store._pingTimer) {
+    clearInterval(store._pingTimer);
+    store._pingTimer = null;
+  }
   store._latency = -1;
 }
 function startTurnTicker() {

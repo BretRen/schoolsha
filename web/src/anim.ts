@@ -116,6 +116,55 @@ function animateCardAction(entry, zone, fromMy) {
   setTimeout(() => { ghost.remove(); svg.remove(); }, 500);
 }
 
+/** 盲选弃牌飞行动画 */
+function animatePickDiscardFly(cards, destEl, onDone) {
+  const dr = destEl.getBoundingClientRect();
+  const dx = dr.left + dr.width / 2;
+  const dy = dr.top + dr.height / 2;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999";
+  const clones = [];
+
+  for (const card of cards) {
+    const r = card.getBoundingClientRect();
+    const sx = r.left + r.width / 2;
+    const sy = r.top + r.height / 2;
+    const len = Math.hypot(dx - sx, dy - sy);
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", sx); line.setAttribute("y1", sy);
+    line.setAttribute("x2", dx); line.setAttribute("y2", dy);
+    line.setAttribute("stroke", "#ef4444"); line.setAttribute("stroke-width", "2");
+    line.setAttribute("stroke-dasharray", len); line.setAttribute("stroke-dashoffset", "0");
+    svg.appendChild(line);
+
+    const clone = card.cloneNode(true);
+    clone.classList.add("card-fly");
+    clone.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;z-index:10000;pointer-events:none;transition:left .45s,top .45s;transform:scale(.8);opacity:.9`;
+    document.body.appendChild(clone);
+    clones.push({ el: clone, line, len, dx, dy });
+  }
+  document.body.appendChild(svg);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      for (const c of clones) {
+        c.el.style.left = c.dx + "px";
+        c.el.style.top = c.dy + "px";
+        c.line.style.transition = "stroke-dashoffset .45s cubic-bezier(.4,0,.2,1)";
+        c.line.setAttribute("stroke-dashoffset", c.len);
+      }
+    });
+  });
+
+  setTimeout(() => {
+    for (const c of clones) c.el.remove();
+    svg.remove();
+    if (onDone) onDone();
+  }, 500);
+}
+
 /** 从对手面板偷牌动画 */
 function animateStealFly(pos, onDone) {
   const stealCard = document.querySelector(`.steal-card[data-pos="${pos}"]`);

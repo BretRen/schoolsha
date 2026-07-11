@@ -119,6 +119,12 @@
   .mini-card.heart,.mini-card.diamond { color: #ef4444; }
   .mini-card.my-card { border-color: #7c3aed !important; background: #1a1530; }
   .mini-card.opp-card { border-color: #ef4444 !important; background: #301515; }
+
+  /* 伤害/治疗闪烁 */
+  @keyframes hp-dmg { 0%,100%{box-shadow:inset 0 0 0 transparent} 25%{box-shadow:inset 0 0 50px rgba(239,68,68,.5)} }
+  @keyframes hp-heal { 0%,100%{box-shadow:inset 0 0 0 transparent} 25%{box-shadow:inset 0 0 50px rgba(34,197,94,.5)} }
+  .hp-flash-dmg { animation: hp-dmg .7s ease-out; }
+  .hp-flash-heal { animation: hp-heal .7s ease-out; }
 </style>
 </head>
 <body x-data>
@@ -234,7 +240,8 @@
   <div id="turn-banner"></div>
 
   <!-- 左：自己面板 -->
-  <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
+  <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden"
+       :class="{'hp-flash-dmg': $store.g._flashMy === 'dmg', 'hp-flash-heal': $store.g._flashMy === 'heal'}">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
       <div style="font-size:17px;font-weight:bold;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
            :class="{'turn-active': $store.g.isMyTurn}"
@@ -306,17 +313,25 @@
       </div>
     </div>
 
-    <!-- Pick Discard zone (陷害：选择对手牌弃置) -->
+    <!-- Pick Discard zone (陷害/午饭留堂：盲选对手牌弃置) -->
     <div x-show="$store.g.pending?.type==='pick_discard' && $store.g.isMyResp" style="margin-bottom:4px;flex-shrink:0">
-      <div style="font-size:11px;opacity:.7;text-align:center;margin-bottom:2px">选择对手 <span x-text="$store.g.pickDiscardNeed()"></span> 张牌弃置：</div>
+      <div style="font-size:11px;opacity:.7;text-align:center;margin-bottom:2px">盲选对手 <span x-text="$store.g.pickDiscardNeed()"></span> 张牌弃置：</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;padding:4px 0">
-        <template x-for="c in $store.g.pickDiscardCards()" :key="c.id">
-          <div class="gcard" :class="{'selected': $store.g.isPickSelected(c.id), 'spade': c.suit==='spade', 'heart': c.suit==='heart', 'club': c.suit==='club', 'diamond': c.suit==='diamond'}"
-               :data-id="c.id"
-               @click="$store.g.togglePickCard(c.id)" style="cursor:pointer">
-            <span class="gsuit" x-text="suitSym(c.suit)"></span>
-            <span class="gname" x-text="c.name"></span>
-            <span class="gnum" x-text="c.number"></span>
+        <!-- 盲选手牌 -->
+        <template x-for="p in $store.g.pickDiscardPoolSize()" :key="'pd'+p">
+          <div class="gcard facedown pick-card" :class="{'selected': $store.g.isPickSelected(p)}"
+               :data-pos="p" @click="$store.g.togglePickCard(p)" style="cursor:pointer">
+            <span class="gsuit">?</span>
+            <span class="gname" x-text="'第'+p+'张'"></span>
+          </div>
+        </template>
+        <!-- 可见装备 -->
+        <template x-for="ec in $store.g.pickDiscardExposed()" :key="'pe'+ec.position">
+          <div class="gcard pick-card" :class="ec.card.suit + ($store.g.isPickSelected(ec.position)?' selected':'')"
+               :data-pos="ec.position" @click="$store.g.togglePickCard(ec.position)" style="cursor:pointer">
+            <span class="gsuit" x-text="suitSym(ec.card.suit)"></span>
+            <span class="gname" x-text="ec.card.name"></span>
+            <span class="gnum" x-text="ec.card.number"></span>
           </div>
         </template>
       </div>
@@ -438,7 +453,8 @@
   </div>
 
   <!-- 右：对手面板 -->
-  <div id="opp-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#1a0f0f 0%,#120a0a 100%);overflow:hidden">
+  <div id="opp-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#1a0f0f 0%,#120a0a 100%);overflow:hidden"
+       :class="{'hp-flash-dmg': $store.g._flashOpp === 'dmg', 'hp-flash-heal': $store.g._flashOpp === 'heal'}">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
       <div style="font-size:17px;font-weight:bold;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
            :class="{'turn-active': $store.g.isOppTurn()}"

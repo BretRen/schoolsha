@@ -57,29 +57,28 @@ function handleMsg(msg) {
       store._playVersion++;
       store._judgeVersion++;
       
-      // 检测回合切换
-      const newTurn = msg.state.turnPlayer;
-      if (store._lastTurnPlayer !== -1 && store._lastTurnPlayer !== newTurn) {
-        store._turnLogStart = msg.state.log.length;
-        showTurnBanner(newTurn === msg.yourIndex);
-      }
-      store._lastTurnPlayer = newTurn;
-      
-      // 检测对手新动作（出牌/弃牌）→ 触发动画
+      // 检测新动作 → 触发动画
       const newLogLen = msg.state.log.length;
       if (store._lastLogLen && newLogLen > store._lastLogLen) {
         for (let i = store._lastLogLen; i < newLogLen; i++) {
           const entry = msg.state.log[i];
           const isMine = entry.player === msg.yourIndex;
           if (entry.id === "card_played" && !isMine) {
-            // 对手出牌 → 从对手面板飞出
             animateCardAction(entry, "play", false);
           } else if ((entry.id === "card_discarded" || entry.id === "discard") && isMine) {
-            // 你的牌被弃（陷害/午饭留堂/告密）→ 从你面板飞出
             animateCardAction(entry, "discard", true);
           } else if ((entry.id === "card_discarded" || entry.id === "discard") && !isMine) {
-            // 对手的牌被弃 → 从对手面板飞出
             animateCardAction(entry, "discard", false);
+          }
+          // 伤害/治疗闪烁
+          if (entry.id === "damage") {
+            const targetMe = entry.player === msg.yourIndex;
+            if (targetMe) { store._flashMy = "dmg"; setTimeout(() => { store._flashMy = ""; }, 700); }
+            else { store._flashOpp = "dmg"; setTimeout(() => { store._flashOpp = ""; }, 700); }
+          } else if (entry.id === "heal") {
+            const targetMe = entry.player === msg.yourIndex;
+            if (targetMe) { store._flashMy = "heal"; setTimeout(() => { store._flashMy = ""; }, 700); }
+            else { store._flashOpp = "heal"; setTimeout(() => { store._flashOpp = ""; }, 700); }
           }
         }
       }

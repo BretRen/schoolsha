@@ -22,8 +22,8 @@ document.addEventListener("alpine:init", () => {
     lbData: null,
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
     _playVersion: 0, _judgeVersion: 0,
-    _turnLogStart: 0, _lastTurnPlayer: -1,
     _pickSelections: {},
+    _flashMy: "", _flashOpp: "",
     _latency: -1,
     _pingTimer: null,
 
@@ -137,10 +137,14 @@ document.addEventListener("alpine:init", () => {
     doPass() { send({ action: "pass" }); },
     doEndPhase() { send({ action: "end_phase" }); },
     doActivateArmor() { send({ action: "activate_armor" }); },
-    // pick_discard（陷害等）
-    pickDiscardCards() {
+    // pick_discard（陷害/午饭留堂 — 盲选）
+    pickDiscardPoolSize() {
+      if (!this.pending || this.pending.type !== "pick_discard") return 0;
+      return this.pending.poolSize || 0;
+    },
+    pickDiscardExposed() {
       if (!this.pending || this.pending.type !== "pick_discard") return [];
-      return this.pending.selectableCards || [];
+      return this.pending.exposedCards || [];
     },
     pickDiscardCount() {
       if (!this.pending || this.pending.type !== "pick_discard") return 0;
@@ -149,24 +153,30 @@ document.addEventListener("alpine:init", () => {
     pickDiscardNeed() {
       return this.pending?.discardCount || 1;
     },
-    togglePickCard(id) {
+    togglePickCard(pos) {
       if (this.blocked) return;
       const sel = this._pickSelections;
       const need = this.pickDiscardNeed();
-      if (sel[id]) { delete sel[id]; }
-      else { if (Object.keys(sel).length >= need) return; sel[id] = true; }
+      if (sel[pos]) { delete sel[pos]; }
+      else { if (Object.keys(sel).length >= need) return; sel[pos] = true; }
       this._pickSelections = Object.assign({}, sel);
     },
-    isPickSelected(id) { return !!this._pickSelections[id]; },
+    isPickSelected(pos) { return !!this._pickSelections[pos]; },
     doPickDiscard() {
-      const ids = Object.keys(this._pickSelections);
-      if (ids.length !== this.pickDiscardNeed()) return;
+      const positions = Object.keys(this._pickSelections).map(Number);
+      if (positions.length !== this.pickDiscardNeed()) return;
       const sel = Object.assign({}, this._pickSelections);
       this._pickSelections = {};
-      // 陷害选的是对手牌，动画飞向弃牌区
-      animateCardFly(ids, "#play-discard-zone", () => {
-        send({ action: "pick_discard", card_ids: ids });
-      });
+      // 动画：从选中的盲选牌飞向弃牌区
+      const cards = positions.map(p => document.querySelector(`.pick-card[data-pos="${p}"]`)).filter(Boolean);
+      const destEl = document.querySelector("#play-discard-zone");
+      if (cards.length && destEl) {
+        animatePickDiscardFly(cards, destEl, () => {
+          send({ action: "pick_discard", positions });
+        });
+      } else {
+        send({ action: "pick_discard", positions });
+      }
     },
     doUseSkill(skillId) { send({ action: "use_skill", skill_id: skillId }); },
     stealWithAnim(pos) {
@@ -206,17 +216,15 @@ document.addEventListener("alpine:init", () => {
     // Recent play/discard for center zone
     recentPlayCard() {
       if (!this.gs?.log) return null;
-      const start = Math.max(0, this._turnLogStart || 0);
-      for (let i = this.gs.log.length - 1; i >= start; i--) {
+      for (let i = this.gs.log.length - 1; i >= 0; i--) {
         if (this.gs.log[i].id === "card_played") return this.gs.log[i];
       }
       return null;
     },
     recentDiscards() {
       if (!this.gs?.log) return [];
-      const start = Math.max(0, this._turnLogStart || 0);
       const d = [];
-      for (let i = this.gs.log.length - 1; i >= start && d.length < 3; i--) {
+      for (let i = this.gs.log.length - 1; i >= 0 && d.length < 3; i--) {
         const e = this.gs.log[i];
         if (e.id === "card_discarded" || e.id === "discard") d.unshift(e);
       }

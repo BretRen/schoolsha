@@ -362,16 +362,17 @@ registerCardEffect("陷害", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opp = s.players[1 - playerIdx];
-    const pool: Card[] = [...opp.hand];
-    if (opp.weapon) pool.push(opp.weapon);
-    if (opp.armor) pool.push(opp.armor);
-    // 让攻击方从对手牌中选择 2 张弃置
+    const exposed: Array<{card: Card; position: number}> = [];
+    let pos = opp.hand.length + 1;
+    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
+    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
     s.pendingResponse = {
       type: "pick_discard",
       source: playerIdx,
       target: playerIdx,
       card,
-      selectableCards: pool,
+      poolSize: opp.hand.length,
+      exposedCards: exposed,
       discardCount: 2,
       timeout: Date.now() + 15000,
     };
@@ -403,15 +404,17 @@ registerCardEffect("午饭留堂", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opp = s.players[1 - playerIdx];
-    const pool: Card[] = [...opp.hand];
-    if (opp.weapon) pool.push(opp.weapon);
-    if (opp.armor) pool.push(opp.armor);
+    const exposed: Array<{card: Card; position: number}> = [];
+    let pos = opp.hand.length + 1;
+    if (opp.weapon) { exposed.push({ card: opp.weapon, position: pos }); pos++; }
+    if (opp.armor) { exposed.push({ card: opp.armor, position: pos }); pos++; }
     s.pendingResponse = {
       type: "pick_discard",
       source: playerIdx,
       target: playerIdx,
       card,
-      selectableCards: pool,
+      poolSize: opp.hand.length,
+      exposedCards: exposed,
       discardCount: 1,
       timeout: Date.now() + 15000,
     };
@@ -755,22 +758,26 @@ export function handleActivateArmor(state: GameState, playerIdx: number): string
   return null;
 }
 
-// 陷害等：攻击方从对手牌中选牌弃置
-export function handlePickDiscard(state: GameState, playerIdx: number, cardIds: string[]): string | null {
+// 陷害等：攻击方从对手牌中盲选弃置
+export function handlePickDiscard(state: GameState, playerIdx: number, positions: number[]): string | null {
   const pending = state.pendingResponse;
   if (!pending || pending.type !== "pick_discard") return "没有待选择的弃牌";
   if (playerIdx !== pending.target) return "不是你需要选择";
 
   const count = pending.discardCount || 1;
-  if (cardIds.length !== count) return `需要选 ${count} 张牌`;
+  if (positions.length !== count) return `需要选 ${count} 张牌`;
 
-  const pool = pending.selectableCards || [];
   const oppIdx = 1 - pending.source;
   const opp = state.players[oppIdx];
 
-  for (const id of cardIds) {
-    const c = pool.find(c => c.id === id);
-    if (!c) return `无效的牌 ${id}`;
+  // 重建池：手牌（盲选）+ 武器 + 防具
+  const pool: Card[] = [...opp.hand];
+  if (opp.weapon) pool.push(opp.weapon);
+  if (opp.armor) pool.push(opp.armor);
+
+  for (const pos of positions) {
+    if (pos < 1 || pos > pool.length) return `无效位置 ${pos}`;
+    const c = pool[pos - 1];
     if (opp.hand.some(h => h.id === c.id)) {
       removeCard(opp.hand, c.id);
     } else if (opp.weapon?.id === c.id) {

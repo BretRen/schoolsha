@@ -219,7 +219,7 @@ export function handleMessage(
       return handleActivateArmor(state, playerIdx);
 
     case "pick_discard":
-      return handlePickDiscard(state, playerIdx, msg.card_ids);
+      return handlePickDiscard(state, playerIdx, msg.positions);
 
     default:
       return `未知操作: ${action}`;

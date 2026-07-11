@@ -456,7 +456,7 @@ export function getPlayerView(
   const pendingView = state.pendingResponse ? { ...state.pendingResponse } : null;
 
   // 回合剩余时间
-  const turnTimeLeft = state.phase === "play" && !state.pendingResponse
+  const turnTimeLeft = (state.phase === "play" || state.phase === "discard") && !state.pendingResponse
     ? Math.max(0, TURN_TIMEOUT_SEC - Math.floor((Date.now() - state.turnStartTime) / 1000))
     : TURN_TIMEOUT_SEC;
 

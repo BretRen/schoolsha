@@ -1,0 +1,11 @@
+{
+  "name": "schoolsha-web",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p dist && for f in src/*.ts; do npx esbuild \"$f\" --outfile=\"dist/$(basename $f .ts).js\"; done",
+    "watch": "mkdir -p dist && for f in src/*.ts; do npx esbuild \"$f\" --outfile=\"dist/$(basename $f .ts).js\" --watch & done; wait"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

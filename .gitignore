@@ -5,3 +5,5 @@ integration_test.py
 integration_test2.py
 quick_test.py
 ws_full_test.py
+web/dist/
+web/node_modules/

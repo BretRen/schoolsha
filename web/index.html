@@ -48,8 +48,6 @@
 
   @keyframes flash-in { 0% { opacity: 0; transform: scale(1.3); } 50% { opacity: 1; transform: scale(1); } }
   @keyframes skill-flash { 0% { opacity: 0; transform: translateY(-8px); } 20% { opacity: 1; transform: translateY(0); } 80% { opacity: 1; } 100% { opacity: 0; } }
-  @keyframes judge-flash { 0% { opacity: 0; transform: rotateY(90deg) scale(1.5); } 30% { opacity: 1; transform: rotateY(0) scale(1); } 70% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.9); } }
-  .animate-judge { animation: judge-flash 2s ease-out forwards; }
   @keyframes card-fade-in { 0% { opacity: 0; transform: translateY(-10px); } 100% { opacity: 1; transform: translateY(0); } }
   @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
   @keyframes discard-pop { 0% { opacity: 0; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } 100% { opacity: 1; transform: scale(1); } }
@@ -202,7 +200,7 @@
 
 <!-- ═══════ 游戏 ═══════ -->
 <div id="screen-game" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'game'"
-     x-effect="(function(){ const p=$store.g.pending; if(!p && $store.g._hadPending) { $store.g._hadPending=false; if($store.g.gs?.phase==='play'||$store.g.gs?.phase==='discard') { startTurnTimer($store.g.gs.turnTimeLeft); } } else if(p) { $store.g._hadPending=true; stopTurnTimer(); if($store.g.isMyResp && p.timeout) { startPendingTimer(p.timeout); } else { stopPendingTimer(); } } else if(!p) { stopPendingTimer(); } })()">
+     x-effect="(function(){ const p=$store.g.pending; const hasP=!!p; if(p && !_prevPending) { stopTurnTimer(); if($store.g.isMyResp && p.timeout) { startPendingTimer(p.timeout); } else { stopPendingTimer(); } } else if(!p && _prevPending) { stopPendingTimer(); if($store.g.gs?.phase==='play'||$store.g.gs?.phase==='discard') { startTurnTimer($store.g.gs.turnTimeLeft); } } _prevPending=hasP; })()">
 
   <!-- 左：自己面板 -->
   <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
@@ -298,22 +296,6 @@
     <div x-show="$store.g.recentSkillUsed()" style="text-align:center;font-size:13px;font-weight:bold;padding:6px;border-radius:8px;color:var(--c-gold);background:rgba(245,158,11,.08);margin-bottom:4px;flex-shrink:0"
          class="animate-skill">
       ⚡ <span x-text="$store.g.recentSkillUsed()?.skillName"></span> 发动！
-    </div>
-
-    <!-- Judge flash -->
-    <div x-effect="$store.g._judgeVersion" x-show="$store.g.recentJudge()" style="text-align:center;font-size:15px;font-weight:bold;padding:8px;border-radius:8px;margin-bottom:4px;flex-shrink:0"
-         :style="$store.g.recentJudge()?.result==='success' ? 'color:#22c55e;background:rgba(34,197,94,.08);border:1px solid #22c55e' : 'color:#ef4444;background:rgba(239,68,68,.08);border:1px solid #ef4444'"
-         class="animate-judge">
-      ⚖ 涂改液判定：翻出
-      <span x-text="suitSym($store.g.recentJudge()?.suit)"></span>
-      【<span x-text="$store.g.recentJudge()?.cardName"></span>】
-      →
-      <template x-if="$store.g.recentJudge()?.result==='success'">
-        <span style="color:#22c55e;font-size:16px">红色·闪避 ✅</span>
-      </template>
-      <template x-if="$store.g.recentJudge()?.result==='fail'">
-        <span style="color:#ef4444;font-size:16px">黑色·生效 ❌</span>
-      </template>
     </div>
 
     <!-- Card info -->

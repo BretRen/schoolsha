@@ -243,7 +243,7 @@ function handleMsg(msg) {
       if (store.gs?.pendingResponse?.type !== "pick_discard") store._pickSelections = {};
       if (store.screen !== "game") { store.screen = "game"; clearInterval(store.charTimer); }
       if (msg.eloResult) store.eloResult = msg.eloResult;
-      if (store.gs.gameOver) { stopTimers(); store._pickSelections = {}; }
+      if (store.gs.gameOver) { resetTimerState(); store._pickSelections = {}; }
       break;
     case "disconnected":
       store.blocked = true; stopTimers();
@@ -335,7 +335,7 @@ function leaveLobby() {
   store.screen = "menu";
 }
 function backToMenu() {
-  stopTimers();
+  resetTimerState();
   const store = Alpine.store("g");
   if (store.matchInterval) { clearInterval(store.matchInterval); store.matchInterval = null; }
   if (store.charTimer) { clearInterval(store.charTimer); store.charTimer = null; }
@@ -358,6 +358,7 @@ function showLeaderboard() {
 // ====== Timers ======
 let _timerInterval = null;
 let _pendingTimer = null;
+let _prevPending = false;  // non-reactive: was pending true last time?
 
 function stopTimers() {
   if (_timerInterval) { clearInterval(_timerInterval); _timerInterval = null; }
@@ -383,6 +384,11 @@ function stopPendingTimer() {
   Alpine.store("g").pendingTimerText = "";
 }
 
+function resetTimerState() {
+  _prevPending = false;
+  stopTimers();
+}
+
 // ====== Init ======
 document.addEventListener("alpine:init", () => {
   Alpine.store("g", {
@@ -403,7 +409,6 @@ document.addEventListener("alpine:init", () => {
     lobbyCode: "", lobbyInvite: "", lobbyStatus: "等待另一位玩家...",
     lbData: null,
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
-    _hadPending: false,
     _playVersion: 0, _judgeVersion: 0,
     _pickSelections: {},
 
@@ -610,6 +615,7 @@ document.addEventListener("alpine:init", () => {
         case "skill_used": return `${who} 发动了技能【${last.skillName}】`;
         case "draw": return `${who} 摸了 ${last.count} 张牌`;
         case "card_discarded": case "discard": return `${who} 弃置了【${last.cardName}】`;
+        case "card_equipped": return `${who} 装备了【${last.cardName}】`;
         case "judge_result":
           return `涂改液判定：${who} 翻出 ${suitSym(last.suit)}【${last.cardName}】→ ${last.result === "success" ? "红色·闪避成功 ✅" : "黑色·判定失败 ❌"}`;
         case "death": return `${who} 阵亡`;

@@ -69,14 +69,10 @@ function pendingIs(pendingType: PendingType): Condition {
 // 可复用效果原语
 // ============================================================
 
-function dealDamage(s: GameState, source: number, target: number, amount: number) {
-  // 大衣：陷害/点名 伤害+1
-  if (s.players[target].armor?.name === "黑名单") {
-    const pending = s.pendingResponse;
-    // 仅在陷害/点名等"火属性"伤害时 +1（简化：非作业来源的伤害）
-    if (!pending || (pending.type !== "dodge" && pending.type !== "barbarian")) {
-      amount++;
-    }
+function dealDamage(s: GameState, source: number, target: number, amount: number, reason?: string) {
+  // 黑名单：点名批评伤害+1
+  if (s.players[target].armor?.name === "黑名单" && reason === "volley") {
+    amount++;
   }
   s.players[target].hp -= amount;
   if (s.players[target].hp < 0) s.players[target].hp = 0;
@@ -138,10 +134,16 @@ function discardFromPool(s: GameState, player: number): boolean {
 function equipCard(s: GameState, playerIdx: number, card: Card): string | null {
   const player = s.players[playerIdx];
   if (card.type === "weapon") {
-    if (player.weapon) s.discard.push(player.weapon);
+    if (player.weapon) {
+      s.discard.push(player.weapon);
+      addLog(s, { id: "card_discarded", player: playerIdx, cardName: player.weapon.name });
+    }
     player.weapon = card;
   } else if (card.type === "armor") {
-    if (player.armor) s.discard.push(player.armor);
+    if (player.armor) {
+      s.discard.push(player.armor);
+      addLog(s, { id: "card_discarded", player: playerIdx, cardName: player.armor.name });
+    }
     player.armor = card;
   } else {
     return "不是装备牌";
@@ -388,11 +390,6 @@ registerCardEffect("点名批评", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
-    // 大衣：免疫
-    if (s.players[opponent].armor?.name === "黑名单") {
-      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-      return;
-    }
     s.pendingResponse = {
       type: "volley", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
@@ -674,7 +671,7 @@ export function handleTimeout(state: GameState) {
   if (plainTypes.includes(pending.type)) {
     const target = pending.target;
     state.pendingResponse = null; // 先清，dealDamage 内处理 near_death
-    dealDamage(state, pending.source, target, 1);
+    dealDamage(state, pending.source, target, 1, pending.type);
     return;
   }
 

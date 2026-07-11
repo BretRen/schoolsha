@@ -378,19 +378,7 @@ export function checkTimeout(state: GameState): boolean {
   ) {
     console.log(`P${state.turnPlayer} turn timeout (${TURN_TIMEOUT_SEC}s) in ${state.phase}`);
     if (state.phase === "discard") {
-      // discard 超时：随机弃牌后推进
-      const player = state.players[state.turnPlayer];
-      const limit = getHandLimit(state, state.turnPlayer, player.characterId ?? "");
-      const needDiscard = player.hand.length - limit;
-      if (needDiscard > 0) {
-        for (let i = 0; i < needDiscard; i++) {
-          const idx = Math.floor(Math.random() * player.hand.length);
-          const [card] = player.hand.splice(idx, 1);
-          state.discard.push(card);
-          addLog(state, { id: "card_discarded", player: state.turnPlayer, cardName: card.name });
-        }
-        emit({ type: "card_discarded", player: state.turnPlayer, cards: [] }, state);
-      }
+      // discard 超时：直接进入下一阶段，不随机弃牌
     }
     advancePhase(state);
     changed = true;

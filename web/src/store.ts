@@ -22,6 +22,7 @@ document.addEventListener("alpine:init", () => {
     lbData: null,
     _lastLogLen: 0, _lastPlayId: null, _lastDiscardKeys: "",
     _playVersion: 0, _judgeVersion: 0,
+    _turnLogStart: 0, _lastTurnPlayer: -1,
     _pickSelections: {},
     _latency: -1,
     _pingTimer: null,
@@ -205,15 +206,17 @@ document.addEventListener("alpine:init", () => {
     // Recent play/discard for center zone
     recentPlayCard() {
       if (!this.gs?.log) return null;
-      for (let i = this.gs.log.length - 1; i >= 0; i--) {
+      const start = Math.max(0, this._turnLogStart || 0);
+      for (let i = this.gs.log.length - 1; i >= start; i--) {
         if (this.gs.log[i].id === "card_played") return this.gs.log[i];
       }
       return null;
     },
     recentDiscards() {
       if (!this.gs?.log) return [];
+      const start = Math.max(0, this._turnLogStart || 0);
       const d = [];
-      for (let i = this.gs.log.length - 1; i >= 0 && d.length < 3; i--) {
+      for (let i = this.gs.log.length - 1; i >= start && d.length < 3; i--) {
         const e = this.gs.log[i];
         if (e.id === "card_discarded" || e.id === "discard") d.unshift(e);
       }
@@ -271,6 +274,13 @@ document.addEventListener("alpine:init", () => {
       if (!this.gs?.gameOver) return "";
       const won = this.gs.winner === this.myIndex;
       return { won, title: won ? "🎉 胜利！" : "💀 失败", cls: won ? "win" : "lose" };
+    },
+    // 卡牌悬浮提示
+    cardTooltip(entry) {
+      if (!entry) return "";
+      const name = entry.cardName || entry.name || "?";
+      const desc = CARD_DESC[name] || "";
+      return `${name}${desc ? "：" + desc : ""}`;
     },
   });
 });

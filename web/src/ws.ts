@@ -56,6 +56,30 @@ function handleMsg(msg) {
       store.gs = msg.state; store.myIndex = msg.yourIndex;
       store._playVersion++;
       store._judgeVersion++;
+      
+      // 检测回合切换
+      const newTurn = msg.state.turnPlayer;
+      if (store._lastTurnPlayer !== -1 && store._lastTurnPlayer !== newTurn) {
+        store._turnLogStart = msg.state.log.length;
+        showTurnBanner(newTurn === msg.yourIndex);
+      }
+      store._lastTurnPlayer = newTurn;
+      
+      // 检测对手新动作（出牌/弃牌）→ 触发动画
+      const newLogLen = msg.state.log.length;
+      if (store._lastLogLen && newLogLen > store._lastLogLen) {
+        for (let i = store._lastLogLen; i < newLogLen; i++) {
+          const entry = msg.state.log[i];
+          if (entry.player !== msg.yourIndex) {
+            if (entry.id === "card_played") {
+              animateEnemyAction(entry, "play");
+            } else if (entry.id === "card_discarded" || entry.id === "discard") {
+              animateEnemyAction(entry, "discard");
+            }
+          }
+        }
+      }
+      store._lastLogLen = newLogLen;
       // 同步服务端倒计时
       const st = msg.state;
       if (!st.pendingResponse && (st.phase === "play" || st.phase === "discard")) {

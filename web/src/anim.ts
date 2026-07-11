@@ -69,6 +69,52 @@ function animateCardFly(cardIds, destSelector, onDone) {
   }, 500);
 }
 
+/** 对手出牌/弃牌动画：从对手面板飞向目的区域 */
+function animateEnemyAction(entry, zone) {
+  const oppEl = document.getElementById("opp-area");
+  const destEl = document.getElementById("play-discard-zone");
+  if (!oppEl || !destEl) return;
+
+  const os = oppEl.getBoundingClientRect();
+  const ds = destEl.getBoundingClientRect();
+  const sx = os.left + os.width / 2;
+  const sy = os.top + os.height / 2;
+  const dx = ds.left + ds.width / 2;
+  const dy = ds.top + ds.height / 2;
+  const len = Math.hypot(dx - sx, dy - sy);
+
+  // 线
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:9999";
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line.setAttribute("x1", sx); line.setAttribute("y1", sy);
+  line.setAttribute("x2", dx); line.setAttribute("y2", dy);
+  line.setAttribute("stroke", zone === "play" ? "#22c55e" : "#ef4444");
+  line.setAttribute("stroke-width", "2");
+  line.setAttribute("stroke-dasharray", len);
+  line.setAttribute("stroke-dashoffset", "0");
+  svg.appendChild(line);
+  document.body.appendChild(svg);
+
+  // 鬼牌
+  const ghost = document.createElement("div");
+  ghost.className = "gcard facedown card-fly";
+  ghost.style.cssText = `position:fixed;left:${sx-40}px;top:${sy-55}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.7);opacity:.85`;
+  ghost.innerHTML = `<span class="gsuit">🃏</span><span class="gname" style="font-size:10px">${entry.cardName}</span>`;
+  document.body.appendChild(ghost);
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      ghost.style.left = (dx - 40) + "px";
+      ghost.style.top = (dy - 55) + "px";
+      line.style.transition = "stroke-dashoffset .45s cubic-bezier(.4,0,.2,1)";
+      line.setAttribute("stroke-dashoffset", len);
+    });
+  });
+
+  setTimeout(() => { ghost.remove(); svg.remove(); }, 500);
+}
+
 /** 从对手面板偷牌动画 */
 function animateStealFly(pos, onDone) {
   const stealCard = document.querySelector(`.steal-card[data-pos="${pos}"]`);

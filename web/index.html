@@ -90,6 +90,19 @@
   #time-warning.show { animation: time-warn .8s ease-in-out infinite; }
   .card-fly { position:fixed;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9 }
 
+  /* 回合切换横幅 */
+  #turn-banner {
+    position:fixed; top:35%; left:50%; transform:translateX(-50%);
+    height:48px; width:0; border-radius:10px;
+    font-size:22px; font-weight:bold; color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    white-space:nowrap; overflow:hidden;
+    z-index:500; pointer-events:none; opacity:0;
+    transition: width .5s cubic-bezier(.4,0,.2,1), opacity .3s;
+  }
+  #turn-banner.banner-in { width:60vw; opacity:1; }
+  #turn-banner.banner-out { width:0; opacity:0; transform:translateX(50vw); transition: width .4s ease-in, opacity .3s, transform .6s cubic-bezier(.6,0,1,1); }
+
   /* Full-screen game layout */
   #screen-game { display: flex; flex-direction: row; max-width: 100vw; padding: 0; height: 100vh; overflow: hidden; }
   #my-area { border-right: 1px solid #1e1e2e; transition: background .3s; }
@@ -215,6 +228,9 @@
        style="display:none" x-show="$store.g.isMyTurn && $store.g.gs?.phase==='play' && !$store.g.pending && $store.g.serverTimer > 0 && $store.g.serverTimer <= 10"
        x-text="'⏰ '+$store.g.serverTimer+'s'"></div>
 
+  <!-- 回合切换横幅 -->
+  <div id="turn-banner"></div>
+
   <!-- 左：自己面板 -->
   <div id="my-area" style="width:210px;flex-shrink:0;display:flex;flex-direction:column;padding:10px 8px;background:linear-gradient(180deg,#0f0f1a 0%,#0a0a12 100%);overflow:hidden">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap">
@@ -307,13 +323,15 @@
     <!-- Play / Discard zone -->
     <div x-effect="$store.g._playVersion" id="play-discard-zone" style="display:flex;gap:12px;justify-content:center;min-height:36px;align-items:center;margin-bottom:3px;flex-shrink:0">
       <template x-if="$store.g.recentPlayCard()">
-        <div class="mini-card animate-card-in" style="font-size:13px;padding:4px 12px">
+        <div class="mini-card animate-card-in" style="font-size:13px;padding:4px 12px"
+             :title="$store.g.cardTooltip($store.g.recentPlayCard())">
           <span class="ms" style="font-size:14px">🃏</span>
           <span class="mn" style="font-weight:bold" x-text="$store.g.recentPlayCard()?.cardName"></span>
         </div>
       </template>
       <template x-for="(d,i) in $store.g.recentDiscards()" :key="i">
-        <div class="mini-card animate-discard" :style="'animation-delay:'+(i*0.1)+'s'">
+        <div class="mini-card animate-discard" :style="'animation-delay:'+(i*0.1)+'s'"
+             :title="$store.g.cardTooltip(d)">
           <span class="mn" x-text="d.cardName"></span>
         </div>
       </template>
@@ -490,6 +508,23 @@
 </div>
 
 <script src="/web/dist/const.js"></script>
+<script>
+// 回合切换横幅动画
+function showTurnBanner(isMyTurn) {
+  const b = document.getElementById("turn-banner");
+  if (!b) return;
+  b.textContent = isMyTurn ? "🔵 你的回合" : "🔴 对手回合";
+  b.style.background = isMyTurn
+    ? "linear-gradient(90deg, #7c3aed, #a78bfa)"
+    : "linear-gradient(90deg, #dc2626, #f87171)";
+  b.classList.remove("banner-out");
+  void b.offsetWidth; // reflow
+  b.classList.add("banner-in");
+  setTimeout(() => {
+    b.classList.remove("banner-in");
+    b.classList.add("banner-out");
+  }, 2200);
+}
 <script src="/web/dist/overlay.js"></script>
 <script src="/web/dist/timers.js"></script>
 <script src="/web/dist/anim.js"></script>

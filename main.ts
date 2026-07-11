@@ -440,14 +440,14 @@ Deno.serve({ port: PORT }, async (req) => {
       return;
     }
 
-    if (!room.game) {
-      send(socket, { type: "error", message: "游戏尚未开始（请先选择角色）" });
+    // ---- ping/pong 延迟测量（选角/游戏中均可）----
+    if (msg.action === "ping") {
+      send(socket, { type: "pong", ts: msg.ts } as ServerMsg);
       return;
     }
 
-    // ---- ping/pong 延迟测量 ----
-    if (msg.action === "ping") {
-      send(socket, { type: "pong", ts: msg.ts } as ServerMsg);
+    if (!room.game) {
+      send(socket, { type: "error", message: "游戏尚未开始（请先选择角色）" });
       return;
     }
 

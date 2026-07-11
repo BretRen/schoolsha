@@ -160,23 +160,16 @@ function equipCard(s: GameState, playerIdx: number, card: Card): string | null {
 // --- 基本牌 ---
 
 registerCardEffect("作业", {
-  canUse: all(playPhase, isTurn, noPending, canAttack),
+  canUse: all(playPhase, isTurn, noPending, canAttack, (s, p, card) => {
+    const opp = s.players[1 - p];
+    if (opp.armor?.name === "黑名单") return false;
+    if (opp.armor?.name === "校服" && (card.suit === "spade" || card.suit === "club")) return false;
+    return true;
+  }),
   needsTarget: true,
   targetFilter: (_s, source, target) => source !== target,
   onUse: (s, playerIdx, card) => {
     const opponent = s.players[1 - playerIdx];
-
-    // 电脑：黑作业(spade/club)无效
-    if (opponent.armor?.name === "校服" && (card.suit === "spade" || card.suit === "club")) {
-      emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-      return;
-    }
-
-    // 大衣：作业无效
-    if (opponent.armor?.name === "黑名单") {
-      emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
-      return;
-    }
 
     // 涂改液：主动技 — 需玩家确认是否发动
     if (opponent.armor?.name === "涂改液") {
@@ -240,15 +233,10 @@ registerCardEffect("小抄", {
 // --- 锦囊牌 — 需要响应 ---
 
 registerCardEffect("辩论", {
-  canUse: all(playPhase, isTurn, noPending),
+  canUse: all(playPhase, isTurn, noPending, (s, p) => s.players[1 - p].armor?.name !== "黑名单"),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
-    // 大衣：免疫
-    if (s.players[opponent].armor?.name === "黑名单") {
-      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-      return;
-    }
     s.pendingResponse = {
       type: "duel", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,
@@ -260,14 +248,10 @@ registerCardEffect("辩论", {
 });
 
 registerCardEffect("突击测验", {
-  canUse: all(playPhase, isTurn, noPending),
+  canUse: all(playPhase, isTurn, noPending, (s, p) => s.players[1 - p].armor?.name !== "黑名单"),
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     const opponent = 1 - playerIdx;
-    if (s.players[opponent].armor?.name === "黑名单") {
-      emit({ type: "card_played", player: playerIdx, card, target: opponent }, s);
-      return;
-    }
     s.pendingResponse = {
       type: "barbarian", source: playerIdx, target: opponent, card,
       timeout: Date.now() + 15_000,

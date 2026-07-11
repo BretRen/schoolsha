@@ -143,6 +143,14 @@ export function tryUseSkill(
     if (used >= skill.perTurn) return "本回合已使用过";
   }
 
+  // 效果前置检查：force_discard 需对手有牌
+  if (skill.effect.type === "force_discard" && skill.effect.target === "opponent") {
+    const oppHand = state.players[1 - playerIdx].hand;
+    if (oppHand.length === 0 && !state.players[1 - playerIdx].weapon && !state.players[1 - playerIdx].armor) {
+      return "对手没有牌可以弃";
+    }
+  }
+
   // 支付代价：弃牌（改为玩家自选）
   if (skill.cost?.discard) {
     const hand = state.players[playerIdx].hand;

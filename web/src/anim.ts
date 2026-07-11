@@ -69,13 +69,14 @@ function animateCardFly(cardIds, destSelector, onDone) {
   }, 500);
 }
 
-/** 对手出牌/弃牌动画：从对手面板飞向目的区域 */
-function animateEnemyAction(entry, zone) {
-  const oppEl = document.getElementById("opp-area");
+/** 卡牌动作动画：从玩家面板飞向中心区
+ *  @param fromMy - true=从我方区域飞出，false=从对手区域飞出 */
+function animateCardAction(entry, zone, fromMy) {
+  const areaEl = document.getElementById(fromMy ? "my-area" : "opp-area");
   const destEl = document.getElementById("play-discard-zone");
-  if (!oppEl || !destEl) return;
+  if (!areaEl || !destEl) return;
 
-  const os = oppEl.getBoundingClientRect();
+  const os = areaEl.getBoundingClientRect();
   const ds = destEl.getBoundingClientRect();
   const sx = os.left + os.width / 2;
   const sy = os.top + os.height / 2;

@@ -70,12 +70,16 @@ function handleMsg(msg) {
       if (store._lastLogLen && newLogLen > store._lastLogLen) {
         for (let i = store._lastLogLen; i < newLogLen; i++) {
           const entry = msg.state.log[i];
-          if (entry.player !== msg.yourIndex) {
-            if (entry.id === "card_played") {
-              animateEnemyAction(entry, "play");
-            } else if (entry.id === "card_discarded" || entry.id === "discard") {
-              animateEnemyAction(entry, "discard");
-            }
+          const isMine = entry.player === msg.yourIndex;
+          if (entry.id === "card_played" && !isMine) {
+            // 对手出牌 → 从对手面板飞出
+            animateCardAction(entry, "play", false);
+          } else if ((entry.id === "card_discarded" || entry.id === "discard") && isMine) {
+            // 你的牌被弃（陷害/午饭留堂/告密）→ 从你面板飞出
+            animateCardAction(entry, "discard", true);
+          } else if ((entry.id === "card_discarded" || entry.id === "discard") && !isMine) {
+            // 对手的牌被弃 → 从对手面板飞出
+            animateCardAction(entry, "discard", false);
           }
         }
       }

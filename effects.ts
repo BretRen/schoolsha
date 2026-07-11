@@ -425,6 +425,7 @@ registerCardEffect("午饭", {
     s.deck = deck;
     s.discard = discard;
     s.players[playerIdx].hand.push(...drawn);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "午饭" });
     emit({ type: "draw_card", player: playerIdx, cards: drawn }, s);
     emit({ type: "card_played", player: playerIdx, card }, s);
   },
@@ -435,6 +436,7 @@ registerCardEffect("感冒", {
   needsTarget: true,
   onUse: (s, playerIdx, card) => {
     dealDamage(s, playerIdx, 1 - playerIdx, 1);
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "感冒", target: 1 - playerIdx });
     emit({ type: "card_played", player: playerIdx, card, target: 1 - playerIdx }, s);
   },
 });
@@ -640,7 +642,7 @@ export function handleStealCard(state: GameState, playerIdx: number, position?: 
     state.discard.push(card);
     state.pendingResponse = null;
     state.discard.push(pending.card!);
-    addLog(state, { id: "card_discarded", player: playerIdx, cardName: card.name });
+    addLog(state, { id: "card_discarded", player: 1 - playerIdx, cardName: card.name });
   } else {
     state.players[playerIdx].hand.push(card);
     state.pendingResponse = null;

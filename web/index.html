@@ -381,21 +381,26 @@
     }
 
     @keyframes hp-glow {
-
-      0%,
-      100% {
-        box-shadow: inset 0 0 30px rgba(255, 0, 0, .15), 0 0 30px rgba(255, 0, 0,
-            .1);
+      0%, 100% {
+        box-shadow: inset 0 0 40px rgba(255, 0, 0, .2), 0 0 40px rgba(255, 0, 0, .12);
       }
-
       50% {
-        box-shadow: inset 0 0 60px rgba(255, 0, 0, .3), 0 0 60px rgba(255, 0, 0,
-            .2);
+        box-shadow: inset 0 0 80px rgba(255, 0, 0, .45), 0 0 80px rgba(255, 0, 0, .25), 0 0 0 3px rgba(255, 0, 0, .35);
       }
     }
 
     #screen-game.hp-critical {
       animation: hp-glow 2s ease-in-out infinite;
+    }
+
+    /* 濒死：自己面板慢速红色闪烁 */
+    @keyframes critical-panel {
+      0%, 100% { box-shadow: inset 0 0 15px rgba(255,0,0,.1); }
+      50%      { box-shadow: inset 0 0 35px rgba(255,0,0,.3); }
+    }
+
+    #screen-game.hp-critical #my-area {
+      animation: critical-panel 2.5s ease-in-out infinite;
     }
 
     @keyframes time-warn {

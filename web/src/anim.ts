@@ -1,5 +1,13 @@
 // anim.ts — 卡牌飞行 + 细线动画
 
+/** 安全克隆卡牌 DOM（不含 Alpine 绑定，避免 c is not defined） */
+function safeCloneCard(card: Element): HTMLElement {
+  const clone = document.createElement("div");
+  clone.className = card.className;
+  clone.innerHTML = card.innerHTML;
+  return clone;
+}
+
 /** 卡牌飞行动画：从手牌飞到目标区域，细线跟随缩短 */
 function animateCardFly(cardIds, destSelector, onDone) {
   const store = Alpine.store("g");
@@ -45,7 +53,7 @@ function animateCardFly(cardIds, destSelector, onDone) {
     lines.push({ line, len });
 
     // Clone card
-    const clone = card.cloneNode(true);
+    const clone = safeCloneCard(card);
     clone.classList.add("card-fly");
     clone.style.cssText =
       `position:fixed;left:${r.left}px;top:${r.top}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9`;
@@ -158,7 +166,7 @@ function animatePickDiscardFly(cards, destEl, onDone) {
     line.setAttribute("stroke-dashoffset", "0");
     svg.appendChild(line);
 
-    const clone = card.cloneNode(true);
+    const clone = safeCloneCard(card);
     clone.classList.add("card-fly");
     clone.style.cssText =
       `position:fixed;left:${r.left}px;top:${r.top}px;z-index:10000;pointer-events:none;transition:left .45s,top .45s;transform:scale(.8);opacity:.9`;
@@ -218,7 +226,7 @@ function animateStealFly(pos, onDone) {
   svg.appendChild(line);
   document.body.appendChild(svg);
 
-  const clone = stealCard.cloneNode(true);
+  const clone = safeCloneCard(stealCard);
   clone.classList.add("card-fly");
   clone.style.cssText =
     `position:fixed;left:${sr.left}px;top:${sr.top}px;z-index:10000;pointer-events:none;transition:left .45s cubic-bezier(.4,0,.2,1),top .45s cubic-bezier(.4,0,.2,1);transform:scale(.8);opacity:.9`;

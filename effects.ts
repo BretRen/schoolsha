@@ -7,6 +7,7 @@ import { drawCards, hasCard, removeCard } from "./cards.ts";
 import { emit } from "./events.ts";
 import { executeSkillEffect, getSkill } from "./skills.ts";
 import { cardLabel } from "./cards.ts";
+import { advancePhase } from "./game.ts";
 
 // ---------- 效果类型 ----------
 
@@ -276,6 +277,50 @@ registerCardEffect("小抄", {
       s.wineUsed = true;
     }
     addLog(s, { id: "card_played", player: playerIdx, cardName: "小抄" });
+    emit({ type: "card_played", player: playerIdx, card }, s);
+  },
+});
+
+// --- 效果牌 ---
+
+registerCardEffect("熬夜复习", {
+  canUse: all(playPhase, isTurn, noPending, (s, p) => s.players[p].hp <= s.players[1 - p].hp),
+  needsTarget: false,
+  onUse: (s, playerIdx, card) => {
+    s.wineUsed = true;
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "熬夜复习" });
+    emit({ type: "card_played", player: playerIdx, card }, s);
+    advancePhase(s);
+  },
+});
+
+registerCardEffect("请家长", {
+  canUse: all(playPhase, isTurn, noPending, (s, p) => s.players[p].hand.length >= 2),
+  needsTarget: false,
+  onUse: (s, playerIdx, card) => {
+    // 弃一张随机手牌作为代价
+    const p = s.players[playerIdx];
+    if (p.hand.length > 0) {
+      const idx = Math.floor(Math.random() * p.hand.length);
+      const [discarded] = p.hand.splice(idx, 1);
+      s.discard.push(discarded);
+      addLog(s, { id: "card_discarded", player: playerIdx, cardName: discarded.name });
+      emit({ type: "card_discarded", player: playerIdx, cards: [discarded] }, s);
+    }
+    // 翻牌判定
+    const { drawn, deck, dd } = drawCards(s.deck, s.discard, 1);
+    s.deck = deck;
+    s.discard = dd;
+    if (drawn.length > 0) {
+      const judge = drawn[0];
+      s.discard.push(judge);
+      const isRed = judge.suit === "heart" || judge.suit === "diamond";
+      addLog(s, { id: "judge_result", player: playerIdx, cardName: judge.name, suit: judge.suit, result: isRed ? "success" : "fail" });
+      if (isRed) {
+        s.skipNextPlay = 1 - playerIdx;
+      }
+    }
+    addLog(s, { id: "card_played", player: playerIdx, cardName: "请家长" });
     emit({ type: "card_played", player: playerIdx, card }, s);
   },
 });

@@ -388,6 +388,21 @@
     },
 
     {
+      "name": "熬夜复习",
+      "type": "effect",
+      "suit": "spade",
+      "number": 12,
+      "count": 2
+    },
+    {
+      "name": "请家长",
+      "type": "effect",
+      "suit": "heart",
+      "number": 13,
+      "count": 2
+    },
+
+    {
       "name": "钢笔",
       "type": "weapon",
       "suit": "diamond",

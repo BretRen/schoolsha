@@ -29,6 +29,11 @@ interface RegisteredHandler {
 
 const handlers: RegisteredHandler[] = [];
 
+/** 清除所有事件处理器（每局开始时调用） */
+export function clearAllHandlers() {
+  handlers.length = 0;
+}
+
 /**
  * 注册事件处理器。返回 unsubscribe 函数。
  *

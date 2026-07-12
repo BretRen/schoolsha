@@ -9,26 +9,19 @@ import type {
   Player,
   PlayerView,
   ServerStateView,
-} from "./types.ts";
-import { createDeck, drawCards, shuffle } from "./cards.ts";
-import {
-  addLog,
-  handleActivateArmor,
-  handlePickDiscard,
-  handleStealCard,
-  handleTimeout,
-  tryUseCard,
-} from "./effects.ts";
+import type { GameState, Player, Phase, ServerStateView, PlayerView, ClientMsg } from "./types.ts";
+import { createDeck, shuffle, drawCards } from "./cards.ts";
+import { tryUseCard, handleTimeout, handleStealCard, addLog, handleActivateArmor, handlePickDiscard } from "./effects.ts";
 import { cardLabel } from "./cards.ts";
-import { emit } from "./events.ts";
+import { emit, clearAllHandlers } from "./events.ts";
 import {
-  executeSkillEffect,
   getCharacter,
+  mountPassiveSkills,
   getHandLimit,
   getSkill,
-  mountPassiveSkills,
   resetSkillCounts,
   tryUseSkill,
+  executeSkillEffect,
 } from "./skills.ts";
 
 export { cardLabel };
@@ -41,6 +34,7 @@ const TURN_TIMEOUT_SEC = 45;
 
 /** picks: [player0_characterId, player1_characterId] */
 export function createGame(picks: [string, string]): GameState {
+  clearAllHandlers();
   const deck = shuffle(createDeck());
 
   const char0 = getCharacter(picks[0]);

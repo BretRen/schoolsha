@@ -951,7 +951,9 @@
       <!-- Card info -->
       <div style="text-align:center;font-size:12px;color:var(--c-gold);min-height:20px;flex-shrink:0">
         <template x-if="$store.g.cardCount > 0 && $store.g.me?.hand">
-          <span x-text="getCardDesc($store.g.me.hand.find(c=>$store.g.isCardSelected(c.id))) || ''"></span>
+          <span x-text="getCardDesc($store.g.me.hand.find(c=>$store.g.isCardSelected(c.id))) || ''"
+            x-show="$store.g.cardCount > 0 && $store.g.me?.hand?.find(c=>$store.g.isCardSelected(c.id))"></span>
+          <span x-show="!$store.g.me?.hand?.find(c=>$store.g.isCardSelected(c.id))" style="opacity:.4">点击手牌选择</span>
         </template>
       </div>
 

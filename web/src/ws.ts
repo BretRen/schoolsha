@@ -107,6 +107,12 @@ function handleMsg(msg) {
       store._playVersion++;
       store._judgeVersion++;
 
+      // 回合切换横幅
+      if (store._lastTurnPlayer !== undefined && store._lastTurnPlayer !== msg.state.turnPlayer) {
+        showTurnBanner(msg.state.turnPlayer === msg.yourIndex);
+      }
+      store._lastTurnPlayer = msg.state.turnPlayer;
+
       // 检测新动作 → 触发动画
       const newLogLen = msg.state.log.length;
       if (store._lastLogLen && newLogLen > store._lastLogLen) {

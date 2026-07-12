@@ -380,6 +380,17 @@
       border: 2px solid var(--c-accent);
     }
 
+    /* 低血量：轻微红边提示 */
+    @keyframes hp-low-glow {
+      0%, 100% { box-shadow: inset 0 0 15px rgba(255,0,0,.08), 0 0 0 1px rgba(255,0,0,.15); }
+      50%      { box-shadow: inset 0 0 25px rgba(255,0,0,.15), 0 0 0 2px rgba(255,0,0,.25); }
+    }
+
+    #screen-game.hp-low {
+      animation: hp-low-glow 3s ease-in-out infinite;
+    }
+
+    /* 濒死：强烈红光 + 红色边框 */
     @keyframes hp-glow {
       0%, 100% {
         box-shadow: inset 0 0 40px rgba(255, 0, 0, .2), 0 0 40px rgba(255, 0, 0, .12);
@@ -789,7 +800,7 @@
 
   <!-- ═══════ 游戏 ═══════ -->
   <div id="screen-game" class="screen" style="display:none" x-cloak x-show="$store.g.screen === 'game'"
-    :class="{'hp-critical': $store.g.pending?.type === 'near_death' && $store.g.isMyResp}"
+    :class="{'hp-low': $store.g.me?.hp === 1 && $store.g.pending?.type !== 'near_death', 'hp-critical': $store.g.pending?.type === 'near_death' && $store.g.isMyResp}"
     x-effect="(function(){ const p=$store.g.pending; const hasP=!!p; if(p && !_prevPending) { stopTurnTimer(); if($store.g.isMyResp && p.timeout) { startPendingTimer(p.timeout); } } else if(!p && _prevPending) { stopPendingTimer(); } _prevPending=hasP; })()">
     <!-- ⏰ 时间警告 -->
     <div id="time-warning"

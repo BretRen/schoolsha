@@ -72,7 +72,7 @@ export function createGame(picks: [string, string]): GameState {
     turnStartTime: Date.now(),
     disconnectCount: [0, 0],
     disconnectedAt: [null, null],
-    wineUsed: false,
+    wineUsed: [false, false],
     skipNextPlay: null,
     skillUseCount: {},
     log: [],

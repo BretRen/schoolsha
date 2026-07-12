@@ -274,7 +274,7 @@ registerCardEffect("小抄", {
       emit({ type: "heal", player: playerIdx, amount: 1 }, s);
       s.pendingResponse = null;
     } else {
-      s.wineUsed = true;
+      s.wineUsed[playerIdx] = true;
     }
     addLog(s, { id: "card_played", player: playerIdx, cardName: "小抄" });
     emit({ type: "card_played", player: playerIdx, card }, s);
@@ -287,7 +287,7 @@ registerCardEffect("熬夜复习", {
   canUse: all(playPhase, isTurn, noPending, (s, p) => s.players[p].hp <= s.players[1 - p].hp),
   needsTarget: false,
   onUse: (s, playerIdx, card) => {
-    s.wineUsed = true;
+    s.wineUsed[playerIdx] = true;
     addLog(s, { id: "card_played", player: playerIdx, cardName: "熬夜复习" });
     emit({ type: "card_played", player: playerIdx, card }, s);
     advancePhase(s);
@@ -917,9 +917,9 @@ export function handleTimeout(state: GameState) {
   if (pending.type === "dodge") {
     const target = pending.target;
     let dmg = 1;
-    if (state.wineUsed) {
+    if (state.wineUsed[pending.source]) {
       dmg++;
-      state.wineUsed = false;
+      state.wineUsed[pending.source] = false;
     }
     if (state.players[pending.source].weapon?.name === "钢笔") dmg++;
     state.pendingResponse = null; // 先清原始 pending，dealDamage 内会设 near_death

@@ -124,7 +124,7 @@ export interface GameState {
   /** 每名玩家的断线起始时间（null = 在线） */
   disconnectedAt: [number | null, number | null];
   /** 酒/辣条效果：本回合下一张作业伤害+1 */
-  wineUsed: boolean;
+  wineUsed: [boolean, boolean];
   /** 下一位跳过出牌阶段的玩家（null = 无人跳过） */
   skipNextPlay: number | null;
   /** 技能每回合使用次数（多房间隔离） */

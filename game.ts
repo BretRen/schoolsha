@@ -61,7 +61,7 @@ export function createGame(picks: [string, string]): GameState {
 
   const state: GameState = {
     phase: "judge",
-    turnPlayer: 0,
+    turnPlayer: Math.random() < 0.5 ? 0 : 1,
     players,
     deck: r2.deck,
     discard: r2.discard,

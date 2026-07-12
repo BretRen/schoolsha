@@ -5,6 +5,21 @@ function safeCloneCard(card: Element): HTMLElement {
   const clone = document.createElement("div");
   clone.className = card.className;
   clone.innerHTML = card.innerHTML;
+  // 去掉 innerHTML 中的所有 Alpine 指令（x-*、@*、:class 等）
+  clone.querySelectorAll("*").forEach((el) => {
+    const toRemove: string[] = [];
+    for (const attr of el.attributes) {
+      const name = attr.name;
+      if (
+        name.startsWith("x-") ||
+        name.startsWith("@") ||
+        name.startsWith(":")
+      ) {
+        toRemove.push(name);
+      }
+    }
+    toRemove.forEach((a) => el.removeAttribute(a));
+  });
   return clone;
 }
 

@@ -2,14 +2,7 @@
 // game.ts — 阶段机 + 游戏状态管理
 // ============================================================
 
-import type {
-  ClientMsg,
-  GameState,
-  Phase,
-  Player,
-  PlayerView,
-  ServerStateView,
-import type { GameState, Player, Phase, ServerStateView, PlayerView, ClientMsg } from "./types.ts";
+import type { ClientMsg, GameState, Phase, Player, PlayerView, ServerStateView } from "./types.ts";
 import { createDeck, shuffle, drawCards } from "./cards.ts";
 import { tryUseCard, handleTimeout, handleStealCard, addLog, handleActivateArmor, handlePickDiscard } from "./effects.ts";
 import { cardLabel } from "./cards.ts";

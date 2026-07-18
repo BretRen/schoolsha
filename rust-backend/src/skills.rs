@@ -5,40 +5,36 @@ use crate::cards::draw_cards;
 use crate::events::{EventBus, GameEvent};
 use crate::types::{CharacterDef, GameState, LogEntry, PendingResponse, PendingType, SkillDef, SkillEffect, SkillType, CharactersConfig, SkillsConfig};
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
-thread_local! {
-    static CHAR_MAP: std::cell::RefCell<HashMap<String, CharacterDef>> = std::cell::RefCell::new(HashMap::new());
-    static SKILL_MAP: std::cell::RefCell<HashMap<String, SkillDef>> = std::cell::RefCell::new(HashMap::new());
-}
+static CHAR_MAP: OnceLock<HashMap<String, CharacterDef>> = OnceLock::new();
+static SKILL_MAP: OnceLock<HashMap<String, SkillDef>> = OnceLock::new();
 
 /// 初始化技能和角色配置
 pub fn init(characters: &CharactersConfig, skills: &SkillsConfig) {
-    CHAR_MAP.with(|cm| {
-        let mut m = cm.borrow_mut();
-        m.clear();
-        for ch in &characters.characters {
-            m.insert(ch.id.clone(), ch.clone());
-        }
-    });
-    SKILL_MAP.with(|sm| {
-        let mut m = sm.borrow_mut();
-        m.clear();
-        for sk in &skills.skills {
-            m.insert(sk.id.clone(), sk.clone());
-        }
-    });
+    let mut char_map = HashMap::new();
+    for ch in &characters.characters {
+        char_map.insert(ch.id.clone(), ch.clone());
+    }
+    CHAR_MAP.set(char_map).ok();
+
+    let mut skill_map = HashMap::new();
+    for sk in &skills.skills {
+        skill_map.insert(sk.id.clone(), sk.clone());
+    }
+    SKILL_MAP.set(skill_map).ok();
 }
 
 pub fn get_character(id: &str) -> Option<CharacterDef> {
-    CHAR_MAP.with(|cm| cm.borrow().get(id).cloned())
+    CHAR_MAP.get().and_then(|m| m.get(id).cloned())
 }
 
 pub fn get_all_characters() -> Vec<CharacterDef> {
-    CHAR_MAP.with(|cm| cm.borrow().values().cloned().collect())
+    CHAR_MAP.get().map(|m| m.values().cloned().collect()).unwrap_or_default()
 }
 
 pub fn get_skill(id: &str) -> Option<SkillDef> {
-    SKILL_MAP.with(|sm| sm.borrow().get(id).cloned())
+    SKILL_MAP.get().and_then(|m| m.get(id).cloned())
 }
 
 /// 角色被动/锁定技挂载到事件总线

@@ -1,5 +1,14 @@
-// types.rs — 所有类型和常量
-// Rust 复刻：对应 Deno TS 的 types.ts
+//! types.rs — 所有游戏类型定义
+//!
+//! 本模块是项目的类型基础，定义了：
+//! - **基础枚举**: Suit(花色), Phase(5阶段), CardType(5种牌型)
+//! - **卡牌/玩家**: Card(含id/花色/点数/类型), Player(含HP/手牌/装备)
+//! - **PendingResponse**: 11种交互锁类型，回合制核心机制
+//! - **GameState**: 完整的游戏状态（牌堆/弃牌堆/断线/酒/日志）
+//! - **WebSocket协议**: ClientMsg(15种操作) + ServerMsg(17种推送)
+//! - **客户端视图**: ServerStateView(对手隐藏手牌) + PlayerView
+//!
+//! JSON序列化使用 serde，字段名采用 camelCase（与前端一致）。
 
 use serde::{Deserialize, Serialize};
 

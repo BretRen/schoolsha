@@ -1,5 +1,25 @@
-// game.rs — 阶段机 + 游戏状态管理 + 消息处理
-// Rust 复刻：对应 Deno TS 的 game.ts
+//! game.rs — 阶段机与游戏状态管理
+//!
+//! ## 回合流程（5阶段）
+//! ```text
+//! Judge → Draw(摸2) → Play(出牌) → Discard(弃牌) → End(切回合) → Judge...
+//! ```
+//!
+//! ## 关键函数
+//! - `create_game()` — 创建新对局（初始化牌堆/手牌/角色/技能）
+//! - `advance_phase()` — 阶段流转（简单版，供 effects 调用）
+//! - `advance_phase_full()` — 阶段流转（完整版，含事件发射）
+//! - `handle_message()` — 消息路由（play_card/use_skill/end_phase/discard/pass/steal_card/confirm_skill/activate_armor）
+//! - `check_timeout()` — 超时检测（pending+回合），每5秒轮询
+//!
+//! ## 断线管理
+//! - 每人最多 3 次断线，30 秒重连窗口
+//! - 超限或超时 → 对手立即获胜
+//! - 有人断线时暂停所有操作 + 超时检测
+//!
+//! ## 客户端视图
+//! - `get_player_view()` — 生成对单个玩家隐藏对手手牌的视图
+//! - 包含回合倒计时、手牌上限(含技能加成)、技能使用次数
 
 use crate::cards::{create_deck, draw_cards};
 use crate::effects::{

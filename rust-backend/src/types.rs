@@ -590,6 +590,12 @@ pub struct EloPrediction {
     pub lose: i32,
 }
 
+impl From<crate::elo::EloPrediction> for EloPrediction {
+    fn from(p: crate::elo::EloPrediction) -> Self {
+        EloPrediction { win: p.win, lose: p.lose }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EloResult {
     pub change: i32,

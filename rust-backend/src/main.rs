@@ -127,7 +127,11 @@ async fn main() {
         .route("/", get(index_handler))
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", 8099))
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8099);
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
         .await
         .unwrap();
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())

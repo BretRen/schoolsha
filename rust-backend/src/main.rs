@@ -18,7 +18,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         ConnectInfo, Query, State,
     },
-    response::IntoResponse,
+    response::{Html, IntoResponse},
     routing::get,
     Router,
 };
@@ -122,6 +122,9 @@ async fn main() {
         .route("/room/create", get(create_room_handler))
         .route("/leaderboard", get(leaderboard_handler))
         .route("/api/disconnected-games", get(disconnected_games_handler))
+        .route("/invite/{code}", get(invite_handler))
+        .route("/{*path}", get(static_handler))
+        .route("/", get(index_handler))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", 8099))
@@ -130,6 +133,18 @@ async fn main() {
     axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
         .await
         .unwrap();
+}
+
+async fn invite_handler(axum::extract::Path(code): axum::extract::Path<String>) -> impl IntoResponse {
+    Html(format!(r#"<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>学校杀</title></head>
+<body>
+<script>
+sessionStorage.setItem("invite_room", "{}");
+location.replace("/");
+</script>
+<p>正在加入房间...</p>
+</body></html>"#, code))
 }
 
 async fn info_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -158,6 +173,78 @@ async fn create_room_handler(State(state): State<Arc<AppState>>) -> impl IntoRes
         "inviteUrl": invite_url,
         "deepLink": deep_link,
     }))
+}
+
+/// Serve index.html for the root path
+async fn index_handler() -> axum::response::Response {
+    serve_static_file("index.html")
+}
+
+/// Serve any static file from ../web/
+async fn static_handler(axum::extract::Path(path): axum::extract::Path<String>) -> axum::response::Response {
+    serve_static_file(&path)
+}
+
+fn get_mime(path: &std::path::Path) -> &'static str {
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("html") => "text/html; charset=utf-8",
+        Some("css") => "text/css",
+        Some("js") => "application/javascript",
+        Some("json") => "application/json",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("svg") => "image/svg+xml",
+        Some("ico") => "image/x-icon",
+        Some("wasm") => "application/wasm",
+        _ => "application/octet-stream",
+    }
+}
+
+fn serve_static_file(path: &str) -> axum::response::Response {
+    use axum::http::{header, StatusCode};
+    use axum::response::Response;
+
+    // Path traversal protection
+    if path.contains("..") || path.contains('~') || path.contains("\\") {
+        return Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .body(axum::body::Body::from("Forbidden"))
+            .unwrap();
+    }
+
+    let file_path = std::path::Path::new("../web").join(path);
+
+    // Default to index.html for HTML5 history routing
+    let final_path = if file_path.extension().is_none() && !path.is_empty() {
+        std::path::Path::new("../web").join("index.html")
+    } else if path.is_empty() || path == "/" {
+        std::path::Path::new("../web").join("index.html")
+    } else {
+        file_path
+    };
+
+    match std::fs::read(&final_path) {
+        Ok(data) => {
+            let mime = get_mime(&final_path);
+            Response::builder()
+                .header(header::CONTENT_TYPE, mime)
+                .body(axum::body::Body::from(data))
+                .unwrap()
+        }
+        Err(_) => {
+            // Fallback to index.html for SPA
+            match std::fs::read("../web/index.html") {
+                Ok(data) => Response::builder()
+                    .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+                    .body(axum::body::Body::from(data))
+                    .unwrap(),
+                Err(_) => Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .body(axum::body::Body::from("Not Found"))
+                    .unwrap(),
+            }
+        }
+    }
 }
 
 async fn leaderboard_handler(State(_state): State<Arc<AppState>>) -> impl IntoResponse {

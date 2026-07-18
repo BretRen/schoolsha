@@ -84,6 +84,23 @@ impl RoomManager {
         room
     }
 
+    /// 匹配模式：查找有空位的匹配房间，没有则创建新房间
+    pub fn find_or_create_matching_room(&mut self) -> (Arc<Mutex<Room>>, usize) {
+        // 先找已有的匹配房间且有空位
+        for room in self.rooms.values() {
+            let r = room.lock();
+            if r.is_match && !r.is_full() && !r.game_started {
+                let seat = if r.clients[0].is_none() { 0 } else { 1 };
+                let code = r.code.clone();
+                drop(r);
+                return (room.clone(), seat);
+            }
+        }
+        // 没找到，创建新房间
+        let room = self.create_room(true);
+        (room, 0)
+    }
+
     pub fn get_room(&self, code: &str) -> Option<Arc<Mutex<Room>>> {
         self.rooms.get(code).cloned()
     }

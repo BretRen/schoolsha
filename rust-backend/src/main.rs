@@ -318,18 +318,17 @@ async fn handle_socket(
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<types::ServerMsg>();
 
     // Join/create room
-    let room = {
+    let (room, assigned_seat) = {
         let mut rooms = state.rooms.lock();
         if let Some(code) = &room_code {
-            rooms.get_or_create_room(code, false)
+            (rooms.get_or_create_room(code, false), None)
         } else if mode == "matching" {
-            // Handle matching mode
-            let room = rooms.create_room(true);
-            room
+            // 匹配模式：查找已有匹配房间或创建新房间
+            let (r, seat) = rooms.find_or_create_matching_room();
+            (r, Some(seat))
         } else {
             // Auto-create room
-            let room = rooms.create_room(false);
-            room
+            (rooms.create_room(false), None)
         }
     };
 
@@ -338,12 +337,19 @@ async fn handle_socket(
     // Add client to room
     {
         let mut r = room.lock();
-        // Find empty seat
-        let seat = if r.clients[0].is_none() { 0 } else if r.clients[1].is_none() { 1 } else {
+        // Find empty seat (use pre-assigned seat for matching mode)
+        let seat: usize = assigned_seat.unwrap_or_else(|| {
+            if r.clients[0].is_none() { 0 } else if r.clients[1].is_none() { 1 } else {
+                // Room full — this shouldn't happen with find_or_create_matching_room
+                0
+            }
+        });
+        
+        if r.clients[seat].is_some() {
             warn!("Room full");
             let _ = tx.send(types::ServerMsg::Error { message: "房间已满".into() });
             return;
-        };
+        }
 
         let client_info = room::ClientInfo {
             user_id: user_id.clone(),
@@ -353,11 +359,19 @@ async fn handle_socket(
         };
         r.clients[seat] = Some(client_info);
 
-        // Send waiting message if not full
+        // Send queue_status for matching, waiting for room joins
         if !r.is_full() {
-            let _ = tx.send(types::ServerMsg::Waiting {
-                message: format!("房间 {} — 等待对手加入...", r.code),
-            });
+            if r.is_match {
+                let _ = tx.send(types::ServerMsg::QueueStatus {
+                    status: "matching".into(),
+                    position: 1,
+                    estimated_wait: "未知".into(),
+                });
+            } else {
+                let _ = tx.send(types::ServerMsg::Waiting {
+                    message: format!("房间 {} — 等待对手加入...", r.code),
+                });
+            }
         }
 
         // If room is now full, start character select

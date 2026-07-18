@@ -8,8 +8,8 @@ use crate::types::{
 };
 use std::collections::HashMap;
 
-// 效果注册表（全局，init_effects 初始化一次）
-static mut EFFECT_MAP: Option<HashMap<String, CardEffect>> = None;
+use std::sync::OnceLock;
+static EFFECT_MAP: OnceLock<HashMap<String, CardEffect>> = OnceLock::new();
 
 // 效果类型
 type CardConditionFn = Box<dyn Fn(&GameState, usize, &Card) -> bool + Send + Sync>;
@@ -23,11 +23,8 @@ pub struct CardEffect {
     pub can_respond: Option<CanRespondFn>,
 }
 
-pub fn get_card_effect(name: &str) -> Option<&'static CardEffect> {
-    let map_ptr: *const HashMap<String, CardEffect> = unsafe {
-        std::ptr::addr_of!(EFFECT_MAP).cast::<Option<HashMap<String, CardEffect>>>().read().as_ref()?
-    };
-    unsafe { (*map_ptr).get(name) }
+pub fn get_card_effect(name: &str) -> Option<&CardEffect> {
+    EFFECT_MAP.get()?.get(name)
 }
 
 // ============================================================
@@ -412,7 +409,7 @@ pub fn init_effects() {
         );
     }
 
-    unsafe { EFFECT_MAP = Some(map); }
+    let _ = EFFECT_MAP.set(map);
 }
 
 // ============================================================

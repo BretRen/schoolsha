@@ -281,9 +281,12 @@ async fn handle_socket(
                     id: c.id.clone(),
                     name: c.name.clone(),
                     max_hp: c.max_hp,
-                    skills: c.skills.iter().map(|s| types::SkillRef {
-                        id: s.id.clone(),
-                        name: s.name.clone(),
+                    skills: c.skills.iter().map(|sid| {
+                        let sk = skills::get_skill(sid);
+                        types::SkillRef {
+                            id: sid.clone(),
+                            name: sk.map_or(sid.clone(), |s| s.name.clone()),
+                        }
                     }).collect(),
                 }
             }).collect();

@@ -471,11 +471,11 @@ pub fn get_player_view(
     let opp_skills: Vec<SkillView> = opp_char
         .as_ref()
         .map(|c| {
-            c.skills.iter().map(|s| {
-                let sk = get_skill(&s.id);
+            c.skills.iter().map(|sid| {
+                let sk = get_skill(sid);
                 SkillView {
-                    id: s.id.clone(),
-                    name: sk.as_ref().map_or(s.name.clone(), |sk| sk.name.clone()),
+                    id: sid.clone(),
+                    name: sk.as_ref().map_or(sid.clone(), |sk| sk.name.clone()),
                     skill_type: sk.map_or("active".into(), |sk| match sk.skill_type {
                         crate::types::SkillType::Active => "active",
                         crate::types::SkillType::Passive => "passive",
@@ -501,11 +501,11 @@ pub fn get_player_view(
     let my_skills: Vec<SkillView> = my_char
         .as_ref()
         .map(|c| {
-            c.skills.iter().map(|s| {
-                let sk = get_skill(&s.id);
+            c.skills.iter().map(|sid| {
+                let sk = get_skill(sid);
                 SkillView {
-                    id: s.id.clone(),
-                    name: sk.as_ref().map_or(s.name.clone(), |sk| sk.name.clone()),
+                    id: sid.clone(),
+                    name: sk.as_ref().map_or(sid.clone(), |sk| sk.name.clone()),
                     skill_type: sk.map_or("active".into(), |sk| match sk.skill_type {
                         crate::types::SkillType::Active => "active",
                         crate::types::SkillType::Passive => "passive",

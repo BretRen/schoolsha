@@ -54,8 +54,8 @@ pub fn mount_passive_skills(
         None => return unsubs,
     };
 
-    for skill_ref in &character.skills {
-        let skill = match get_skill(&skill_ref.id) {
+    for skill_id in &character.skills {
+        let skill = match get_skill(skill_id) {
             Some(s) => s,
             None => continue,
         };
@@ -64,7 +64,7 @@ pub fn mount_passive_skills(
         }
 
         if let Some(ref trigger) = skill.trigger {
-            if trigger.event == "draw_card" {
+            if trigger.event.as_deref() == Some("draw_card") {
                 let pid = player_idx;
                 let sid = skill.id.clone();
                 let handler: crate::events::EventHandlerFn = Box::new(
@@ -94,8 +94,8 @@ pub fn get_hand_limit(state: &GameState, player_idx: usize, char_id: &str) -> us
     };
 
     let bonus: i32 = 0;
-    for skill_ref in &character.skills {
-        let skill = match get_skill(&skill_ref.id) {
+    for skill_id in &character.skills {
+        let skill = match get_skill(skill_id) {
             Some(s) => s,
             None => continue,
         };
@@ -120,7 +120,7 @@ pub fn try_use_skill(
     skill_id: &str,
 ) -> Result<(), String> {
     let character = get_character(char_id).ok_or("你没有这个角色")?;
-    if !character.skills.iter().any(|s| s.id == skill_id) {
+    if !character.skills.contains(&skill_id.to_string()) {
         return Err("你没有这个技能".to_string());
     }
 
@@ -150,11 +150,13 @@ pub fn try_use_skill(
 
     // 检查阶段
     if let Some(ref trigger) = skill.trigger {
-        if let Some(ref phase) = trigger.condition {
-            // TS checks skill.trigger.phase against state.phase
-            // In our struct SkillTrigger has condition, not phase directly
-            // Skip this check for now — the TS trigger.phase is used differently
-            _ = phase;
+        if let Some(ref phase_str) = trigger.phase {
+            let expected: &str = phase_str;
+            if (expected == "play" && state.phase != crate::types::Phase::Play)
+                || (expected == "draw" && state.phase != crate::types::Phase::Draw)
+            {
+                return Err("不在正确的阶段".to_string());
+            }
         }
     }
 
@@ -282,12 +284,14 @@ pub fn execute_skill_effect(state: &mut GameState, player_idx: usize, skill_id: 
             if state.players[target].hp < 0 {
                 state.players[target].hp = 0;
             }
-            // emit damage event
             if state.players[target].hp <= 0 && !state.game_over {
                 state.players[target].alive = false;
                 state.game_over = true;
                 state.winner = Some(player_idx);
             }
+        }
+        SkillEffect::HandLimitBonus { .. } => {
+            // Handled by get_hand_limit, no runtime action needed
         }
     }
 }

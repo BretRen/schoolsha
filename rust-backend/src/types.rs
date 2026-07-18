@@ -267,7 +267,8 @@ pub enum SkillType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillTrigger {
-    pub event: String,
+    pub event: Option<String>,
+    pub phase: Option<String>,
     #[serde(default)]
     pub condition: Option<String>,
 }
@@ -279,10 +280,12 @@ pub enum SkillEffect {
     Damage { amount: u32 },
     #[serde(rename = "heal")]
     SkillHeal { amount: u32 },
-    #[serde(rename = "draw")]
+    #[serde(rename = "draw_cards")]
     SkillDraw { count: u32 },
     #[serde(rename = "force_discard")]
     ForceDiscard { count: u32 },
+    #[serde(rename = "hand_limit_bonus")]
+    HandLimitBonus { amount: i32 },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -301,7 +304,7 @@ pub struct CharacterDef {
     pub name: String,
     #[serde(rename = "maxHp")]
     pub max_hp: i32,
-    pub skills: Vec<SkillRef>,
+    pub skills: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

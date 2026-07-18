@@ -11,7 +11,10 @@ function buildWsUrl(path) {
 
 function connect(wsUrl) {
   const store = Alpine.store("g");
-  if (store.ws) store.ws.close();
+  if (store.ws) {
+    if (store.ws.readyState === WebSocket.OPEN) store.ws.close();
+    store.ws = null;
+  }
   store.ws = new WebSocket(wsUrl);
   store.selectedCards = {};
   store.blocked = false;
